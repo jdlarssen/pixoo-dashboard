@@ -11,13 +11,13 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **DISP-01**: Full-frame custom rendering via PIL/Pillow pushed to Pixoo 64
 - [x] **DISP-02**: Pixel font rendering with Norwegian character support (æøå)
-- [ ] **DISP-03**: Single-screen layout — all info zones on 64x64, readable at a glance
+- [x] **DISP-03**: Single-screen layout — all info zones on 64x64, readable at a glance
 - [ ] **DISP-04**: Auto-brightness based on time of day
 
 ### Clock
 
-- [ ] **CLCK-01**: Display current time in large, readable digits
-- [ ] **CLCK-02**: Display today's date in Norwegian (e.g. "tor 20. feb")
+- [x] **CLCK-01**: Display current time in large, readable digits
+- [x] **CLCK-02**: Display today's date in Norwegian (e.g. "tor 20. feb")
 
 ### Bus
 
@@ -90,10 +90,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | DISP-01 | Phase 1 | Complete |
 | DISP-02 | Phase 1 | Complete |
-| DISP-03 | Phase 1 | Pending |
+| DISP-03 | Phase 1 | Complete |
 | DISP-04 | Phase 4 | Pending |
-| CLCK-01 | Phase 1 | Pending |
-| CLCK-02 | Phase 1 | Pending |
+| CLCK-01 | Phase 1 | Complete |
+| CLCK-02 | Phase 1 | Complete |
 | BUS-01 | Phase 2 | Pending |
 | BUS-02 | Phase 2 | Pending |
 | BUS-03 | Phase 2 | Pending |

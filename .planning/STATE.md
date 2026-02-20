@@ -5,32 +5,32 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** Glance at the display and instantly know: what time it is, when the next buses leave, and what the weather is doing -- without pulling out your phone.
-**Current focus:** Phase 1: Foundation
+**Current focus:** Phase 1: Foundation (Complete)
 
 ## Current Position
 
-Phase: 1 of 4 (Foundation)
-Plan: 1 of 2 in current phase
-Status: Executing
-Last activity: 2026-02-20 -- Completed 01-01-PLAN.md
+Phase: 1 of 4 (Foundation) -- COMPLETE
+Plan: 2 of 2 in current phase (all plans complete)
+Status: Phase complete -- ready for Phase 2 planning
+Last activity: 2026-02-20 -- Completed 01-02-PLAN.md
 
-Progress: [█░░░░░░░░░] 10%
+Progress: [██░░░░░░░░] 20%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: 4 min
-- Total execution time: 0.07 hours
+- Total plans completed: 2
+- Average duration: 12 min
+- Total execution time: 0.40 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-foundation | 1 | 4 min | 4 min |
+| 01-foundation | 2 | 24 min | 12 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (4 min)
+- Last 5 plans: 01-01 (4 min), 01-02 (20 min)
 - Trend: Starting
 
 *Updated after each plan completion*
@@ -47,6 +47,9 @@ Recent decisions affecting current work:
 - [01-01]: draw_image() accepts PIL Image objects directly -- no temp file needed for device push
 - [01-01]: SimulatorConfiguration imported from pixoo.configurations.simulatorconfiguration (not top-level pixoo import)
 - [01-01]: Converted font files (.pil/.pbm) gitignored -- regenerated from BDF at runtime
+- [01-02]: Norwegian day/month names use manual dictionaries instead of locale -- avoids system locale dependency
+- [01-02]: DisplayState equality drives dirty flag -- only re-renders when minute changes
+- [01-02]: Zone pixel budget: clock 14px, date 9px, divider 1px, bus 19px, divider 1px, weather 20px = 64px
 
 ### Pending Todos
 
@@ -60,5 +63,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 01-01-PLAN.md (project infrastructure)
+Stopped at: Completed 01-02-PLAN.md (clock dashboard -- Phase 1 complete)
 Resume file: None

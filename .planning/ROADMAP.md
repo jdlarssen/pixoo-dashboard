@@ -12,7 +12,7 @@ Divoom Hub delivers an always-on entryway dashboard on a 64x64 LED pixel display
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation** - Device driver, render engine, pixel layout, and clock/date on the Pixoo 64
+- [x] **Phase 1: Foundation** - Device driver, render engine, pixel layout, and clock/date on the Pixoo 64
 - [ ] **Phase 2: Bus Departures** - Live Entur transit data for Ladeveien in both directions
 - [ ] **Phase 3: Weather** - Yr/MET weather data with pixel art icons
 - [ ] **Phase 4: Polish and Reliability** - Urgency coloring, brightness, error handling, service wrapper, and push messages
@@ -32,8 +32,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Project scaffolding, BDF font system, and Pixoo device client
-- [ ] 01-02-PLAN.md — Norwegian clock, zone layout, renderer, main loop, and device verification
+- [x] 01-01-PLAN.md — Project scaffolding, BDF font system, and Pixoo device client
+- [x] 01-02-PLAN.md — Norwegian clock, zone layout, renderer, main loop, and device verification
 
 ### Phase 2: Bus Departures
 **Goal**: Real-time bus departures from Ladeveien (both directions) populate the bus zone, refreshing every 60 seconds
@@ -85,7 +85,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/2 | Planned | - |
+| 1. Foundation | 2/2 | Complete | 2026-02-20 |
 | 2. Bus Departures | 0/? | Not started | - |
 | 3. Weather | 0/? | Not started | - |
 | 4. Polish and Reliability | 0/? | Not started | - |
