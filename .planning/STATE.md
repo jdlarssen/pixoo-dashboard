@@ -10,29 +10,29 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 2 of 4 (Bus Departures)
-Plan: 1 of 2 in current phase
-Status: Executing Phase 2 -- Plan 01 complete
-Last activity: 2026-02-20 -- Completed 02-01-PLAN.md
+Plan: 2 of 2 in current phase
+Status: Executing Phase 2 -- Plan 02 complete (all plans done)
+Last activity: 2026-02-20 -- Completed 02-02-PLAN.md
 
-Progress: [███░░░░░░░] 30%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 9 min
-- Total execution time: 0.45 hours
+- Total plans completed: 4
+- Average duration: 10 min
+- Total execution time: 0.65 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-foundation | 2 | 24 min | 12 min |
-| 02-bus-departures | 1 | 3 min | 3 min |
+| 02-bus-departures | 2 | 15 min | 7.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (4 min), 01-02 (20 min), 02-01 (3 min)
-- Trend: Accelerating
+- Last 5 plans: 01-01 (4 min), 01-02 (20 min), 02-01 (3 min), 02-02 (12 min)
+- Trend: Consistent
 
 *Updated after each plan completion*
 
@@ -54,6 +54,10 @@ Recent decisions affecting current work:
 - [02-01]: Quay IDs from Entur: NSR:Quay:73154 (Sentrum) and NSR:Quay:73152 (Lade/Strindheim)
 - [02-01]: DisplayState bus fields use tuples (not lists) to preserve hashability for dirty flag
 - [02-01]: fetch_departures_safe returns list[int] | None -- simplified for renderer consumption
+- [02-02]: Arrow directions match actual travel: <S (Sentrum leftward), >L (Lade rightward)
+- [02-02]: 3 departures per direction (user feedback) -- more useful for planning
+- [02-02]: Cancelled departures filtered silently -- request extra from API, skip cancelled entries
+- [02-02]: Bus zone uses 5x8 font for countdown numbers; zone-renderer-helper pattern established
 
 ### Pending Todos
 
@@ -67,5 +71,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 02-01-PLAN.md (bus data provider -- Plan 1 of Phase 2 complete)
+Stopped at: Completed 02-02-PLAN.md (bus zone renderer -- all Phase 2 plans complete, pending verification)
 Resume file: None
