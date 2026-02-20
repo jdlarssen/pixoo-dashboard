@@ -76,8 +76,9 @@ def main_loop(
     Checks time every iteration. Pushes a frame when the display state
     changes or when the weather animation ticks a new frame.
 
-    When weather animation is active, the loop runs at ~4 FPS (0.25s sleep)
-    to produce smooth animation. Otherwise it sleeps 1 second.
+    When weather animation is active, the loop runs at ~3 FPS (0.35s sleep)
+    to produce smooth animation while staying above the device's 0.3s rate
+    limit (prevents frame drops from timing jitter). Otherwise it sleeps 1 second.
 
     Args:
         client: Pixoo device client for pushing frames.
@@ -149,8 +150,8 @@ def main_loop(
                 logger.info("Pushed frame: %s %s", current_state.time_str, current_state.date_str)
             needs_push = False
 
-        # Sleep: 0.25s when animation is active (4 FPS), 1s otherwise
-        sleep_time = 0.25 if weather_anim is not None else 1.0
+        # Sleep: 0.35s when animation is active (~3 FPS), 1s otherwise
+        sleep_time = 0.35 if weather_anim is not None else 1.0
         time.sleep(sleep_time)
 
 

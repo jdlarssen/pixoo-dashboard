@@ -126,15 +126,12 @@ def render_weather_zone(
 
     # Composite animation background if available
     if anim_frame is not None:
-        # Paste RGBA overlay onto the RGB image at the weather zone position
-        img.paste(
-            Image.alpha_composite(
-                Image.new("RGBA", anim_frame.size, (0, 0, 0, 255)),
-                anim_frame,
-            ).convert("RGB"),
-            (0, zone_y),
-            mask=anim_frame.split()[3],  # use alpha channel as mask
-        )
+        # Single-pass alpha composite: extract the zone region, composite once, paste back.
+        # Previous code applied alpha twice (alpha_composite + paste mask), squashing
+        # effective opacity from ~20% to ~4% -- invisible on LED hardware.
+        zone_region = img.crop((0, zone_y, anim_frame.width, zone_y + anim_frame.height)).convert("RGBA")
+        composited = Image.alpha_composite(zone_region, anim_frame)
+        img.paste(composited.convert("RGB"), (0, zone_y))
 
     if state.weather_temp is None:
         # No weather data -- show placeholder

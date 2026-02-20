@@ -15,7 +15,7 @@ class PixooClient:
 
     Provides:
     - Connection refresh to prevent the ~300-push lockup (enabled by default in pixoo lib)
-    - Rate-limited frame pushing (minimum 1 second between pushes)
+    - Rate-limited frame pushing (minimum 0.3s between pushes, ~3 FPS max)
     - Brightness control capped at MAX_BRIGHTNESS (90%)
     - Simulator mode for development without hardware
     """
@@ -50,8 +50,9 @@ class PixooClient:
     def push_frame(self, image: Image.Image) -> None:
         """Push a PIL Image frame to the device.
 
-        Enforces a minimum 1-second interval between pushes. If called
-        too soon after the last push, the call is skipped with a warning.
+        Enforces a minimum 0.3-second (300ms) interval between pushes. The
+        Pixoo 64 handles ~3 FPS over HTTP reliably. If called too soon after
+        the last push, the call is skipped with a warning.
 
         Args:
             image: A PIL RGB Image (should be 64x64 for Pixoo 64).
@@ -59,9 +60,9 @@ class PixooClient:
         now = time.monotonic()
         elapsed = now - self._last_push_time
 
-        if self._last_push_time > 0 and elapsed < 1.0:
+        if self._last_push_time > 0 and elapsed < 0.3:
             logger.warning(
-                "Push skipped: only %.2fs since last push (minimum 1s interval)", elapsed
+                "Push skipped: only %.2fs since last push (minimum 0.3s interval)", elapsed
             )
             return
 
