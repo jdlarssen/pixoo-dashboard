@@ -27,6 +27,6 @@ MAX_BRIGHTNESS = 90  # cap at 90% -- full brightness can crash device
 BUS_QUAY_DIRECTION1 = os.environ.get("BUS_QUAY_DIR1", "NSR:Quay:73154")
 BUS_QUAY_DIRECTION2 = os.environ.get("BUS_QUAY_DIR2", "NSR:Quay:73152")
 BUS_REFRESH_INTERVAL = 60  # seconds between bus API fetches
-BUS_NUM_DEPARTURES = 2  # number of departures to show per direction
+BUS_NUM_DEPARTURES = 3  # number of departures to show per direction
 ET_CLIENT_NAME = os.environ.get("ET_CLIENT_NAME", "jdl-divoomhub")
 ENTUR_API_URL = "https://api.entur.io/journey-planner/v3/graphql"

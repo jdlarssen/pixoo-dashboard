@@ -31,12 +31,14 @@ def _make_call(
     realtime: bool = True,
     front_text: str = "Sentrum",
     line_code: str = "4",
+    cancellation: bool = False,
 ) -> dict:
     """Build a single estimatedCall dict matching Entur response format."""
     return {
         "expectedDepartureTime": dep_time.isoformat(),
         "aimedDepartureTime": dep_time.isoformat(),
         "realtime": realtime,
+        "cancellation": cancellation,
         "destinationDisplay": {"frontText": front_text},
         "serviceJourney": {"line": {"publicCode": line_code}},
     }
@@ -114,6 +116,82 @@ class TestCountdownCalculation:
         result = fetch_departures("NSR:Quay:73154", num_departures=1)
 
         assert result[0].minutes == 0
+
+
+# --- Cancellation filtering tests ---
+
+
+class TestCancellationFiltering:
+    """Test that cancelled departures are filtered out."""
+
+    @patch("src.providers.bus.requests.post")
+    @patch("src.providers.bus.datetime")
+    def test_cancelled_departures_are_skipped(self, mock_dt, mock_post):
+        """Cancelled departures are excluded from results."""
+        now = datetime(2026, 2, 20, 14, 0, 0, tzinfo=timezone.utc)
+        mock_dt.now.return_value = now
+        mock_dt.fromisoformat = datetime.fromisoformat
+
+        dep1 = now + timedelta(minutes=5)
+        dep2 = now + timedelta(minutes=10)  # cancelled
+        dep3 = now + timedelta(minutes=15)
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = _make_entur_response([
+            _make_call(dep1),
+            _make_call(dep2, cancellation=True),
+            _make_call(dep3),
+        ])
+        mock_response.raise_for_status = MagicMock()
+        mock_post.return_value = mock_response
+
+        result = fetch_departures("NSR:Quay:73154", num_departures=3)
+
+        assert len(result) == 2
+        assert result[0].minutes == 5
+        assert result[1].minutes == 15
+
+    @patch("src.providers.bus.requests.post")
+    @patch("src.providers.bus.datetime")
+    def test_all_cancelled_returns_empty(self, mock_dt, mock_post):
+        """If all departures are cancelled, return empty list."""
+        now = datetime(2026, 2, 20, 14, 0, 0, tzinfo=timezone.utc)
+        mock_dt.now.return_value = now
+        mock_dt.fromisoformat = datetime.fromisoformat
+
+        dep1 = now + timedelta(minutes=5)
+        dep2 = now + timedelta(minutes=10)
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = _make_entur_response([
+            _make_call(dep1, cancellation=True),
+            _make_call(dep2, cancellation=True),
+        ])
+        mock_response.raise_for_status = MagicMock()
+        mock_post.return_value = mock_response
+
+        result = fetch_departures("NSR:Quay:73154", num_departures=3)
+
+        assert result == []
+
+    @patch("src.providers.bus.requests.post")
+    @patch("src.providers.bus.datetime")
+    def test_result_limited_to_num_departures(self, mock_dt, mock_post):
+        """Non-cancelled results are capped at num_departures."""
+        now = datetime(2026, 2, 20, 14, 0, 0, tzinfo=timezone.utc)
+        mock_dt.now.return_value = now
+        mock_dt.fromisoformat = datetime.fromisoformat
+
+        calls = [_make_call(now + timedelta(minutes=i * 5)) for i in range(6)]
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = _make_entur_response(calls)
+        mock_response.raise_for_status = MagicMock()
+        mock_post.return_value = mock_response
+
+        result = fetch_departures("NSR:Quay:73154", num_departures=3)
+
+        assert len(result) == 3
 
 
 # --- Response parsing tests ---
@@ -229,14 +307,14 @@ class TestDisplayStateBusFields:
         s1 = DisplayState(
             time_str="14:00",
             date_str="tor 20. feb",
-            bus_direction1=(5, 12),
-            bus_direction2=(3, 8),
+            bus_direction1=(5, 12, 25),
+            bus_direction2=(3, 8, 18),
         )
         s2 = DisplayState(
             time_str="14:00",
             date_str="tor 20. feb",
-            bus_direction1=(5, 12),
-            bus_direction2=(3, 8),
+            bus_direction1=(5, 12, 25),
+            bus_direction2=(3, 8, 18),
         )
         assert s1 == s2
 
@@ -245,14 +323,14 @@ class TestDisplayStateBusFields:
         s1 = DisplayState(
             time_str="14:00",
             date_str="tor 20. feb",
-            bus_direction1=(5, 12),
-            bus_direction2=(3, 8),
+            bus_direction1=(5, 12, 25),
+            bus_direction2=(3, 8, 18),
         )
         s2 = DisplayState(
             time_str="14:00",
             date_str="tor 20. feb",
-            bus_direction1=(4, 11),
-            bus_direction2=(3, 8),
+            bus_direction1=(4, 11, 24),
+            bus_direction2=(3, 8, 18),
         )
         assert s1 != s2
 
@@ -265,11 +343,11 @@ class TestDisplayStateBusFields:
     def test_from_now_with_bus_data(self):
         """from_now() converts bus data lists to tuples."""
         dt = datetime(2026, 2, 20, 14, 0, 0)
-        bus_data = ([5, 12], [3, 8])
+        bus_data = ([5, 12, 25], [3, 8, 18])
         state = DisplayState.from_now(dt, bus_data=bus_data)
 
-        assert state.bus_direction1 == (5, 12)
-        assert state.bus_direction2 == (3, 8)
+        assert state.bus_direction1 == (5, 12, 25)
+        assert state.bus_direction2 == (3, 8, 18)
         assert isinstance(state.bus_direction1, tuple)
         assert isinstance(state.bus_direction2, tuple)
 

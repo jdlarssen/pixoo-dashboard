@@ -2,6 +2,7 @@
 
 from PIL import Image, ImageDraw
 
+from src.config import BUS_NUM_DEPARTURES
 from src.display.layout import (
     BUS_ZONE,
     CLOCK_ZONE,
@@ -42,11 +43,11 @@ def render_bus_zone(
     """
     font = fonts["small"]  # 5x8 for better readability of countdown numbers
 
-    # Direction 1 (Sentrum) -- top line
-    _draw_bus_line(draw, TEXT_X, BUS_ZONE.y + 1, ">S", state.bus_direction1, COLOR_BUS_DIR1, font)
+    # Direction 1 (Sentrum) -- top line, arrow points left (towards city center)
+    _draw_bus_line(draw, TEXT_X, BUS_ZONE.y + 1, "<S", state.bus_direction1, COLOR_BUS_DIR1, font)
 
-    # Direction 2 (Lade) -- bottom line
-    _draw_bus_line(draw, TEXT_X, BUS_ZONE.y + 10, "<L", state.bus_direction2, COLOR_BUS_DIR2, font)
+    # Direction 2 (Lade) -- bottom line, arrow points right (towards Lade/Strindheim)
+    _draw_bus_line(draw, TEXT_X, BUS_ZONE.y + 10, ">L", state.bus_direction2, COLOR_BUS_DIR2, font)
 
 
 def _draw_bus_line(
@@ -78,10 +79,10 @@ def _draw_bus_line(
 
     # Format countdown numbers
     if departures is None:
-        time_str = "-- --"
+        time_str = " ".join(["--"] * BUS_NUM_DEPARTURES)
     else:
         parts = []
-        for i in range(2):
+        for i in range(BUS_NUM_DEPARTURES):
             if i < len(departures):
                 parts.append(str(departures[i]))
             else:

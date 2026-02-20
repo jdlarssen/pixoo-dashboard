@@ -111,8 +111,8 @@ class TestBusZoneRendering:
         state = DisplayState(
             time_str="14:32",
             date_str="lor 21. mar",
-            bus_direction1=(5, 12),
-            bus_direction2=(3, 8),
+            bus_direction1=(5, 12, 25),
+            bus_direction2=(3, 8, 18),
         )
         frame = render_frame(state, FONTS)
         assert _has_non_black_pixels(frame, 24, 43), (
@@ -180,8 +180,8 @@ class TestBusZoneRendering:
         state = DisplayState(
             time_str="14:32",
             date_str="lor 21. mar",
-            bus_direction1=(120, 180),
-            bus_direction2=(65, 90),
+            bus_direction1=(120, 180, 240),
+            bus_direction2=(65, 90, 120),
         )
         frame = render_frame(state, FONTS)
         assert isinstance(frame, Image.Image)
@@ -193,8 +193,8 @@ class TestBusZoneRendering:
         state = DisplayState(
             time_str="14:32",
             date_str="lor 21. mar",
-            bus_direction1=(5, 12),
-            bus_direction2=(3, 8),
+            bus_direction1=(5, 12, 25),
+            bus_direction2=(3, 8, 18),
         )
         frame = render_frame(state, FONTS)
         assert frame.size == (64, 64)
@@ -205,8 +205,8 @@ class TestBusZoneRendering:
         state = DisplayState(
             time_str="14:32",
             date_str="lor 21. mar",
-            bus_direction1=(5, 12),
-            bus_direction2=(3, 8),
+            bus_direction1=(5, 12, 25),
+            bus_direction2=(3, 8, 18),
         )
         frame = render_frame(state, FONTS)
         output_path = Path("/tmp/test_dashboard_bus.png")

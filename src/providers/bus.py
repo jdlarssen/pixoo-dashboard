@@ -31,6 +31,7 @@ DEPARTURE_QUERY = """{
       expectedDepartureTime
       aimedDepartureTime
       realtime
+      cancellation
       destinationDisplay {
         frontText
       }
@@ -70,7 +71,8 @@ def fetch_departures(
         requests.HTTPError: If the API returns a non-2xx status.
         KeyError: If the response structure is unexpected.
     """
-    query = DEPARTURE_QUERY % (quay_id, num_departures)
+    # Request extra departures to compensate for cancelled ones being filtered out
+    query = DEPARTURE_QUERY % (quay_id, num_departures + 3)
 
     response = requests.post(
         ENTUR_API_URL,
@@ -86,6 +88,8 @@ def fetch_departures(
 
     departures = []
     for call in calls:
+        if call.get("cancellation", False):
+            continue  # Skip cancelled departures
         dep_time = datetime.fromisoformat(call["expectedDepartureTime"])
         minutes = int((dep_time - now).total_seconds() / 60)
         departures.append(
@@ -97,7 +101,7 @@ def fetch_departures(
             )
         )
 
-    return departures
+    return departures[:num_departures]
 
 
 def fetch_departures_safe(
