@@ -6,6 +6,9 @@ from src.config import BUS_NUM_DEPARTURES
 from src.display.layout import (
     BUS_ZONE,
     CLOCK_ZONE,
+    COLOR_BIRTHDAY_ACCENT,
+    COLOR_BIRTHDAY_CROWN,
+    COLOR_BIRTHDAY_GOLD,
     COLOR_BUS_DIR1,
     COLOR_BUS_DIR2,
     COLOR_DATE,
@@ -287,6 +290,60 @@ def _wrap_text(text: str, font, max_width: int) -> list[str]:
     return lines
 
 
+def _draw_birthday_crown(draw: ImageDraw.ImageDraw) -> None:
+    """Draw a small 5x5 pixel crown icon at top-right of clock zone.
+
+    Crown pattern (5x5, starting at x=58, y=0):
+      . * . * .
+      . * * * .
+      * * * * *
+      * * * * *
+      * . . . *
+
+    Args:
+        draw: PIL ImageDraw instance.
+    """
+    cx, cy = 58, 0
+    c = COLOR_BIRTHDAY_CROWN
+    # Row 0: points at columns 1, 3
+    draw.point((cx + 1, cy + 0), fill=c)
+    draw.point((cx + 3, cy + 0), fill=c)
+    # Row 1: columns 1, 2, 3
+    draw.point((cx + 1, cy + 1), fill=c)
+    draw.point((cx + 2, cy + 1), fill=c)
+    draw.point((cx + 3, cy + 1), fill=c)
+    # Row 2: full row
+    for i in range(5):
+        draw.point((cx + i, cy + 2), fill=c)
+    # Row 3: full row
+    for i in range(5):
+        draw.point((cx + i, cy + 3), fill=c)
+    # Row 4: columns 0, 4 (feet of crown)
+    draw.point((cx + 0, cy + 4), fill=c)
+    draw.point((cx + 4, cy + 4), fill=c)
+
+
+def _draw_birthday_sparkles(draw: ImageDraw.ImageDraw, date_str: str) -> None:
+    """Draw deterministic sparkle pixels in the clock/date zone border area.
+
+    Uses hash of date_str for deterministic but varied positions to avoid
+    flicker between frames.
+
+    Args:
+        draw: PIL ImageDraw instance.
+        date_str: Current date string (used for deterministic position hash).
+    """
+    h = hash(date_str)
+    sparkle_positions = [
+        (abs(h) % 20 + 35, 0),        # top area, right of center
+        (abs(h >> 4) % 15 + 2, 10),    # bottom of clock zone
+        (abs(h >> 8) % 25 + 35, 18),   # near divider 1
+    ]
+    for x, y in sparkle_positions:
+        if 0 <= x < 64 and 0 <= y < 64:
+            draw.point((x, y), fill=(255, 255, 255))
+
+
 def render_frame(
     state: DisplayState,
     fonts: dict,
@@ -309,12 +366,16 @@ def render_frame(
     img = Image.new("RGB", (64, 64), color=(0, 0, 0))
     draw = ImageDraw.Draw(img)
 
+    # Birthday color overrides -- golden clock, pink date on special days
+    time_color = COLOR_BIRTHDAY_GOLD if state.is_birthday else COLOR_TIME
+    date_color = COLOR_BIRTHDAY_ACCENT if state.is_birthday else COLOR_DATE
+
     # Clock time -- small font for compact 11px zone (still readable on LED)
     draw.text(
         (TEXT_X, CLOCK_ZONE.y + 1),
         state.time_str,
         font=fonts["small"],
-        fill=COLOR_TIME,
+        fill=time_color,
     )
 
     # Weather icon next to clock (right of time digits)
@@ -328,13 +389,21 @@ def render_frame(
         if icon_x + icon.width <= 64:
             img.paste(icon.convert("RGB"), (icon_x, icon_y), mask=icon.split()[3])
 
-    # Date -- smaller dim white text
+    # Birthday crown icon in top-right corner
+    if state.is_birthday:
+        _draw_birthday_crown(draw)
+
+    # Date -- smaller text with color override on birthdays
     draw.text(
         (TEXT_X, DATE_ZONE.y),
         state.date_str,
         font=fonts["small"],
-        fill=COLOR_DATE,
+        fill=date_color,
     )
+
+    # Birthday sparkle pixels -- deterministic positions based on date
+    if state.is_birthday:
+        _draw_birthday_sparkles(draw, state.date_str)
 
     # Divider line 1 (between date and bus zone)
     draw.line(

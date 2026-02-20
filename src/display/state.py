@@ -33,6 +33,8 @@ class DisplayState:
     weather_is_day: bool = True              # day/night from symbol_code
     # Message override from Discord bot
     message_text: str | None = None          # persistent message text, or None
+    # Birthday easter egg
+    is_birthday: bool = False                # True on March 17 or December 16
     # Staleness flags for graceful error states
     bus_stale: bool = False                  # bus data is aging (>180s) but still usable
     bus_too_old: bool = False                # bus data too old (>600s) -- show dashes
@@ -79,12 +81,16 @@ class DisplayState:
                 "weather_is_day": weather_data.is_day,
             }
 
+        # Birthday easter egg: March 17 or December 16
+        is_birthday = (dt.month == 3 and dt.day == 17) or (dt.month == 12 and dt.day == 16)
+
         return cls(
             time_str=format_time(dt),
             date_str=format_date_norwegian(dt),
             bus_direction1=tuple(bus_data[0]) if bus_data[0] else None,
             bus_direction2=tuple(bus_data[1]) if bus_data[1] else None,
             message_text=message_text,
+            is_birthday=is_birthday,
             bus_stale=bus_stale,
             bus_too_old=bus_too_old,
             weather_stale=weather_stale,

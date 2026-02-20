@@ -60,6 +60,11 @@ COLOR_WEATHER_TEMP_NEG = (100, 180, 255)   # Brighter blue for negative temperat
 COLOR_WEATHER_HILO = (120, 180, 160)       # Soft teal for high/low text (not grey)
 COLOR_WEATHER_RAIN = (50, 180, 255)        # Vivid blue for rain indicator text
 
+# Birthday easter egg colors (March 17, December 16)
+COLOR_BIRTHDAY_GOLD = (255, 200, 50)       # Golden festive color for clock text
+COLOR_BIRTHDAY_CROWN = (255, 215, 0)       # Crown/star icon color
+COLOR_BIRTHDAY_ACCENT = (255, 100, 150)    # Pink accent for date text
+
 # Text positioning
 TEXT_X = 2  # 2px left padding for all text
 
