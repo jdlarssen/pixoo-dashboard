@@ -43,6 +43,15 @@ COLOR_BUS_DIR1 = (100, 200, 255)   # Light blue for Sentrum direction (arrow+let
 COLOR_BUS_DIR2 = (255, 180, 50)    # Amber/orange for Lade direction (arrow+letter)
 COLOR_BUS_TIME = (255, 255, 255)   # White for departure countdown numbers
 
+# Bus urgency colors (applied to countdown numbers per departure)
+COLOR_URGENCY_GREEN = (50, 255, 50)      # >10 min -- plenty of time
+COLOR_URGENCY_YELLOW = (255, 200, 0)     # 5-10 min -- hurry
+COLOR_URGENCY_RED = (255, 50, 50)        # <5 min -- imminent
+COLOR_URGENCY_DIMMED = (80, 80, 80)      # <2 min -- bus has effectively left
+
+# Staleness indicator
+COLOR_STALE_INDICATOR = (255, 100, 0)    # Orange dot for stale data
+
 # Weather zone colors
 COLOR_WEATHER_TEMP = (255, 255, 255)       # White for positive temperatures
 COLOR_WEATHER_TEMP_NEG = (100, 160, 255)   # Blue for negative temperatures (no minus sign)
@@ -51,3 +60,28 @@ COLOR_WEATHER_RAIN = (80, 160, 255)        # Blue tint for rain indicator text
 
 # Text positioning
 TEXT_X = 2  # 2px left padding for all text
+
+
+def urgency_color(minutes: int) -> tuple[int, int, int]:
+    """Return RGB color for a bus departure based on urgency.
+
+    Thresholds per user decision:
+    - Green: >10 min (plenty of time)
+    - Yellow: 5-10 min (hurry)
+    - Red: <5 min (imminent)
+    - Dimmed: <2 min (bus has effectively left)
+
+    Args:
+        minutes: Countdown minutes until departure.
+
+    Returns:
+        RGB color tuple for the departure number.
+    """
+    if minutes < 2:
+        return COLOR_URGENCY_DIMMED
+    elif minutes < 5:
+        return COLOR_URGENCY_RED
+    elif minutes <= 10:
+        return COLOR_URGENCY_YELLOW
+    else:
+        return COLOR_URGENCY_GREEN

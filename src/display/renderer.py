@@ -8,10 +8,10 @@ from src.display.layout import (
     CLOCK_ZONE,
     COLOR_BUS_DIR1,
     COLOR_BUS_DIR2,
-    COLOR_BUS_TIME,
     COLOR_DATE,
     COLOR_DIVIDER,
     COLOR_PLACEHOLDER,
+    COLOR_STALE_INDICATOR,
     COLOR_TIME,
     COLOR_WEATHER_HILO,
     COLOR_WEATHER_RAIN,
@@ -22,6 +22,7 @@ from src.display.layout import (
     DIVIDER_2,
     TEXT_X,
     WEATHER_ZONE,
+    urgency_color,
 )
 from src.display.state import DisplayState
 from src.display.weather_icons import get_weather_icon
@@ -64,7 +65,11 @@ def _draw_bus_line(
     label_color: tuple[int, int, int],
     font,
 ) -> None:
-    """Draw a single bus direction line with colored label and white times.
+    """Draw a single bus direction line with colored label and urgency-colored times.
+
+    Each departure countdown number is drawn individually with its own urgency
+    color based on the minute value (green >10, yellow 5-10, red <5, dimmed <2).
+    Direction labels retain their original colors per user decision.
 
     Args:
         draw: PIL ImageDraw instance.
@@ -75,29 +80,38 @@ def _draw_bus_line(
         label_color: RGB color for the direction label.
         font: PIL font to use.
     """
-    # Draw label in direction color
+    # Draw label in direction color (unchanged -- user decision)
     draw.text((x, y), label, font=font, fill=label_color)
 
     # Calculate label width to position countdown numbers after it
     label_bbox = font.getbbox(label)
     label_width = label_bbox[2] - label_bbox[0] if label_bbox else len(label) * 6
 
-    # Format countdown numbers
-    if departures is None:
-        time_str = " ".join(["--"] * BUS_NUM_DEPARTURES)
-    else:
-        parts = []
-        for i in range(BUS_NUM_DEPARTURES):
-            if i < len(departures):
-                parts.append(str(departures[i]))
-            else:
-                parts.append("--")
-        time_str = " ".join(parts)
+    # Starting x position for countdown numbers
+    cursor_x = x + label_width + 4  # 4px gap between label and times
 
-    # Draw countdown numbers in white, with spacing after label
-    time_x = x + label_width + 4  # 4px gap between label and times
-    time_color = COLOR_BUS_TIME if departures is not None else COLOR_PLACEHOLDER
-    draw.text((time_x, y), time_str, font=font, fill=time_color)
+    # Measure space character width for consistent spacing
+    space_bbox = font.getbbox(" ")
+    space_width = space_bbox[2] - space_bbox[0] if space_bbox else 3
+
+    # Draw each departure number individually with its own urgency color
+    for i in range(BUS_NUM_DEPARTURES):
+        if i > 0:
+            cursor_x += space_width  # space between numbers
+
+        if departures is not None and i < len(departures):
+            text = str(departures[i])
+            color = urgency_color(departures[i])
+        else:
+            text = "--"
+            color = COLOR_PLACEHOLDER
+
+        draw.text((cursor_x, y), text, font=font, fill=color)
+
+        # Advance cursor by text width
+        text_bbox = font.getbbox(text)
+        text_width = text_bbox[2] - text_bbox[0] if text_bbox else len(text) * 6
+        cursor_x += text_width
 
 
 def render_weather_zone(
