@@ -59,10 +59,11 @@ Plans:
   2. A pixel art weather icon (sun, clouds, rain, etc.) correctly represents current conditions
   3. Today's high and low temperatures are visible
   4. A rain indicator is shown when precipitation is expected
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 03-01: TBD
+- [ ] 03-01-PLAN.md -- Weather data provider (MET API client, config, DisplayState extension)
+- [ ] 03-02-PLAN.md -- Weather zone renderer with icons, animations, clock icon, and device verification
 
 ### Phase 4: Polish and Reliability
 **Goal**: The dashboard is production-quality for daily use with urgency coloring, adaptive brightness, robust error handling, supervised operation, and message override capability
