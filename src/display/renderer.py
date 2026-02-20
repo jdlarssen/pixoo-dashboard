@@ -35,7 +35,7 @@ def render_bus_zone(
 ) -> None:
     """Render the bus departure zone with two direction lines.
 
-    Layout within the 19px bus zone (y=24 to y=42):
+    Layout within the 19px bus zone (y=20 to y=38):
     - Line 1 (direction 1 / Sentrum): y = BUS_ZONE.y + 1 (1px top padding)
     - Line 2 (direction 2 / Lade): y = BUS_ZONE.y + 10 (1px gap after 8px line)
     - Total: 1px + 8px + 1px + 8px + 1px = 19px
@@ -123,9 +123,9 @@ def render_weather_zone(
 ) -> None:
     """Render the weather zone with temperature, high/low, and rain indicator.
 
-    Layout within the 20px weather zone (y=44 to y=63):
-    - Row 1 (y+1): Current temperature (large-ish) + rain indicator
-    - Row 2 (y+11): High/low temperatures in dim gray
+    Layout within the 24px weather zone (y=40 to y=63):
+    - Row 1 (y+1): Current temperature + rain indicator
+    - Row 2 (y+11): High/low temperatures in soft teal
 
     Animation background is composited first, then text drawn on top.
 
@@ -134,7 +134,7 @@ def render_weather_zone(
         img: The base RGB image (for compositing animation overlay).
         state: Current display state with weather data.
         fonts: Font dictionary with "small" (5x8) and "tiny" (4x6) keys.
-        anim_frame: Optional RGBA animation overlay (64x20).
+        anim_frame: Optional RGBA animation overlay (64x24).
     """
     zone_y = WEATHER_ZONE.y
 
@@ -213,7 +213,7 @@ def render_frame(
         state: Current display data (time string, date string).
         fonts: Dictionary with keys "large", "small", "tiny" mapping
                to PIL ImageFont objects.
-        anim_frame: Optional RGBA animation overlay for weather zone (64x20).
+        anim_frame: Optional RGBA animation overlay for weather zone (64x24).
 
     Returns:
         A 64x64 RGB PIL Image ready for pushing to the device.
@@ -221,21 +221,21 @@ def render_frame(
     img = Image.new("RGB", (64, 64), color=(0, 0, 0))
     draw = ImageDraw.Draw(img)
 
-    # Clock time -- large white digits
+    # Clock time -- small font for compact 11px zone (still readable on LED)
     draw.text(
-        (TEXT_X, CLOCK_ZONE.y),
+        (TEXT_X, CLOCK_ZONE.y + 1),
         state.time_str,
-        font=fonts["large"],
+        font=fonts["small"],
         fill=COLOR_TIME,
     )
 
     # Weather icon next to clock (right of time digits)
     if state.weather_symbol is not None:
-        time_bbox = fonts["large"].getbbox(state.time_str)
-        time_width = time_bbox[2] - time_bbox[0] if time_bbox else len(state.time_str) * 8
+        time_bbox = fonts["small"].getbbox(state.time_str)
+        time_width = time_bbox[2] - time_bbox[0] if time_bbox else len(state.time_str) * 6
         icon = get_weather_icon(state.weather_symbol, size=10)
         icon_x = TEXT_X + time_width + 2  # 2px gap after time text
-        icon_y = CLOCK_ZONE.y + 2  # slight vertical offset to center in clock zone
+        icon_y = CLOCK_ZONE.y + 1  # align with text in compact 11px clock zone
         # Only paste if icon fits within display width
         if icon_x + icon.width <= 64:
             img.paste(icon.convert("RGB"), (icon_x, icon_y), mask=icon.split()[3])

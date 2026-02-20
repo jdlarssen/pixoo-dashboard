@@ -89,12 +89,12 @@ class TestAnimationVisibility:
             f"Snow only has {non_transparent} non-transparent pixels -- particles too small"
         )
 
-    def test_all_frames_are_rgba_64x20(self):
-        """All animation frames must be 64x20 RGBA."""
+    def test_all_frames_are_rgba_64x24(self):
+        """All animation frames must be 64x24 RGBA."""
         for name in ["clear", "rain", "snow", "cloudy", "thunder", "fog"]:
             anim = get_animation(name)
             frame = anim.tick()
-            assert frame.size == (64, 20), f"{name} frame size {frame.size} != (64, 20)"
+            assert frame.size == (64, 24), f"{name} frame size {frame.size} != (64, 24)"
             assert frame.mode == "RGBA", f"{name} frame mode {frame.mode} != RGBA"
 
     def test_get_animation_returns_correct_types(self):

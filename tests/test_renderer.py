@@ -51,48 +51,48 @@ class TestRenderFrame:
         assert frame.mode == "RGB"
 
     def test_clock_region_has_pixels(self):
-        """Clock zone (y=0 to y=13) should contain non-black pixels (white text)."""
+        """Clock zone (y=0 to y=10) should contain non-black pixels (time text)."""
         frame = render_frame(TEST_STATE, FONTS)
-        assert _has_non_black_pixels(frame, 0, 14), (
-            "Clock zone (y=0..13) is all black -- no time text rendered"
+        assert _has_non_black_pixels(frame, 0, 11), (
+            "Clock zone (y=0..10) is all black -- no time text rendered"
         )
 
     def test_date_region_has_pixels(self):
-        """Date zone (y=14 to y=22) should contain non-black pixels."""
+        """Date zone (y=11 to y=18) should contain non-black pixels."""
         frame = render_frame(TEST_STATE, FONTS)
-        assert _has_non_black_pixels(frame, 14, 23), (
-            "Date zone (y=14..22) is all black -- no date text rendered"
+        assert _has_non_black_pixels(frame, 11, 19), (
+            "Date zone (y=11..18) is all black -- no date text rendered"
         )
 
     def test_divider_1_exists(self):
-        """Divider line at y=23 should have non-black pixels."""
+        """Divider line at y=19 should have non-black pixels."""
         frame = render_frame(TEST_STATE, FONTS)
-        assert _row_has_non_black_pixels(frame, 23), (
-            "Divider 1 at y=23 is all black -- no divider line drawn"
+        assert _row_has_non_black_pixels(frame, 19), (
+            "Divider 1 at y=19 is all black -- no divider line drawn"
         )
 
     def test_divider_2_exists(self):
-        """Divider line at y=43 should have non-black pixels."""
+        """Divider line at y=39 should have non-black pixels."""
         frame = render_frame(TEST_STATE, FONTS)
-        assert _row_has_non_black_pixels(frame, 43), (
-            "Divider 2 at y=43 is all black -- no divider line drawn"
+        assert _row_has_non_black_pixels(frame, 39), (
+            "Divider 2 at y=39 is all black -- no divider line drawn"
         )
 
     def test_bus_placeholder_has_pixels(self):
-        """Bus zone (y=24 to y=42) should contain placeholder text pixels.
+        """Bus zone (y=20 to y=38) should contain placeholder text pixels.
 
         Even with no bus data (None), the bus zone should render dashes.
         """
         frame = render_frame(TEST_STATE, FONTS)
-        assert _has_non_black_pixels(frame, 24, 43), (
-            "Bus zone (y=24..42) is all black -- no bus zone text rendered"
+        assert _has_non_black_pixels(frame, 20, 39), (
+            "Bus zone (y=20..38) is all black -- no bus zone text rendered"
         )
 
     def test_weather_placeholder_has_pixels(self):
-        """Weather zone (y=44 to y=63) should contain placeholder text pixels."""
+        """Weather zone (y=40 to y=63) should contain placeholder text pixels."""
         frame = render_frame(TEST_STATE, FONTS)
-        assert _has_non_black_pixels(frame, 44, 64), (
-            "Weather zone (y=44..63) is all black -- no placeholder text rendered"
+        assert _has_non_black_pixels(frame, 40, 64), (
+            "Weather zone (y=40..63) is all black -- no placeholder text rendered"
         )
 
     def test_save_test_dashboard(self):
@@ -115,8 +115,8 @@ class TestBusZoneRendering:
             bus_direction2=(3, 8, 18),
         )
         frame = render_frame(state, FONTS)
-        assert _has_non_black_pixels(frame, 24, 43), (
-            "Bus zone (y=24..42) is all black -- no bus data rendered"
+        assert _has_non_black_pixels(frame, 20, 39), (
+            "Bus zone (y=20..38) is all black -- no bus data rendered"
         )
 
     def test_bus_zone_with_none_data_renders_dashes(self):
@@ -132,8 +132,8 @@ class TestBusZoneRendering:
         assert frame.size == (64, 64)
         assert frame.mode == "RGB"
         # Should still have pixels (dashes rendered in dim gray)
-        assert _has_non_black_pixels(frame, 24, 43), (
-            "Bus zone (y=24..42) is all black -- dashes not rendered for None data"
+        assert _has_non_black_pixels(frame, 20, 39), (
+            "Bus zone (y=20..38) is all black -- dashes not rendered for None data"
         )
 
     def test_bus_zone_with_partial_data(self):
@@ -147,7 +147,7 @@ class TestBusZoneRendering:
         frame = render_frame(state, FONTS)
         assert isinstance(frame, Image.Image)
         assert frame.size == (64, 64)
-        assert _has_non_black_pixels(frame, 24, 43)
+        assert _has_non_black_pixels(frame, 20, 39)
 
     def test_bus_zone_with_zero_minutes(self):
         """Bus zone handles 0 minutes (bus arriving now) correctly."""
@@ -160,7 +160,7 @@ class TestBusZoneRendering:
         frame = render_frame(state, FONTS)
         assert isinstance(frame, Image.Image)
         assert frame.size == (64, 64)
-        assert _has_non_black_pixels(frame, 24, 43)
+        assert _has_non_black_pixels(frame, 20, 39)
 
     def test_bus_zone_with_empty_tuple(self):
         """Bus zone handles empty tuple (API returned 0 departures)."""
@@ -173,7 +173,7 @@ class TestBusZoneRendering:
         frame = render_frame(state, FONTS)
         assert isinstance(frame, Image.Image)
         assert frame.size == (64, 64)
-        assert _has_non_black_pixels(frame, 24, 43)
+        assert _has_non_black_pixels(frame, 20, 39)
 
     def test_bus_zone_with_long_waits(self):
         """Bus zone handles large countdown numbers (60+ minutes)."""
@@ -186,7 +186,7 @@ class TestBusZoneRendering:
         frame = render_frame(state, FONTS)
         assert isinstance(frame, Image.Image)
         assert frame.size == (64, 64)
-        assert _has_non_black_pixels(frame, 24, 43)
+        assert _has_non_black_pixels(frame, 20, 39)
 
     def test_rendered_image_still_64x64_rgb(self):
         """Full dashboard with bus data is still 64x64 RGB."""
@@ -230,8 +230,8 @@ class TestWeatherZoneRendering:
             weather_is_day=True,
         )
         frame = render_frame(state, FONTS)
-        assert _has_non_black_pixels(frame, 44, 64), (
-            "Weather zone (y=44..63) is all black -- no temperature rendered"
+        assert _has_non_black_pixels(frame, 40, 64), (
+            "Weather zone (y=40..63) is all black -- no temperature rendered"
         )
 
     def test_weather_zone_placeholder_when_none(self):
@@ -243,8 +243,8 @@ class TestWeatherZoneRendering:
             weather_symbol=None,
         )
         frame = render_frame(state, FONTS)
-        assert _has_non_black_pixels(frame, 44, 64), (
-            "Weather zone (y=44..63) is all black -- no placeholder rendered"
+        assert _has_non_black_pixels(frame, 40, 64), (
+            "Weather zone (y=40..63) is all black -- no placeholder rendered"
         )
 
     def test_negative_temperature_uses_blue_color(self):
@@ -262,7 +262,7 @@ class TestWeatherZoneRendering:
         frame = render_frame(state, FONTS)
         # Check weather zone for blue-ish pixels (R < G or R < B)
         found_blue = False
-        for y in range(44, 55):  # temperature text area
+        for y in range(40, 52):  # temperature text area
             for x in range(64):
                 r, g, b = frame.getpixel((x, y))
                 if b > 100 and b > r and (r, g, b) != (0, 0, 0):
@@ -294,8 +294,8 @@ class TestWeatherZoneRendering:
         # Clock zone should differ (icon present vs absent)
         # Check the right side of clock zone where icon would be placed
         diff_found = False
-        for y in range(0, 14):
-            for x in range(40, 64):  # right side of clock zone
+        for y in range(0, 11):
+            for x in range(30, 64):  # right side of clock zone (smaller font = icon closer)
                 if frame_with.getpixel((x, y)) != frame_without.getpixel((x, y)):
                     diff_found = True
                     break
@@ -314,7 +314,7 @@ class TestWeatherZoneRendering:
         frame = render_frame(state, FONTS)
         # Right side of clock zone (past the time text, ~x=45+) should be black
         all_black = True
-        for y in range(0, 14):
+        for y in range(0, 11):
             for x in range(50, 64):
                 if frame.getpixel((x, y)) != (0, 0, 0):
                     all_black = False
@@ -335,8 +335,8 @@ class TestWeatherZoneRendering:
             weather_precip_mm=2.1,
             weather_is_day=True,
         )
-        # Create a mock animation frame (64x20 RGBA)
-        anim_frame = Image.new("RGBA", (64, 20), (80, 160, 255, 30))
+        # Create a mock animation frame (64x24 RGBA)
+        anim_frame = Image.new("RGBA", (64, 24), (80, 160, 255, 30))
         frame = render_frame(state, FONTS, anim_frame=anim_frame)
         assert isinstance(frame, Image.Image)
         assert frame.size == (64, 64)
@@ -355,8 +355,8 @@ class TestWeatherZoneRendering:
             weather_is_day=True,
         )
         frame = render_frame(state, FONTS)
-        # Lower part of weather zone (y=55+) should have rain text pixels
-        assert _has_non_black_pixels(frame, 55, 64), (
+        # Lower part of weather zone (y=51+) should have rain text pixels
+        assert _has_non_black_pixels(frame, 51, 64), (
             "No rain indicator pixels in lower weather zone"
         )
 

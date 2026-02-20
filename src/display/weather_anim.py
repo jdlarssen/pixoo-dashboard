@@ -1,8 +1,11 @@
-"""Animated weather backgrounds for the 64x20 weather zone.
+"""Animated weather backgrounds for the 64x24 weather zone.
 
 Provides ambient animation overlays (RGBA) that render behind weather text.
 Alpha values are tuned for LED hardware visibility (65-150 range) -- lower
 values produce no visible light on the Pixoo 64's LED matrix.
+
+Color palette: vivid, LED-friendly colors per weather type.
+Rain=blue, snow=bright white, sun=warm yellow, fog=soft white, clouds=grey-white.
 """
 
 import random
@@ -13,11 +16,11 @@ from PIL import Image, ImageDraw
 class WeatherAnimation:
     """Base class for weather zone background animations.
 
-    Produces 64x20 RGBA overlay images. Subclasses override tick() to
+    Produces 64x24 RGBA overlay images. Subclasses override tick() to
     generate per-frame particle effects.
     """
 
-    def __init__(self, width: int = 64, height: int = 20) -> None:
+    def __init__(self, width: int = 64, height: int = 24) -> None:
         self.width = width
         self.height = height
 
@@ -30,16 +33,22 @@ class WeatherAnimation:
 
 
 class ClearAnimation(WeatherAnimation):
-    """Minimal animation for clear skies -- transparent overlay."""
+    """Minimal animation for clear skies -- transparent overlay.
+
+    Uses default 64x24 zone size.
+    """
 
     def tick(self) -> Image.Image:
         return Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
 
 
 class RainAnimation(WeatherAnimation):
-    """Falling blue raindrop particles (2px vertical streaks)."""
+    """Falling blue raindrop particles (2px vertical streaks).
 
-    def __init__(self, width: int = 64, height: int = 20) -> None:
+    Color: vivid blue (80, 160, 255) -- clearly reads as water drops on LED.
+    """
+
+    def __init__(self, width: int = 64, height: int = 24) -> None:
         super().__init__(width, height)
         self.drops: list[list[int]] = []
         self._spawn_drops(22)
@@ -75,9 +84,12 @@ class RainAnimation(WeatherAnimation):
 
 
 class SnowAnimation(WeatherAnimation):
-    """Gently falling white snowflake particles (2x1 rectangles)."""
+    """Gently falling white snowflake particles (2x1 rectangles).
 
-    def __init__(self, width: int = 64, height: int = 20) -> None:
+    Color: bright white with blue tint (220, 230, 255) -- reads as snow/ice on LED.
+    """
+
+    def __init__(self, width: int = 64, height: int = 24) -> None:
         super().__init__(width, height)
         self.flakes: list[list[int]] = []
         self._spawn_flakes(15)
@@ -96,7 +108,7 @@ class SnowAnimation(WeatherAnimation):
             x, y = flake[0], flake[1]
             if 0 <= x < self.width and 0 <= y < self.height:
                 # Draw snowflake as a 2x1 horizontal rectangle for LED visibility
-                draw.rectangle([x, y, min(x + 1, self.width - 1), y], fill=(255, 255, 255, 110))
+                draw.rectangle([x, y, min(x + 1, self.width - 1), y], fill=(220, 230, 255, 110))
             # Slow descent with horizontal drift (already slow enough for ~3 FPS)
             flake[1] += random.randint(1, 2)
             flake[0] += random.choice([-1, 0, 0, 1])
@@ -111,15 +123,18 @@ class SnowAnimation(WeatherAnimation):
 
 
 class CloudAnimation(WeatherAnimation):
-    """Slowly drifting gray cloud blobs."""
+    """Slowly drifting grey-white cloud blobs.
 
-    def __init__(self, width: int = 64, height: int = 20) -> None:
+    Color: subtle grey-white (160, 170, 180) -- reads as clouds drifting on LED.
+    """
+
+    def __init__(self, width: int = 64, height: int = 24) -> None:
         super().__init__(width, height)
         # 3 cloud blobs at different positions and speeds (halved for ~3 FPS)
         self.clouds: list[dict] = [
-            {"x": 5.0, "y": 3, "w": 12, "h": 6, "speed": 0.15},
-            {"x": 30.0, "y": 8, "w": 10, "h": 5, "speed": 0.1},
-            {"x": 50.0, "y": 13, "w": 14, "h": 5, "speed": 0.2},
+            {"x": 5.0, "y": 4, "w": 12, "h": 6, "speed": 0.15},
+            {"x": 30.0, "y": 10, "w": 10, "h": 5, "speed": 0.1},
+            {"x": 50.0, "y": 16, "w": 14, "h": 5, "speed": 0.2},
         ]
 
     def tick(self) -> Image.Image:
@@ -133,11 +148,11 @@ class CloudAnimation(WeatherAnimation):
             # Draw cloud as overlapping ellipses -- alpha tuned for LED visibility
             draw.ellipse(
                 [x, y, x + w, y + h],
-                fill=(180, 180, 190, 80),
+                fill=(160, 170, 180, 80),
             )
             draw.ellipse(
                 [x + w // 3, y - 1, x + w + w // 3, y + h - 1],
-                fill=(180, 180, 190, 65),
+                fill=(160, 170, 180, 65),
             )
             # Drift right, wrap around
             cloud["x"] += cloud["speed"]
@@ -152,9 +167,12 @@ class CloudAnimation(WeatherAnimation):
 
 
 class SunAnimation(WeatherAnimation):
-    """Warm glow pulsing effect for sunny conditions."""
+    """Warm glow pulsing effect for sunny conditions.
 
-    def __init__(self, width: int = 64, height: int = 20) -> None:
+    Color: warm yellow-orange (255, 200, 80) for sun rays/shimmer on LED.
+    """
+
+    def __init__(self, width: int = 64, height: int = 24) -> None:
         super().__init__(width, height)
         self._tick_count = 0
 
@@ -167,8 +185,8 @@ class SunAnimation(WeatherAnimation):
         alpha = int(50 + 40 * abs(phase - 0.5) * 2)
         # Warm gradient from top-left corner
         draw.ellipse(
-            [-10, -10, 25, 15],
-            fill=(255, 200, 50, alpha),
+            [-10, -10, 25, 18],
+            fill=(255, 200, 80, alpha),
         )
         return img
 
@@ -177,9 +195,12 @@ class SunAnimation(WeatherAnimation):
 
 
 class ThunderAnimation(WeatherAnimation):
-    """Rain with occasional lightning flash."""
+    """Rain with occasional yellow-white lightning flash.
 
-    def __init__(self, width: int = 64, height: int = 20) -> None:
+    Base rain in blue + yellow/white flash (255, 255, 100) for lightning on LED.
+    """
+
+    def __init__(self, width: int = 64, height: int = 24) -> None:
         super().__init__(width, height)
         self._rain = RainAnimation(width, height)
         self._tick_count = 0
@@ -190,10 +211,10 @@ class ThunderAnimation(WeatherAnimation):
         # Flash every ~20 ticks (roughly every 7 seconds at ~3 FPS)
         if self._tick_count % 20 == 0:
             draw = ImageDraw.Draw(img)
-            # Bright visible flash across zone
+            # Yellow-white lightning flash across zone
             draw.rectangle(
                 [0, 0, self.width - 1, self.height - 1],
-                fill=(255, 255, 255, 150),
+                fill=(255, 255, 100, 150),
             )
         return img
 
@@ -203,9 +224,12 @@ class ThunderAnimation(WeatherAnimation):
 
 
 class FogAnimation(WeatherAnimation):
-    """Slow-moving horizontal gray bands."""
+    """Slow-moving horizontal fog bands.
 
-    def __init__(self, width: int = 64, height: int = 20) -> None:
+    Color: soft white (180, 190, 200) wisps -- reads as fog/mist on LED.
+    """
+
+    def __init__(self, width: int = 64, height: int = 24) -> None:
         super().__init__(width, height)
         self._offset = 0.0
 
@@ -213,15 +237,15 @@ class FogAnimation(WeatherAnimation):
         img = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
         self._offset += 0.08  # slower for ~3 FPS (was 0.15 at ~1 effective FPS)
-        # Draw horizontal fog bands at varying positions
-        for i, base_y in enumerate([3, 8, 13, 17]):
+        # Draw horizontal fog bands at varying positions (spread across 24px zone)
+        for i, base_y in enumerate([3, 9, 15, 21]):
             y = int(base_y + (self._offset + i * 1.5) % 3 - 1)
             if 0 <= y < self.height:
                 alpha = 70 + (i % 2) * 30  # LED-visible alpha range
                 x_start = int((self._offset * (i + 1)) % 5)
                 draw.line(
                     [(x_start, y), (self.width - 1 - x_start, y)],
-                    fill=(180, 180, 190, alpha),
+                    fill=(180, 190, 200, alpha),
                 )
         return img
 
