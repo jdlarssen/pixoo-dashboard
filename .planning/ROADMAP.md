@@ -76,10 +76,13 @@ Plans:
   3. When an API fails, the display shows last known data with a visible staleness indicator rather than crashing or going blank
   4. The service restarts automatically after a crash or system reboot (systemd/launchd wrapper)
   5. A text message can be pushed to temporarily override the normal display
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 04-01: TBD
+- [ ] 04-01-PLAN.md -- Urgency colors for bus departures and staleness/error handling
+- [ ] 04-02-PLAN.md -- Auto-brightness scheduling and visual color overhaul
+- [ ] 04-03-PLAN.md -- Discord message override integration
+- [ ] 04-04-PLAN.md -- Launchd service wrapper and birthday easter egg
 
 ## Progress
 
@@ -91,4 +94,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 1. Foundation | 2/2 | Complete    | 2026-02-20 |
 | 2. Bus Departures | 2/2 | Complete | 2026-02-20 |
 | 3. Weather | 2/3 | Gap closure | - |
-| 4. Polish and Reliability | 0/? | Not started | - |
+| 4. Polish and Reliability | 0/4 | Planned | - |
