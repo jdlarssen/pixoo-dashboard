@@ -51,6 +51,9 @@ COLOR_URGENCY_DIMMED = (80, 80, 80)      # <2 min -- bus has effectively left
 # Staleness indicator
 COLOR_STALE_INDICATOR = (255, 100, 0)    # Orange dot for stale data
 
+# Message override color (Discord messages)
+COLOR_MESSAGE = (255, 220, 100)            # Warm yellow for message text -- stands out
+
 # Weather zone colors -- vivid palette
 COLOR_WEATHER_TEMP = (255, 255, 255)       # White for positive temperatures
 COLOR_WEATHER_TEMP_NEG = (100, 180, 255)   # Brighter blue for negative temperatures

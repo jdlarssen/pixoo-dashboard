@@ -23,6 +23,8 @@ if _project_root not in sys.path:
 from src.config import (
     BUS_REFRESH_INTERVAL,
     DEVICE_IP,
+    DISCORD_BOT_TOKEN,
+    DISCORD_CHANNEL_ID,
     FONT_DIR,
     FONT_LARGE,
     FONT_SMALL,
@@ -37,6 +39,7 @@ from src.display.state import DisplayState
 from src.display.weather_anim import WeatherAnimation, get_animation
 from src.display.weather_icons import symbol_to_group
 from src.providers.bus import fetch_bus_data
+from src.providers.discord_bot import MessageBridge, start_discord_bot
 from src.providers.weather import WeatherData, fetch_weather_safe
 from src.device.pixoo_client import PixooClient
 from src.display.fonts import load_fonts
@@ -70,6 +73,7 @@ def main_loop(
     fonts: dict,
     *,
     save_frame: bool = False,
+    message_bridge: MessageBridge | None = None,
 ) -> None:
     """Run the dashboard main loop.
 
@@ -84,6 +88,7 @@ def main_loop(
         client: Pixoo device client for pushing frames.
         fonts: Font dictionary with keys "large", "small", "tiny".
         save_frame: If True, save each rendered frame to debug_frame.png.
+        message_bridge: Optional MessageBridge from Discord bot for message override.
     """
     last_state = None
     last_bus_fetch = 0.0  # monotonic() is always > 60 on a running system
@@ -174,10 +179,14 @@ def main_loop(
             last_brightness = target_brightness
             logger.info("Brightness set to %d%%", target_brightness)
 
+        # Read current message from Discord bot (thread-safe)
+        current_message = message_bridge.current_message if message_bridge else None
+
         current_state = DisplayState.from_now(
             now,
             bus_data=effective_bus,
             weather_data=effective_weather,
+            message_text=current_message,
             bus_stale=bus_stale,
             bus_too_old=bus_too_old,
             weather_stale=weather_stale,
@@ -242,9 +251,16 @@ def main() -> None:
     logger.info("Connecting to Pixoo 64 at %s (simulated=%s)", args.ip, args.simulated)
     client = PixooClient(ip=args.ip, simulated=args.simulated)
 
+    # Start Discord bot in background thread (optional)
+    message_bridge = start_discord_bot(DISCORD_BOT_TOKEN, DISCORD_CHANNEL_ID)
+    if message_bridge:
+        logger.info("Discord bot started for message override")
+    else:
+        logger.info("Discord bot not configured (no DISCORD_BOT_TOKEN/DISCORD_CHANNEL_ID)")
+
     logger.info("Starting dashboard main loop (Ctrl+C to stop)")
     try:
-        main_loop(client, fonts, save_frame=args.save_frame)
+        main_loop(client, fonts, save_frame=args.save_frame, message_bridge=message_bridge)
     except KeyboardInterrupt:
         logger.info("Shutting down")
 

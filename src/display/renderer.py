@@ -10,6 +10,7 @@ from src.display.layout import (
     COLOR_BUS_DIR2,
     COLOR_DATE,
     COLOR_DIVIDER,
+    COLOR_MESSAGE,
     COLOR_PLACEHOLDER,
     COLOR_STALE_INDICATOR,
     COLOR_TIME,
@@ -189,14 +190,101 @@ def render_weather_zone(
         )
 
     # Rain indicator -- show precipitation amount if > 0
-    if state.weather_precip_mm is not None and state.weather_precip_mm > 0:
-        rain_text = f"{state.weather_precip_mm:.1f}mm"
+    # When message is active, skip rain to make room for message text
+    if state.message_text is None:
+        if state.weather_precip_mm is not None and state.weather_precip_mm > 0:
+            rain_text = f"{state.weather_precip_mm:.1f}mm"
+            draw.text(
+                (TEXT_X, zone_y + 11),
+                rain_text,
+                font=fonts["tiny"],
+                fill=COLOR_WEATHER_RAIN,
+            )
+
+    # Message overlay -- persistent Discord message in bottom of weather zone
+    if state.message_text is not None:
+        _render_message(draw, zone_y, state.message_text, fonts)
+
+
+def _render_message(
+    draw: ImageDraw.ImageDraw,
+    zone_y: int,
+    text: str,
+    fonts: dict,
+) -> None:
+    """Render a persistent message in the bottom portion of the weather zone.
+
+    Uses the tiny (4x6) font. Truncates to fit within 64px display width.
+    Renders up to 2 lines starting at zone_y + 12 (below weather data).
+
+    Args:
+        draw: PIL ImageDraw instance.
+        zone_y: Top y coordinate of the weather zone.
+        text: Message text to display.
+        fonts: Font dictionary with "tiny" (4x6) key.
+    """
+    font = fonts["tiny"]
+    max_width = 64 - TEXT_X - 1  # 1px right margin
+
+    # Split into lines that fit within max_width
+    lines = _wrap_text(text, font, max_width)
+
+    # Render up to 2 lines in the bottom portion of the weather zone
+    line_height = 7  # 6px font + 1px gap
+    start_y = zone_y + 12  # Below temperature/hilo row
+    for i, line in enumerate(lines[:2]):
         draw.text(
-            (TEXT_X, zone_y + 11),
-            rain_text,
-            font=fonts["tiny"],
-            fill=COLOR_WEATHER_RAIN,
+            (TEXT_X, start_y + i * line_height),
+            line,
+            font=font,
+            fill=COLOR_MESSAGE,
         )
+
+
+def _wrap_text(text: str, font, max_width: int) -> list[str]:
+    """Wrap text into lines that fit within max_width pixels.
+
+    Args:
+        text: Text to wrap.
+        font: PIL font for measuring text width.
+        max_width: Maximum line width in pixels.
+
+    Returns:
+        List of text lines, each fitting within max_width.
+    """
+    words = text.split()
+    if not words:
+        return []
+
+    lines = []
+    current_line = words[0]
+
+    for word in words[1:]:
+        test_line = current_line + " " + word
+        bbox = font.getbbox(test_line)
+        line_width = bbox[2] - bbox[0] if bbox else len(test_line) * 5
+        if line_width <= max_width:
+            current_line = test_line
+        else:
+            lines.append(current_line)
+            current_line = word
+
+    lines.append(current_line)
+
+    # Truncate last visible line with "..." if there are more lines
+    if len(lines) > 2:
+        last_line = lines[1]
+        # Try to fit with ellipsis
+        while last_line:
+            test = last_line + "..."
+            bbox = font.getbbox(test)
+            width = bbox[2] - bbox[0] if bbox else len(test) * 5
+            if width <= max_width:
+                lines[1] = test
+                break
+            last_line = last_line[:-1]
+
+    return lines
 
 
 def render_frame(
