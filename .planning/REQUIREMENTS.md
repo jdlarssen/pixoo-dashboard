@@ -29,10 +29,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Weather
 
-- [ ] **WTHR-01**: Current temperature (°C) from Yr/MET
+- [x] **WTHR-01**: Current temperature (°C) from Yr/MET
 - [ ] **WTHR-02**: Weather icon as pixel art sprite
-- [ ] **WTHR-03**: Today's high/low temperature
-- [ ] **WTHR-04**: Rain expected indicator
+- [x] **WTHR-03**: Today's high/low temperature
+- [x] **WTHR-04**: Rain expected indicator
 
 ### Reliability
 
@@ -99,10 +99,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BUS-03 | Phase 2 | Complete |
 | BUS-04 | Phase 4 | Pending |
 | BUS-05 | Phase 2 | Complete |
-| WTHR-01 | Phase 3 | Pending |
+| WTHR-01 | Phase 3 | Complete |
 | WTHR-02 | Phase 3 | Pending |
-| WTHR-03 | Phase 3 | Pending |
-| WTHR-04 | Phase 3 | Pending |
+| WTHR-03 | Phase 3 | Complete |
+| WTHR-04 | Phase 3 | Complete |
 | RLBL-01 | Phase 1 | Complete |
 | RLBL-02 | Phase 4 | Pending |
 | RLBL-03 | Phase 4 | Pending |
