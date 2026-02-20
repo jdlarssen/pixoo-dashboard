@@ -20,5 +20,8 @@ assets/fonts/*.pbm
 .vscode/
 .idea/
 
+# Debug output
+debug_frame.png
+
 # OS
 .DS_Store
