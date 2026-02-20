@@ -71,7 +71,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+1. Weather animation and rain text colors indistinguishable (display) — `.planning/todos/pending/2026-02-20-weather-animation-and-rain-text-colors-indistinguishable.md`
 
 ### Blockers/Concerns
 
