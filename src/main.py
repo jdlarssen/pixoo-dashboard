@@ -21,6 +21,7 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 from src.config import (
+    BUS_REFRESH_INTERVAL,
     DEVICE_IP,
     FONT_DIR,
     FONT_LARGE,
@@ -28,6 +29,7 @@ from src.config import (
     FONT_TINY,
     MAX_BRIGHTNESS,
 )
+from src.providers.bus import fetch_bus_data
 from src.device.pixoo_client import PixooClient
 from src.display.fonts import load_fonts
 from src.display.renderer import render_frame
@@ -74,10 +76,19 @@ def main_loop(
         save_frame: If True, save each rendered frame to debug_frame.png.
     """
     last_state = None
+    last_bus_fetch = 0.0  # monotonic() is always > 60 on a running system
+    bus_data: tuple[list[int] | None, list[int] | None] = (None, None)
 
     while True:
+        # Independent 60-second bus data refresh
+        now_mono = time.monotonic()
+        if now_mono - last_bus_fetch >= BUS_REFRESH_INTERVAL:
+            bus_data = fetch_bus_data()
+            last_bus_fetch = now_mono
+            logger.info("Bus data refreshed: dir1=%s dir2=%s", bus_data[0], bus_data[1])
+
         now = datetime.now()
-        current_state = DisplayState.from_now(now)
+        current_state = DisplayState.from_now(now, bus_data=bus_data)
 
         if current_state != last_state:
             frame = render_frame(current_state, fonts)

@@ -5,6 +5,9 @@ from PIL import Image, ImageDraw
 from src.display.layout import (
     BUS_ZONE,
     CLOCK_ZONE,
+    COLOR_BUS_DIR1,
+    COLOR_BUS_DIR2,
+    COLOR_BUS_TIME,
     COLOR_DATE,
     COLOR_DIVIDER,
     COLOR_PLACEHOLDER,
@@ -16,6 +19,79 @@ from src.display.layout import (
     WEATHER_ZONE,
 )
 from src.display.state import DisplayState
+
+
+def render_bus_zone(
+    draw: ImageDraw.ImageDraw,
+    state: DisplayState,
+    fonts: dict,
+) -> None:
+    """Render the bus departure zone with two direction lines.
+
+    Layout within the 19px bus zone (y=24 to y=42):
+    - Line 1 (direction 1 / Sentrum): y = BUS_ZONE.y + 1 (1px top padding)
+    - Line 2 (direction 2 / Lade): y = BUS_ZONE.y + 10 (1px gap after 8px line)
+    - Total: 1px + 8px + 1px + 8px + 1px = 19px
+
+    Each line: arrow+letter label in direction color, countdown numbers in white.
+
+    Args:
+        draw: PIL ImageDraw instance.
+        state: Current display state with bus departure data.
+        fonts: Font dictionary with "small" (5x8) and "tiny" (4x6) keys.
+    """
+    font = fonts["small"]  # 5x8 for better readability of countdown numbers
+
+    # Direction 1 (Sentrum) -- top line
+    _draw_bus_line(draw, TEXT_X, BUS_ZONE.y + 1, ">S", state.bus_direction1, COLOR_BUS_DIR1, font)
+
+    # Direction 2 (Lade) -- bottom line
+    _draw_bus_line(draw, TEXT_X, BUS_ZONE.y + 10, "<L", state.bus_direction2, COLOR_BUS_DIR2, font)
+
+
+def _draw_bus_line(
+    draw: ImageDraw.ImageDraw,
+    x: int,
+    y: int,
+    label: str,
+    departures: tuple[int, ...] | None,
+    label_color: tuple[int, int, int],
+    font,
+) -> None:
+    """Draw a single bus direction line with colored label and white times.
+
+    Args:
+        draw: PIL ImageDraw instance.
+        x: Starting x coordinate.
+        y: Starting y coordinate.
+        label: Direction label (e.g. ">S").
+        departures: Countdown minutes tuple or None.
+        label_color: RGB color for the direction label.
+        font: PIL font to use.
+    """
+    # Draw label in direction color
+    draw.text((x, y), label, font=font, fill=label_color)
+
+    # Calculate label width to position countdown numbers after it
+    label_bbox = font.getbbox(label)
+    label_width = label_bbox[2] - label_bbox[0] if label_bbox else len(label) * 6
+
+    # Format countdown numbers
+    if departures is None:
+        time_str = "-- --"
+    else:
+        parts = []
+        for i in range(2):
+            if i < len(departures):
+                parts.append(str(departures[i]))
+            else:
+                parts.append("--")
+        time_str = " ".join(parts)
+
+    # Draw countdown numbers in white, with spacing after label
+    time_x = x + label_width + 4  # 4px gap between label and times
+    time_color = COLOR_BUS_TIME if departures is not None else COLOR_PLACEHOLDER
+    draw.text((time_x, y), time_str, font=font, fill=time_color)
 
 
 def render_frame(state: DisplayState, fonts: dict) -> Image.Image:
@@ -57,13 +133,8 @@ def render_frame(state: DisplayState, fonts: dict) -> Image.Image:
         fill=COLOR_DIVIDER,
     )
 
-    # Bus zone placeholder
-    draw.text(
-        (TEXT_X, BUS_ZONE.y + 1),
-        "BUS",
-        font=fonts["tiny"],
-        fill=COLOR_PLACEHOLDER,
-    )
+    # Bus zone -- two direction lines with colored labels and countdown numbers
+    render_bus_zone(draw, state, fonts)
 
     # Divider line 2 (between bus and weather zone)
     draw.line(

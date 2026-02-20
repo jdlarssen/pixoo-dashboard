@@ -79,10 +79,13 @@ class TestRenderFrame:
         )
 
     def test_bus_placeholder_has_pixels(self):
-        """Bus zone (y=24 to y=42) should contain placeholder text pixels."""
+        """Bus zone (y=24 to y=42) should contain placeholder text pixels.
+
+        Even with no bus data (None), the bus zone should render dashes.
+        """
         frame = render_frame(TEST_STATE, FONTS)
         assert _has_non_black_pixels(frame, 24, 43), (
-            "Bus zone (y=24..42) is all black -- no placeholder text rendered"
+            "Bus zone (y=24..42) is all black -- no bus zone text rendered"
         )
 
     def test_weather_placeholder_has_pixels(self):
@@ -98,3 +101,114 @@ class TestRenderFrame:
         output_path = Path("/tmp/test_dashboard.png")
         frame.save(output_path)
         assert output_path.exists(), "Failed to save test dashboard image"
+
+
+class TestBusZoneRendering:
+    """Tests for bus zone rendering with departure data."""
+
+    def test_bus_zone_with_data_has_colored_pixels(self):
+        """Bus zone should contain non-black pixels when bus data is present."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            bus_direction1=(5, 12),
+            bus_direction2=(3, 8),
+        )
+        frame = render_frame(state, FONTS)
+        assert _has_non_black_pixels(frame, 24, 43), (
+            "Bus zone (y=24..42) is all black -- no bus data rendered"
+        )
+
+    def test_bus_zone_with_none_data_renders_dashes(self):
+        """Bus zone should render without crashing when bus data is None."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            bus_direction1=None,
+            bus_direction2=None,
+        )
+        frame = render_frame(state, FONTS)
+        assert isinstance(frame, Image.Image)
+        assert frame.size == (64, 64)
+        assert frame.mode == "RGB"
+        # Should still have pixels (dashes rendered in dim gray)
+        assert _has_non_black_pixels(frame, 24, 43), (
+            "Bus zone (y=24..42) is all black -- dashes not rendered for None data"
+        )
+
+    def test_bus_zone_with_partial_data(self):
+        """Bus zone renders when one direction has data, other is None."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            bus_direction1=(5, 12),
+            bus_direction2=None,
+        )
+        frame = render_frame(state, FONTS)
+        assert isinstance(frame, Image.Image)
+        assert frame.size == (64, 64)
+        assert _has_non_black_pixels(frame, 24, 43)
+
+    def test_bus_zone_with_zero_minutes(self):
+        """Bus zone handles 0 minutes (bus arriving now) correctly."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            bus_direction1=(0, 5),
+            bus_direction2=(0, 0),
+        )
+        frame = render_frame(state, FONTS)
+        assert isinstance(frame, Image.Image)
+        assert frame.size == (64, 64)
+        assert _has_non_black_pixels(frame, 24, 43)
+
+    def test_bus_zone_with_empty_tuple(self):
+        """Bus zone handles empty tuple (API returned 0 departures)."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            bus_direction1=(),
+            bus_direction2=(),
+        )
+        frame = render_frame(state, FONTS)
+        assert isinstance(frame, Image.Image)
+        assert frame.size == (64, 64)
+        assert _has_non_black_pixels(frame, 24, 43)
+
+    def test_bus_zone_with_long_waits(self):
+        """Bus zone handles large countdown numbers (60+ minutes)."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            bus_direction1=(120, 180),
+            bus_direction2=(65, 90),
+        )
+        frame = render_frame(state, FONTS)
+        assert isinstance(frame, Image.Image)
+        assert frame.size == (64, 64)
+        assert _has_non_black_pixels(frame, 24, 43)
+
+    def test_rendered_image_still_64x64_rgb(self):
+        """Full dashboard with bus data is still 64x64 RGB."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            bus_direction1=(5, 12),
+            bus_direction2=(3, 8),
+        )
+        frame = render_frame(state, FONTS)
+        assert frame.size == (64, 64)
+        assert frame.mode == "RGB"
+
+    def test_save_bus_dashboard(self):
+        """Save a test frame with bus data to /tmp for visual inspection."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            bus_direction1=(5, 12),
+            bus_direction2=(3, 8),
+        )
+        frame = render_frame(state, FONTS)
+        output_path = Path("/tmp/test_dashboard_bus.png")
+        frame.save(output_path)
+        assert output_path.exists(), "Failed to save bus dashboard image"

@@ -38,5 +38,10 @@ COLOR_DATE = (180, 180, 180)       # Dim white for date
 COLOR_DIVIDER = (40, 40, 40)       # Subtle gray divider
 COLOR_PLACEHOLDER = (60, 60, 60)   # Very dim for placeholder text
 
+# Bus zone colors
+COLOR_BUS_DIR1 = (100, 200, 255)   # Light blue for Sentrum direction (arrow+letter)
+COLOR_BUS_DIR2 = (255, 180, 50)    # Amber/orange for Lade direction (arrow+letter)
+COLOR_BUS_TIME = (255, 255, 255)   # White for departure countdown numbers
+
 # Text positioning
 TEXT_X = 2  # 2px left padding for all text
