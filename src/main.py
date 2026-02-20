@@ -94,20 +94,44 @@ def main_loop(
     last_weather_group: str | None = None
     needs_push = False
 
+    # Staleness tracking -- preserve last-good data through API failures
+    last_good_bus: tuple[list[int] | None, list[int] | None] = (None, None)
+    last_good_bus_time: float = 0.0  # monotonic time of last successful bus fetch
+    last_good_weather: WeatherData | None = None
+    last_good_weather_time: float = 0.0  # monotonic time of last successful weather fetch
+
+    # Staleness thresholds (seconds)
+    BUS_STALE_THRESHOLD = 180     # 3 minutes -- bus data is aging
+    BUS_TOO_OLD_THRESHOLD = 600   # 10 minutes -- bus data is too old, show dashes
+    WEATHER_STALE_THRESHOLD = 1800   # 30 minutes -- weather data is aging
+    WEATHER_TOO_OLD_THRESHOLD = 3600  # 1 hour -- weather data is too old, show dashes
+
     while True:
         now_mono = time.monotonic()
 
         # Independent 60-second bus data refresh
         if now_mono - last_bus_fetch >= BUS_REFRESH_INTERVAL:
-            bus_data = fetch_bus_data()
+            fresh_bus = fetch_bus_data()
             last_bus_fetch = now_mono
-            logger.info("Bus data refreshed: dir1=%s dir2=%s", bus_data[0], bus_data[1])
+            # Preserve last-good data on failure
+            if fresh_bus != (None, None):
+                bus_data = fresh_bus
+                last_good_bus = fresh_bus
+                last_good_bus_time = now_mono
+                logger.info("Bus data refreshed: dir1=%s dir2=%s", bus_data[0], bus_data[1])
+            else:
+                # API failed -- keep using last-good data
+                bus_data = last_good_bus
+                logger.warning("Bus fetch failed, using last-good data (age=%.0fs)", now_mono - last_good_bus_time if last_good_bus_time > 0 else 0)
 
         # Independent 600-second weather data refresh
         if now_mono - last_weather_fetch >= WEATHER_REFRESH_INTERVAL:
-            weather_data = fetch_weather_safe(WEATHER_LAT, WEATHER_LON)
+            fresh_weather = fetch_weather_safe(WEATHER_LAT, WEATHER_LON)
             last_weather_fetch = now_mono
-            if weather_data:
+            if fresh_weather:
+                weather_data = fresh_weather
+                last_good_weather = fresh_weather
+                last_good_weather_time = now_mono
                 logger.info(
                     "Weather refreshed: %.1f°C %s precip=%.1fmm",
                     weather_data.temperature,
@@ -121,10 +145,33 @@ def main_loop(
                     last_weather_group = new_group
                     logger.info("Weather animation: %s", new_group)
             else:
-                logger.warning("Weather fetch returned None")
+                # API failed -- keep using last-good data
+                weather_data = last_good_weather
+                logger.warning("Weather fetch failed, using last-good data (age=%.0fs)", now_mono - last_good_weather_time if last_good_weather_time > 0 else 0)
+
+        # Calculate staleness flags
+        bus_age = now_mono - last_good_bus_time if last_good_bus_time > 0 else 0
+        weather_age = now_mono - last_good_weather_time if last_good_weather_time > 0 else 0
+
+        bus_stale = bus_age > BUS_STALE_THRESHOLD and last_good_bus_time > 0
+        bus_too_old = bus_age > BUS_TOO_OLD_THRESHOLD and last_good_bus_time > 0
+        weather_stale = weather_age > WEATHER_STALE_THRESHOLD and last_good_weather_time > 0
+        weather_too_old = weather_age > WEATHER_TOO_OLD_THRESHOLD and last_good_weather_time > 0
+
+        # When data is too old, pass None to show dash placeholders
+        effective_bus = (None, None) if bus_too_old else bus_data
+        effective_weather = None if weather_too_old else weather_data
 
         now = datetime.now()
-        current_state = DisplayState.from_now(now, bus_data=bus_data, weather_data=weather_data)
+        current_state = DisplayState.from_now(
+            now,
+            bus_data=effective_bus,
+            weather_data=effective_weather,
+            bus_stale=bus_stale,
+            bus_too_old=bus_too_old,
+            weather_stale=weather_stale,
+            weather_too_old=weather_too_old,
+        )
 
         # Check if state changed (minute change, bus update, weather update)
         state_changed = current_state != last_state

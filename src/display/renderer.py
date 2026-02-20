@@ -257,6 +257,10 @@ def render_frame(
     # Bus zone -- two direction lines with colored labels and countdown numbers
     render_bus_zone(draw, state, fonts)
 
+    # Staleness indicator for bus data (orange dot at top-right of bus zone)
+    if state.bus_stale and not state.bus_too_old:
+        draw.point((62, BUS_ZONE.y + 1), fill=COLOR_STALE_INDICATOR)
+
     # Divider line 2 (between bus and weather zone)
     draw.line(
         [(0, DIVIDER_2.y), (63, DIVIDER_2.y)],
@@ -265,5 +269,9 @@ def render_frame(
 
     # Weather zone -- temperature, high/low, rain indicator with animated background
     render_weather_zone(draw, img, state, fonts, anim_frame)
+
+    # Staleness indicator for weather data (orange dot at top-right of weather zone)
+    if state.weather_stale and not state.weather_too_old:
+        draw.point((62, WEATHER_ZONE.y + 1), fill=COLOR_STALE_INDICATOR)
 
     return img

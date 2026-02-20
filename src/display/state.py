@@ -31,6 +31,11 @@ class DisplayState:
     weather_low: int | None = None           # today's low, rounded to int
     weather_precip_mm: float | None = None   # next 1h precipitation in mm
     weather_is_day: bool = True              # day/night from symbol_code
+    # Staleness flags for graceful error states
+    bus_stale: bool = False                  # bus data is aging (>180s) but still usable
+    bus_too_old: bool = False                # bus data too old (>600s) -- show dashes
+    weather_stale: bool = False              # weather data is aging (>1800s) but still usable
+    weather_too_old: bool = False            # weather data too old (>3600s) -- show dashes
 
     @classmethod
     def from_now(
@@ -38,6 +43,11 @@ class DisplayState:
         dt: datetime,
         bus_data: tuple[list[int] | None, list[int] | None] = (None, None),
         weather_data: WeatherData | None = None,
+        *,
+        bus_stale: bool = False,
+        bus_too_old: bool = False,
+        weather_stale: bool = False,
+        weather_too_old: bool = False,
     ) -> DisplayState:
         """Create a DisplayState from a datetime and optional data sources.
 
@@ -46,9 +56,13 @@ class DisplayState:
             bus_data: Tuple of (direction1_minutes, direction2_minutes).
                 Each element is a list of countdown minutes or None.
             weather_data: WeatherData from MET API or None.
+            bus_stale: True when bus data is stale but still usable.
+            bus_too_old: True when bus data is too old to display.
+            weather_stale: True when weather data is stale but still usable.
+            weather_too_old: True when weather data is too old to display.
 
         Returns:
-            DisplayState with formatted time, date, bus, and weather data.
+            DisplayState with formatted time, date, bus, weather, and staleness data.
         """
         weather_kwargs: dict = {}
         if weather_data is not None:
@@ -66,5 +80,9 @@ class DisplayState:
             date_str=format_date_norwegian(dt),
             bus_direction1=tuple(bus_data[0]) if bus_data[0] else None,
             bus_direction2=tuple(bus_data[1]) if bus_data[1] else None,
+            bus_stale=bus_stale,
+            bus_too_old=bus_too_old,
+            weather_stale=weather_stale,
+            weather_too_old=weather_too_old,
             **weather_kwargs,
         )
