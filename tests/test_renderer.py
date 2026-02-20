@@ -212,3 +212,169 @@ class TestBusZoneRendering:
         output_path = Path("/tmp/test_dashboard_bus.png")
         frame.save(output_path)
         assert output_path.exists(), "Failed to save bus dashboard image"
+
+
+class TestWeatherZoneRendering:
+    """Tests for weather zone rendering with weather data."""
+
+    def test_weather_zone_renders_temperature(self):
+        """Weather zone should show temperature text when weather_temp is set."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            weather_temp=8,
+            weather_symbol="partlycloudy_day",
+            weather_high=12,
+            weather_low=3,
+            weather_precip_mm=0.0,
+            weather_is_day=True,
+        )
+        frame = render_frame(state, FONTS)
+        assert _has_non_black_pixels(frame, 44, 64), (
+            "Weather zone (y=44..63) is all black -- no temperature rendered"
+        )
+
+    def test_weather_zone_placeholder_when_none(self):
+        """Weather zone should show placeholder text when weather_temp is None."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            weather_temp=None,
+            weather_symbol=None,
+        )
+        frame = render_frame(state, FONTS)
+        assert _has_non_black_pixels(frame, 44, 64), (
+            "Weather zone (y=44..63) is all black -- no placeholder rendered"
+        )
+
+    def test_negative_temperature_uses_blue_color(self):
+        """Negative temperature should use blue color (not white)."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            weather_temp=-5,
+            weather_symbol="snow_day",
+            weather_high=1,
+            weather_low=-7,
+            weather_precip_mm=0.0,
+            weather_is_day=True,
+        )
+        frame = render_frame(state, FONTS)
+        # Check weather zone for blue-ish pixels (R < G or R < B)
+        found_blue = False
+        for y in range(44, 55):  # temperature text area
+            for x in range(64):
+                r, g, b = frame.getpixel((x, y))
+                if b > 100 and b > r and (r, g, b) != (0, 0, 0):
+                    found_blue = True
+                    break
+            if found_blue:
+                break
+        assert found_blue, "No blue pixels found for negative temperature"
+
+    def test_clock_icon_renders_with_weather_symbol(self):
+        """Weather icon should appear in clock zone when weather_symbol is set."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            weather_temp=8,
+            weather_symbol="clearsky_day",
+            weather_high=12,
+            weather_low=3,
+            weather_precip_mm=0.0,
+            weather_is_day=True,
+        )
+        # Render with and without weather symbol
+        frame_with = render_frame(state, FONTS)
+        state_without = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+        )
+        frame_without = render_frame(state_without, FONTS)
+        # Clock zone should differ (icon present vs absent)
+        # Check the right side of clock zone where icon would be placed
+        diff_found = False
+        for y in range(0, 14):
+            for x in range(40, 64):  # right side of clock zone
+                if frame_with.getpixel((x, y)) != frame_without.getpixel((x, y)):
+                    diff_found = True
+                    break
+            if diff_found:
+                break
+        assert diff_found, "No icon pixels found in clock zone right side"
+
+    def test_clock_icon_absent_without_weather_symbol(self):
+        """Clock zone right side should be empty when weather_symbol is None."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            weather_temp=None,
+            weather_symbol=None,
+        )
+        frame = render_frame(state, FONTS)
+        # Right side of clock zone (past the time text, ~x=45+) should be black
+        all_black = True
+        for y in range(0, 14):
+            for x in range(50, 64):
+                if frame.getpixel((x, y)) != (0, 0, 0):
+                    all_black = False
+                    break
+            if not all_black:
+                break
+        assert all_black, "Clock zone right side has unexpected pixels without weather symbol"
+
+    def test_render_frame_accepts_anim_frame(self):
+        """render_frame should accept anim_frame parameter without error."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            weather_temp=8,
+            weather_symbol="rain_day",
+            weather_high=10,
+            weather_low=5,
+            weather_precip_mm=2.1,
+            weather_is_day=True,
+        )
+        # Create a mock animation frame (64x20 RGBA)
+        anim_frame = Image.new("RGBA", (64, 20), (80, 160, 255, 30))
+        frame = render_frame(state, FONTS, anim_frame=anim_frame)
+        assert isinstance(frame, Image.Image)
+        assert frame.size == (64, 64)
+        assert frame.mode == "RGB"
+
+    def test_rain_indicator_with_precipitation(self):
+        """Weather zone should show rain indicator when precip > 0."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            weather_temp=8,
+            weather_symbol="rain_day",
+            weather_high=10,
+            weather_low=5,
+            weather_precip_mm=2.5,
+            weather_is_day=True,
+        )
+        frame = render_frame(state, FONTS)
+        # Lower part of weather zone (y=55+) should have rain text pixels
+        assert _has_non_black_pixels(frame, 55, 64), (
+            "No rain indicator pixels in lower weather zone"
+        )
+
+    def test_save_weather_dashboard(self):
+        """Save a test frame with full weather data to /tmp for visual inspection."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            bus_direction1=(5, 12, 25),
+            bus_direction2=(3, 8, 18),
+            weather_temp=8,
+            weather_symbol="partlycloudy_day",
+            weather_high=12,
+            weather_low=3,
+            weather_precip_mm=0.5,
+            weather_is_day=True,
+        )
+        frame = render_frame(state, FONTS)
+        output_path = Path("/tmp/test_dashboard_weather.png")
+        frame.save(output_path)
+        assert output_path.exists(), "Failed to save weather dashboard image"

@@ -28,12 +28,18 @@ from src.config import (
     FONT_SMALL,
     FONT_TINY,
     MAX_BRIGHTNESS,
+    WEATHER_LAT,
+    WEATHER_LON,
+    WEATHER_REFRESH_INTERVAL,
 )
-from src.providers.bus import fetch_bus_data
-from src.device.pixoo_client import PixooClient
-from src.display.fonts import load_fonts
 from src.display.renderer import render_frame
 from src.display.state import DisplayState
+from src.display.weather_anim import WeatherAnimation, get_animation
+from src.display.weather_icons import symbol_to_group
+from src.providers.bus import fetch_bus_data
+from src.providers.weather import WeatherData, fetch_weather_safe
+from src.device.pixoo_client import PixooClient
+from src.display.fonts import load_fonts
 
 logging.basicConfig(
     level=logging.INFO,
@@ -67,8 +73,11 @@ def main_loop(
 ) -> None:
     """Run the dashboard main loop.
 
-    Checks time every second. Only re-renders and pushes a frame when the
-    display state changes (i.e., when the minute changes).
+    Checks time every iteration. Pushes a frame when the display state
+    changes or when the weather animation ticks a new frame.
+
+    When weather animation is active, the loop runs at ~4 FPS (0.25s sleep)
+    to produce smooth animation. Otherwise it sleeps 1 second.
 
     Args:
         client: Pixoo device client for pushing frames.
@@ -77,31 +86,72 @@ def main_loop(
     """
     last_state = None
     last_bus_fetch = 0.0  # monotonic() is always > 60 on a running system
+    last_weather_fetch = 0.0
     bus_data: tuple[list[int] | None, list[int] | None] = (None, None)
+    weather_data: WeatherData | None = None
+    weather_anim: WeatherAnimation | None = None
+    last_weather_group: str | None = None
+    needs_push = False
 
     while True:
-        # Independent 60-second bus data refresh
         now_mono = time.monotonic()
+
+        # Independent 60-second bus data refresh
         if now_mono - last_bus_fetch >= BUS_REFRESH_INTERVAL:
             bus_data = fetch_bus_data()
             last_bus_fetch = now_mono
             logger.info("Bus data refreshed: dir1=%s dir2=%s", bus_data[0], bus_data[1])
 
-        now = datetime.now()
-        current_state = DisplayState.from_now(now, bus_data=bus_data)
+        # Independent 600-second weather data refresh
+        if now_mono - last_weather_fetch >= WEATHER_REFRESH_INTERVAL:
+            weather_data = fetch_weather_safe(WEATHER_LAT, WEATHER_LON)
+            last_weather_fetch = now_mono
+            if weather_data:
+                logger.info(
+                    "Weather refreshed: %.1f°C %s precip=%.1fmm",
+                    weather_data.temperature,
+                    weather_data.symbol_code,
+                    weather_data.precipitation_mm,
+                )
+                # Swap animation if weather group changed
+                new_group = symbol_to_group(weather_data.symbol_code)
+                if new_group != last_weather_group:
+                    weather_anim = get_animation(new_group)
+                    last_weather_group = new_group
+                    logger.info("Weather animation: %s", new_group)
+            else:
+                logger.warning("Weather fetch returned None")
 
-        if current_state != last_state:
-            frame = render_frame(current_state, fonts)
+        now = datetime.now()
+        current_state = DisplayState.from_now(now, bus_data=bus_data, weather_data=weather_data)
+
+        # Check if state changed (minute change, bus update, weather update)
+        state_changed = current_state != last_state
+        if state_changed:
+            needs_push = True
+            last_state = current_state
+
+        # Tick animation -- always produces a new frame when active
+        anim_frame = None
+        if weather_anim is not None:
+            anim_frame = weather_anim.tick()
+            needs_push = True  # animation always triggers a re-render
+
+        if needs_push:
+            frame = render_frame(current_state, fonts, anim_frame=anim_frame)
 
             if save_frame:
                 frame.save("debug_frame.png")
                 logger.info("Saved debug_frame.png")
 
             client.push_frame(frame)
-            logger.info("Pushed frame: %s %s", current_state.time_str, current_state.date_str)
-            last_state = current_state
+            if state_changed:
+                logger.info("Pushed frame: %s %s", current_state.time_str, current_state.date_str)
+            needs_push = False
 
-        time.sleep(1)
+        # Sleep: 0.25s when animation is active (4 FPS), 1s otherwise
+        sleep_time = 0.25 if weather_anim is not None else 1.0
+        time.sleep(sleep_time)
 
 
 def main() -> None:

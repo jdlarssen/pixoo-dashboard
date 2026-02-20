@@ -43,5 +43,11 @@ COLOR_BUS_DIR1 = (100, 200, 255)   # Light blue for Sentrum direction (arrow+let
 COLOR_BUS_DIR2 = (255, 180, 50)    # Amber/orange for Lade direction (arrow+letter)
 COLOR_BUS_TIME = (255, 255, 255)   # White for departure countdown numbers
 
+# Weather zone colors
+COLOR_WEATHER_TEMP = (255, 255, 255)       # White for positive temperatures
+COLOR_WEATHER_TEMP_NEG = (100, 160, 255)   # Blue for negative temperatures (no minus sign)
+COLOR_WEATHER_HILO = (140, 140, 140)       # Dim gray for high/low text
+COLOR_WEATHER_RAIN = (80, 160, 255)        # Blue tint for rain indicator text
+
 # Text positioning
 TEXT_X = 2  # 2px left padding for all text
