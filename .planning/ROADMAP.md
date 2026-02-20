@@ -29,11 +29,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Today's date appears in Norwegian with correct characters (e.g. "tor 20. feb" with working ae/oe/aa)
   4. All planned information zones (clock, bus, weather) are visible and proportioned on a single screen
   5. The display runs continuously for 8+ hours without device lockup (connection refresh working)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md — Project scaffolding, BDF font system, and Pixoo device client
+- [ ] 01-02-PLAN.md — Norwegian clock, zone layout, renderer, main loop, and device verification
 
 ### Phase 2: Bus Departures
 **Goal**: Real-time bus departures from Ladeveien (both directions) populate the bus zone, refreshing every 60 seconds
@@ -85,7 +85,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/? | Not started | - |
+| 1. Foundation | 0/2 | Planned | - |
 | 2. Bus Departures | 0/? | Not started | - |
 | 3. Weather | 0/? | Not started | - |
 | 4. Polish and Reliability | 0/? | Not started | - |
