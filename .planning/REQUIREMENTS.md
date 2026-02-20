@@ -88,31 +88,31 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DISP-01 | — | Pending |
-| DISP-02 | — | Pending |
-| DISP-03 | — | Pending |
-| DISP-04 | — | Pending |
-| CLCK-01 | — | Pending |
-| CLCK-02 | — | Pending |
-| BUS-01 | — | Pending |
-| BUS-02 | — | Pending |
-| BUS-03 | — | Pending |
-| BUS-04 | — | Pending |
-| BUS-05 | — | Pending |
-| WTHR-01 | — | Pending |
-| WTHR-02 | — | Pending |
-| WTHR-03 | — | Pending |
-| WTHR-04 | — | Pending |
-| RLBL-01 | — | Pending |
-| RLBL-02 | — | Pending |
-| RLBL-03 | — | Pending |
-| MSG-01 | — | Pending |
+| DISP-01 | Phase 1 | Pending |
+| DISP-02 | Phase 1 | Pending |
+| DISP-03 | Phase 1 | Pending |
+| DISP-04 | Phase 4 | Pending |
+| CLCK-01 | Phase 1 | Pending |
+| CLCK-02 | Phase 1 | Pending |
+| BUS-01 | Phase 2 | Pending |
+| BUS-02 | Phase 2 | Pending |
+| BUS-03 | Phase 2 | Pending |
+| BUS-04 | Phase 4 | Pending |
+| BUS-05 | Phase 2 | Pending |
+| WTHR-01 | Phase 3 | Pending |
+| WTHR-02 | Phase 3 | Pending |
+| WTHR-03 | Phase 3 | Pending |
+| WTHR-04 | Phase 3 | Pending |
+| RLBL-01 | Phase 1 | Pending |
+| RLBL-02 | Phase 4 | Pending |
+| RLBL-03 | Phase 4 | Pending |
+| MSG-01 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 19 total
-- Mapped to phases: 0
-- Unmapped: 19 ⚠️
+- Mapped to phases: 19
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-20*
-*Last updated: 2026-02-20 after initial definition*
+*Last updated: 2026-02-20 after roadmap creation*
