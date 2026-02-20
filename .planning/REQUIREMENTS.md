@@ -30,7 +30,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Weather
 
 - [x] **WTHR-01**: Current temperature (°C) from Yr/MET
-- [ ] **WTHR-02**: Weather icon as pixel art sprite
+- [x] **WTHR-02**: Weather icon as pixel art sprite
 - [x] **WTHR-03**: Today's high/low temperature
 - [x] **WTHR-04**: Rain expected indicator
 
@@ -100,7 +100,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BUS-04 | Phase 4 | Pending |
 | BUS-05 | Phase 2 | Complete |
 | WTHR-01 | Phase 3 | Complete |
-| WTHR-02 | Phase 3 | Pending |
+| WTHR-02 | Phase 3 | Complete |
 | WTHR-03 | Phase 3 | Complete |
 | WTHR-04 | Phase 3 | Complete |
 | RLBL-01 | Phase 1 | Complete |

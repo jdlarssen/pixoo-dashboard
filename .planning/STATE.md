@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** Glance at the display and instantly know: what time it is, when the next buses leave, and what the weather is doing -- without pulling out your phone.
-**Current focus:** Phase 3: Weather (In Progress)
+**Current focus:** Phase 3: Weather (Complete)
 
 ## Current Position
 
 Phase: 3 of 4 (Weather)
-Plan: 1 of 2 in current phase
-Status: Executing Phase 3 -- Plan 01 complete
-Last activity: 2026-02-20 -- Completed 03-01-PLAN.md
+Plan: 2 of 2 in current phase
+Status: Phase 3 Complete -- ready for Phase 4
+Last activity: 2026-02-20 -- Completed 03-02-PLAN.md
 
-Progress: [██████░░░░] 62%
+Progress: [████████░░] 75%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: 9 min
-- Total execution time: 0.7 hours
+- Total plans completed: 6
+- Average duration: 8 min
+- Total execution time: 0.8 hours
 
 **By Phase:**
 
@@ -29,10 +29,10 @@ Progress: [██████░░░░] 62%
 |-------|-------|-------|----------|
 | 01-foundation | 2 | 24 min | 12 min |
 | 02-bus-departures | 2 | 15 min | 7.5 min |
-| 03-weather | 1 | 3 min | 3 min |
+| 03-weather | 2 | 8 min | 4 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-02 (20 min), 02-01 (3 min), 02-02 (12 min), 03-01 (3 min)
+- Last 5 plans: 02-01 (3 min), 02-02 (12 min), 03-01 (3 min), 03-02 (5 min)
 - Trend: Consistent
 
 *Updated after each plan completion*
@@ -63,6 +63,10 @@ Recent decisions affecting current work:
 - [03-01]: If-Modified-Since caching via module-level globals for MET API compliance
 - [03-01]: High/low temps: scan today's timeseries entries, fallback to next_6_hours
 - [03-01]: DisplayState weather fields use TYPE_CHECKING import to avoid circular imports
+- [03-02]: Pixel art icons drawn programmatically with PIL (not PNG sprites) -- 10px icons too small for file overhead
+- [03-02]: Animation alpha 30-50 range keeps text readable over animated backgrounds
+- [03-02]: Main loop runs 4 FPS (0.25s) when animation active, 1s when idle
+- [03-02]: Temperature: no degree symbol, blue text for negative (no minus sign), white for positive
 
 ### Pending Todos
 
@@ -76,5 +80,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 03-01-PLAN.md (weather data provider -- Plan 02 remaining)
+Stopped at: Phase 3 complete -- ready for Phase 4 planning
 Resume file: None

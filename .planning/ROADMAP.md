@@ -13,8 +13,8 @@ Divoom Hub delivers an always-on entryway dashboard on a 64x64 LED pixel display
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation** - Device driver, render engine, pixel layout, and clock/date on the Pixoo 64
-- [ ] **Phase 2: Bus Departures** - Live Entur transit data for Ladeveien in both directions
-- [ ] **Phase 3: Weather** - Yr/MET weather data with pixel art icons
+- [x] **Phase 2: Bus Departures** - Live Entur transit data for Ladeveien in both directions
+- [x] **Phase 3: Weather** - Yr/MET weather data with pixel art icons
 - [ ] **Phase 4: Polish and Reliability** - Urgency coloring, brightness, error handling, service wrapper, and push messages
 
 ## Phase Details
@@ -47,8 +47,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Bus provider (Entur API client, config, DisplayState extension)
-- [ ] 02-02-PLAN.md — Bus zone renderer, main loop integration, and device verification
+- [x] 02-01-PLAN.md — Bus provider (Entur API client, config, DisplayState extension)
+- [x] 02-02-PLAN.md — Bus zone renderer, main loop integration, and device verification
 
 ### Phase 3: Weather
 **Goal**: Current weather conditions from Yr fill the weather zone with temperature, icon, and forecast data
@@ -62,8 +62,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 03-01-PLAN.md -- Weather data provider (MET API client, config, DisplayState extension)
-- [ ] 03-02-PLAN.md -- Weather zone renderer with icons, animations, clock icon, and device verification
+- [x] 03-01-PLAN.md -- Weather data provider (MET API client, config, DisplayState extension)
+- [x] 03-02-PLAN.md -- Weather zone renderer with icons, animations, clock icon, and device verification
 
 ### Phase 4: Polish and Reliability
 **Goal**: The dashboard is production-quality for daily use with urgency coloring, adaptive brightness, robust error handling, supervised operation, and message override capability
@@ -88,6 +88,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | Complete    | 2026-02-20 |
-| 2. Bus Departures | 0/? | Not started | - |
-| 3. Weather | 0/? | Not started | - |
+| 2. Bus Departures | 2/2 | Complete | 2026-02-20 |
+| 3. Weather | 2/2 | Complete | 2026-02-20 |
 | 4. Polish and Reliability | 0/? | Not started | - |
