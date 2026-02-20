@@ -1,0 +1,24 @@
+# Virtual environment
+.venv/
+
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Converted PIL font files (generated from BDF at runtime)
+assets/fonts/*.pil
+assets/fonts/*.pbm
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
