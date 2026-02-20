@@ -27,10 +27,10 @@ from src.config import (
     FONT_LARGE,
     FONT_SMALL,
     FONT_TINY,
-    MAX_BRIGHTNESS,
     WEATHER_LAT,
     WEATHER_LON,
     WEATHER_REFRESH_INTERVAL,
+    get_target_brightness,
 )
 from src.display.renderer import render_frame
 from src.display.state import DisplayState
@@ -100,6 +100,9 @@ def main_loop(
     last_good_weather: WeatherData | None = None
     last_good_weather_time: float = 0.0  # monotonic time of last successful weather fetch
 
+    # Brightness tracking -- only send brightness when target changes
+    last_brightness: int = -1
+
     # Staleness thresholds (seconds)
     BUS_STALE_THRESHOLD = 180     # 3 minutes -- bus data is aging
     BUS_TOO_OLD_THRESHOLD = 600   # 10 minutes -- bus data is too old, show dashes
@@ -163,6 +166,14 @@ def main_loop(
         effective_weather = None if weather_too_old else weather_data
 
         now = datetime.now()
+
+        # Auto-brightness: adjust based on time of day (only when target changes)
+        target_brightness = get_target_brightness(now.hour)
+        if target_brightness != last_brightness:
+            client.set_brightness(target_brightness)
+            last_brightness = target_brightness
+            logger.info("Brightness set to %d%%", target_brightness)
+
         current_state = DisplayState.from_now(
             now,
             bus_data=effective_bus,
@@ -230,8 +241,6 @@ def main() -> None:
 
     logger.info("Connecting to Pixoo 64 at %s (simulated=%s)", args.ip, args.simulated)
     client = PixooClient(ip=args.ip, simulated=args.simulated)
-    client.set_brightness(MAX_BRIGHTNESS)
-    logger.info("Brightness set to %d%%", MAX_BRIGHTNESS)
 
     logger.info("Starting dashboard main loop (Ctrl+C to stop)")
     try:
