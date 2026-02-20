@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** Glance at the display and instantly know: what time it is, when the next buses leave, and what the weather is doing -- without pulling out your phone.
-**Current focus:** Phase 3: Weather (Complete)
+**Current focus:** Phase 3: Weather (Complete, including gap closure)
 
 ## Current Position
 
 Phase: 3 of 4 (Weather)
-Plan: 2 of 2 in current phase
-Status: Phase 3 Complete -- ready for Phase 4
-Last activity: 2026-02-20 -- Completed 03-02-PLAN.md
+Plan: 3 of 3 in current phase
+Status: Phase 3 Complete -- gap closure plan executed, ready for Phase 4
+Last activity: 2026-02-20 -- Completed 03-03-PLAN.md (gap closure)
 
-Progress: [████████░░] 75%
+Progress: [████████░░] 78%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
-- Average duration: 8 min
-- Total execution time: 0.8 hours
+- Total plans completed: 7
+- Average duration: 7 min
+- Total execution time: 0.9 hours
 
 **By Phase:**
 
@@ -29,10 +29,10 @@ Progress: [████████░░] 75%
 |-------|-------|-------|----------|
 | 01-foundation | 2 | 24 min | 12 min |
 | 02-bus-departures | 2 | 15 min | 7.5 min |
-| 03-weather | 2 | 8 min | 4 min |
+| 03-weather | 3 | 12 min | 4 min |
 
 **Recent Trend:**
-- Last 5 plans: 02-01 (3 min), 02-02 (12 min), 03-01 (3 min), 03-02 (5 min)
+- Last 5 plans: 02-02 (12 min), 03-01 (3 min), 03-02 (5 min), 03-03 (4 min)
 - Trend: Consistent
 
 *Updated after each plan completion*
@@ -64,9 +64,10 @@ Recent decisions affecting current work:
 - [03-01]: High/low temps: scan today's timeseries entries, fallback to next_6_hours
 - [03-01]: DisplayState weather fields use TYPE_CHECKING import to avoid circular imports
 - [03-02]: Pixel art icons drawn programmatically with PIL (not PNG sprites) -- 10px icons too small for file overhead
-- [03-02]: Animation alpha 30-50 range keeps text readable over animated backgrounds
-- [03-02]: Main loop runs 4 FPS (0.25s) when animation active, 1s when idle
 - [03-02]: Temperature: no degree symbol, blue text for negative (no minus sign), white for positive
+- [03-03]: Single-pass alpha_composite replaces double-alpha paste+mask pattern (was squashing opacity to ~4%)
+- [03-03]: Rate limiter 0.3s (was 1.0s) with 0.35s sleep to prevent jitter-induced frame drops
+- [03-03]: Animation alphas in 65-150 range for LED visibility (was 15-50, invisible on hardware)
 
 ### Pending Todos
 
@@ -80,5 +81,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Phase 3 complete -- ready for Phase 4 planning
+Stopped at: Phase 3 complete (gap closure done) -- ready for Phase 4 planning
 Resume file: None
