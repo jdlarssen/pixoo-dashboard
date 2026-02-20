@@ -1,7 +1,8 @@
 """Animated weather backgrounds for the 64x20 weather zone.
 
 Provides ambient animation overlays (RGBA) that render behind weather text.
-Each animation class produces low-alpha particle effects so text remains readable.
+Alpha values are tuned for LED hardware visibility (65-150 range) -- lower
+values produce no visible light on the Pixoo 64's LED matrix.
 """
 
 import random
@@ -36,12 +37,12 @@ class ClearAnimation(WeatherAnimation):
 
 
 class RainAnimation(WeatherAnimation):
-    """Falling blue raindrop particles."""
+    """Falling blue raindrop particles (2px vertical streaks)."""
 
     def __init__(self, width: int = 64, height: int = 20) -> None:
         super().__init__(width, height)
         self.drops: list[list[int]] = []
-        self._spawn_drops(18)
+        self._spawn_drops(22)
 
     def _spawn_drops(self, count: int) -> None:
         """Create initial raindrop positions spread across the zone."""
@@ -55,11 +56,12 @@ class RainAnimation(WeatherAnimation):
         img = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
         for drop in self.drops:
-            # Draw raindrop as a 1px blue dot
-            if 0 <= drop[0] < self.width and 0 <= drop[1] < self.height:
-                draw.point((drop[0], drop[1]), fill=(80, 160, 255, 50))
-            # Move down with slight horizontal drift
-            drop[1] += random.randint(2, 3)
+            # Draw raindrop as a 1x2 vertical streak for LED visibility
+            x, y = drop[0], drop[1]
+            if 0 <= x < self.width and 0 <= y < self.height:
+                draw.line([(x, y), (x, min(y + 1, self.height - 1))], fill=(80, 160, 255, 120))
+            # Move down with slight horizontal drift (slower for ~3 FPS)
+            drop[1] += random.randint(1, 2)
             drop[0] += random.choice([-1, 0, 0, 0])
             # Wrap to top when off-screen
             if drop[1] >= self.height:
@@ -69,11 +71,11 @@ class RainAnimation(WeatherAnimation):
 
     def reset(self) -> None:
         self.drops.clear()
-        self._spawn_drops(18)
+        self._spawn_drops(22)
 
 
 class SnowAnimation(WeatherAnimation):
-    """Gently falling white snowflake particles."""
+    """Gently falling white snowflake particles (2x1 rectangles)."""
 
     def __init__(self, width: int = 64, height: int = 20) -> None:
         super().__init__(width, height)
@@ -91,9 +93,11 @@ class SnowAnimation(WeatherAnimation):
         img = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
         for flake in self.flakes:
-            if 0 <= flake[0] < self.width and 0 <= flake[1] < self.height:
-                draw.point((flake[0], flake[1]), fill=(255, 255, 255, 45))
-            # Slow descent with horizontal drift
+            x, y = flake[0], flake[1]
+            if 0 <= x < self.width and 0 <= y < self.height:
+                # Draw snowflake as a 2x1 horizontal rectangle for LED visibility
+                draw.rectangle([x, y, min(x + 1, self.width - 1), y], fill=(255, 255, 255, 110))
+            # Slow descent with horizontal drift (already slow enough for ~3 FPS)
             flake[1] += random.randint(1, 2)
             flake[0] += random.choice([-1, 0, 0, 1])
             if flake[1] >= self.height:
@@ -111,11 +115,11 @@ class CloudAnimation(WeatherAnimation):
 
     def __init__(self, width: int = 64, height: int = 20) -> None:
         super().__init__(width, height)
-        # 3 cloud blobs at different positions and speeds
+        # 3 cloud blobs at different positions and speeds (halved for ~3 FPS)
         self.clouds: list[dict] = [
-            {"x": 5.0, "y": 3, "w": 12, "h": 6, "speed": 0.3},
-            {"x": 30.0, "y": 8, "w": 10, "h": 5, "speed": 0.2},
-            {"x": 50.0, "y": 13, "w": 14, "h": 5, "speed": 0.4},
+            {"x": 5.0, "y": 3, "w": 12, "h": 6, "speed": 0.15},
+            {"x": 30.0, "y": 8, "w": 10, "h": 5, "speed": 0.1},
+            {"x": 50.0, "y": 13, "w": 14, "h": 5, "speed": 0.2},
         ]
 
     def tick(self) -> Image.Image:
@@ -126,14 +130,14 @@ class CloudAnimation(WeatherAnimation):
             y = cloud["y"]
             w = cloud["w"]
             h = cloud["h"]
-            # Draw cloud as overlapping ellipses at low alpha
+            # Draw cloud as overlapping ellipses -- alpha tuned for LED visibility
             draw.ellipse(
                 [x, y, x + w, y + h],
-                fill=(180, 180, 190, 35),
+                fill=(180, 180, 190, 80),
             )
             draw.ellipse(
                 [x + w // 3, y - 1, x + w + w // 3, y + h - 1],
-                fill=(180, 180, 190, 30),
+                fill=(180, 180, 190, 65),
             )
             # Drift right, wrap around
             cloud["x"] += cloud["speed"]
@@ -148,7 +152,7 @@ class CloudAnimation(WeatherAnimation):
 
 
 class SunAnimation(WeatherAnimation):
-    """Subtle warm glow pulsing effect for sunny conditions."""
+    """Warm glow pulsing effect for sunny conditions."""
 
     def __init__(self, width: int = 64, height: int = 20) -> None:
         super().__init__(width, height)
@@ -157,10 +161,10 @@ class SunAnimation(WeatherAnimation):
     def tick(self) -> Image.Image:
         img = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
-        # Gentle pulsing glow: alpha oscillates between 15 and 35
+        # Pulsing glow: alpha oscillates between 50 and 90 for LED visibility
         self._tick_count += 1
         phase = (self._tick_count % 20) / 20.0
-        alpha = int(15 + 20 * abs(phase - 0.5) * 2)
+        alpha = int(50 + 40 * abs(phase - 0.5) * 2)
         # Warm gradient from top-left corner
         draw.ellipse(
             [-10, -10, 25, 15],
@@ -183,13 +187,13 @@ class ThunderAnimation(WeatherAnimation):
     def tick(self) -> Image.Image:
         img = self._rain.tick()
         self._tick_count += 1
-        # Flash every ~20 ticks (roughly every 5 seconds at 4 FPS)
+        # Flash every ~20 ticks (roughly every 7 seconds at ~3 FPS)
         if self._tick_count % 20 == 0:
             draw = ImageDraw.Draw(img)
-            # Brief bright flash across zone
+            # Bright visible flash across zone
             draw.rectangle(
                 [0, 0, self.width - 1, self.height - 1],
-                fill=(255, 255, 255, 40),
+                fill=(255, 255, 255, 150),
             )
         return img
 
@@ -208,12 +212,12 @@ class FogAnimation(WeatherAnimation):
     def tick(self) -> Image.Image:
         img = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
-        self._offset += 0.15
+        self._offset += 0.08  # slower for ~3 FPS (was 0.15 at ~1 effective FPS)
         # Draw horizontal fog bands at varying positions
         for i, base_y in enumerate([3, 8, 13, 17]):
             y = int(base_y + (self._offset + i * 1.5) % 3 - 1)
             if 0 <= y < self.height:
-                alpha = 30 + (i % 2) * 15
+                alpha = 70 + (i % 2) * 30  # LED-visible alpha range
                 x_start = int((self._offset * (i + 1)) % 5)
                 draw.line(
                     [(x_start, y), (self.width - 1 - x_start, y)],
