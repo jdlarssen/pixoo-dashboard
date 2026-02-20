@@ -14,8 +14,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation** - Device driver, render engine, pixel layout, and clock/date on the Pixoo 64
 - [x] **Phase 2: Bus Departures** - Live Entur transit data for Ladeveien in both directions
-- [ ] **Phase 3: Weather** - Yr/MET weather data with pixel art icons
-- [ ] **Phase 4: Polish and Reliability** - Urgency coloring, brightness, error handling, service wrapper, and push messages
+- [x] **Phase 3: Weather** - Yr/MET weather data with pixel art icons
+- [x] **Phase 4: Polish and Reliability** - Urgency coloring, brightness, error handling, service wrapper, and push messages
 
 ## Phase Details
 
@@ -64,7 +64,7 @@ Plans:
 Plans:
 - [x] 03-01-PLAN.md -- Weather data provider (MET API client, config, DisplayState extension)
 - [x] 03-02-PLAN.md -- Weather zone renderer with icons, animations, clock icon, and device verification
-- [ ] 03-03-PLAN.md -- Gap closure: fix animation visibility (compositing, rate limiter, alpha values)
+- [x] 03-03-PLAN.md -- Gap closure: fix animation visibility (compositing, rate limiter, alpha values)
 
 ### Phase 4: Polish and Reliability
 **Goal**: The dashboard is production-quality for daily use with urgency coloring, adaptive brightness, robust error handling, supervised operation, and message override capability
@@ -79,10 +79,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 04-01-PLAN.md -- Urgency colors for bus departures and staleness/error handling
-- [ ] 04-02-PLAN.md -- Auto-brightness scheduling and visual color overhaul
-- [ ] 04-03-PLAN.md -- Discord message override integration
-- [ ] 04-04-PLAN.md -- Launchd service wrapper and birthday easter egg
+- [x] 04-01-PLAN.md -- Urgency colors for bus departures and staleness/error handling
+- [x] 04-02-PLAN.md -- Auto-brightness scheduling and visual color overhaul
+- [x] 04-03-PLAN.md -- Discord message override integration
+- [x] 04-04-PLAN.md -- Launchd service wrapper and birthday easter egg
 
 ## Progress
 
@@ -93,5 +93,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | Complete    | 2026-02-20 |
 | 2. Bus Departures | 2/2 | Complete | 2026-02-20 |
-| 3. Weather | 2/3 | Gap closure | - |
-| 4. Polish and Reliability | 0/4 | Planned | - |
+| 3. Weather | 3/3 | Complete | 2026-02-20 |
+| 4. Polish and Reliability | 4/4 | Complete | 2026-02-20 |
