@@ -9,8 +9,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Display
 
-- [ ] **DISP-01**: Full-frame custom rendering via PIL/Pillow pushed to Pixoo 64
-- [ ] **DISP-02**: Pixel font rendering with Norwegian character support (æøå)
+- [x] **DISP-01**: Full-frame custom rendering via PIL/Pillow pushed to Pixoo 64
+- [x] **DISP-02**: Pixel font rendering with Norwegian character support (æøå)
 - [ ] **DISP-03**: Single-screen layout — all info zones on 64x64, readable at a glance
 - [ ] **DISP-04**: Auto-brightness based on time of day
 
@@ -36,7 +36,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Reliability
 
-- [ ] **RLBL-01**: Connection refresh cycle (prevent 300-push lockup)
+- [x] **RLBL-01**: Connection refresh cycle (prevent 300-push lockup)
 - [ ] **RLBL-02**: Graceful error states (show last known data when API fails)
 - [ ] **RLBL-03**: Auto-restart via service wrapper (systemd/launchd)
 
@@ -88,8 +88,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DISP-01 | Phase 1 | Pending |
-| DISP-02 | Phase 1 | Pending |
+| DISP-01 | Phase 1 | Complete |
+| DISP-02 | Phase 1 | Complete |
 | DISP-03 | Phase 1 | Pending |
 | DISP-04 | Phase 4 | Pending |
 | CLCK-01 | Phase 1 | Pending |
@@ -103,7 +103,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WTHR-02 | Phase 3 | Pending |
 | WTHR-03 | Phase 3 | Pending |
 | WTHR-04 | Phase 3 | Pending |
-| RLBL-01 | Phase 1 | Pending |
+| RLBL-01 | Phase 1 | Complete |
 | RLBL-02 | Phase 4 | Pending |
 | RLBL-03 | Phase 4 | Pending |
 | MSG-01 | Phase 4 | Pending |
