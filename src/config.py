@@ -62,3 +62,7 @@ WEATHER_API_URL = "https://api.met.no/weatherapi/locationforecast/2.0/compact"
 WEATHER_USER_AGENT = os.environ.get(
     "WEATHER_USER_AGENT", "divoom-hub/0.1 github.com/jdl/divoom-hub"
 )
+
+# Discord message override settings (optional -- bot only starts if both are set)
+DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN")  # None if not configured
+DISCORD_CHANNEL_ID = os.environ.get("DISCORD_CHANNEL_ID")  # None if not configured
