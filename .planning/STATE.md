@@ -5,33 +5,34 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** Glance at the display and instantly know: what time it is, when the next buses leave, and what the weather is doing -- without pulling out your phone.
-**Current focus:** Phase 1: Foundation (Complete)
+**Current focus:** Phase 2: Bus Departures (In Progress)
 
 ## Current Position
 
-Phase: 1 of 4 (Foundation) -- COMPLETE
-Plan: 2 of 2 in current phase (all plans complete)
-Status: Phase complete -- ready for Phase 2 planning
-Last activity: 2026-02-20 -- Completed 01-02-PLAN.md
+Phase: 2 of 4 (Bus Departures)
+Plan: 1 of 2 in current phase
+Status: Executing Phase 2 -- Plan 01 complete
+Last activity: 2026-02-20 -- Completed 02-01-PLAN.md
 
-Progress: [██░░░░░░░░] 20%
+Progress: [███░░░░░░░] 30%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: 12 min
-- Total execution time: 0.40 hours
+- Total plans completed: 3
+- Average duration: 9 min
+- Total execution time: 0.45 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-foundation | 2 | 24 min | 12 min |
+| 02-bus-departures | 1 | 3 min | 3 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (4 min), 01-02 (20 min)
-- Trend: Starting
+- Last 5 plans: 01-01 (4 min), 01-02 (20 min), 02-01 (3 min)
+- Trend: Accelerating
 
 *Updated after each plan completion*
 
@@ -50,6 +51,9 @@ Recent decisions affecting current work:
 - [01-02]: Norwegian day/month names use manual dictionaries instead of locale -- avoids system locale dependency
 - [01-02]: DisplayState equality drives dirty flag -- only re-renders when minute changes
 - [01-02]: Zone pixel budget: clock 14px, date 9px, divider 1px, bus 19px, divider 1px, weather 20px = 64px
+- [02-01]: Quay IDs from Entur: NSR:Quay:73154 (Sentrum) and NSR:Quay:73152 (Lade/Strindheim)
+- [02-01]: DisplayState bus fields use tuples (not lists) to preserve hashability for dirty flag
+- [02-01]: fetch_departures_safe returns list[int] | None -- simplified for renderer consumption
 
 ### Pending Todos
 
@@ -58,10 +62,10 @@ None yet.
 ### Blockers/Concerns
 
 - ~~Phase 1 needs hands-on Norwegian bitmap font testing~~ RESOLVED: hzeller BDF fonts confirmed rendering ae/oe/aa in all 3 sizes (4x6, 5x8, 7x13)
-- Phase 2 requires Ladeveien quay ID lookup (5-minute mechanical task via stoppested.entur.org) before implementation
+- ~~Phase 2 requires Ladeveien quay ID lookup (5-minute mechanical task via stoppested.entur.org) before implementation~~ RESOLVED: Quay IDs discovered via Entur API -- NSR:Quay:73154 (Sentrum) and NSR:Quay:73152 (Lade/Strindheim)
 
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 01-02-PLAN.md (clock dashboard -- Phase 1 complete)
+Stopped at: Completed 02-01-PLAN.md (bus data provider -- Plan 1 of Phase 2 complete)
 Resume file: None

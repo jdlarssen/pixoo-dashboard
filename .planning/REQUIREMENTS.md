@@ -21,11 +21,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Bus
 
-- [ ] **BUS-01**: Show next 2 departures from Ladeveien — direction 1
-- [ ] **BUS-02**: Show next 2 departures from Ladeveien — direction 2
-- [ ] **BUS-03**: Countdown format ("5 min" instead of "14:35")
+- [x] **BUS-01**: Show next 2 departures from Ladeveien — direction 1
+- [x] **BUS-02**: Show next 2 departures from Ladeveien — direction 2
+- [x] **BUS-03**: Countdown format ("5 min" instead of "14:35")
 - [ ] **BUS-04**: Color coding by urgency (green/yellow/red)
-- [ ] **BUS-05**: 60-second refresh cycle
+- [x] **BUS-05**: 60-second refresh cycle
 
 ### Weather
 
@@ -94,11 +94,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DISP-04 | Phase 4 | Pending |
 | CLCK-01 | Phase 1 | Complete |
 | CLCK-02 | Phase 1 | Complete |
-| BUS-01 | Phase 2 | Pending |
-| BUS-02 | Phase 2 | Pending |
-| BUS-03 | Phase 2 | Pending |
+| BUS-01 | Phase 2 | Complete |
+| BUS-02 | Phase 2 | Complete |
+| BUS-03 | Phase 2 | Complete |
 | BUS-04 | Phase 4 | Pending |
-| BUS-05 | Phase 2 | Pending |
+| BUS-05 | Phase 2 | Complete |
 | WTHR-01 | Phase 3 | Pending |
 | WTHR-02 | Phase 3 | Pending |
 | WTHR-03 | Phase 3 | Pending |
