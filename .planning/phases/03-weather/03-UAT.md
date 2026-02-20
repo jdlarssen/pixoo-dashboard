@@ -1,5 +1,5 @@
 ---
-status: complete
+status: diagnosed
 phase: 03-weather
 source: [03-01-SUMMARY.md, 03-02-SUMMARY.md]
 started: 2026-02-20T20:00:00Z
@@ -54,7 +54,18 @@ skipped: 1
   reason: "User reported: I don't see it, it might be too subtle"
   severity: minor
   test: 4
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "Double alpha application in renderer.py compositing -- alpha_composite() + paste(mask=alpha) squares effective opacity (20% becomes ~4%). Compounded by PixooClient 1s rate limiter dropping 75% of 4-FPS frames."
+  artifacts:
+    - path: "src/display/renderer.py"
+      issue: "Lines 128-137: alpha_composite + paste(mask=alpha) applies transparency twice"
+    - path: "src/device/pixoo_client.py"
+      issue: "Lines 62-66: 1s rate limiter silently drops most animation frames"
+    - path: "src/display/weather_anim.py"
+      issue: "Alpha values 30-50 too low for LED hardware even without double-alpha bug"
+    - path: "src/main.py"
+      issue: "0.25s animation loop conflicts with 1s device rate limit"
+  missing:
+    - "Fix compositing to apply alpha only once (alpha_composite OR paste mask, not both)"
+    - "Align animation frame rate with device rate limit"
+    - "Increase alpha values and particle sizes for LED hardware visibility"
+  debug_session: ".planning/debug/weather-animation-too-subtle.md"
