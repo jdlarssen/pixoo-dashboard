@@ -44,10 +44,11 @@ Plans:
   2. Next 2 bus departures for direction 2 from Ladeveien are displayed on screen
   3. Departures show countdown format ("5 min") rather than absolute time
   4. Bus data refreshes every 60 seconds with updated countdowns
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: TBD
+- [ ] 02-01-PLAN.md — Bus provider (Entur API client, config, DisplayState extension)
+- [ ] 02-02-PLAN.md — Bus zone renderer, main loop integration, and device verification
 
 ### Phase 3: Weather
 **Goal**: Current weather conditions from Yr fill the weather zone with temperature, icon, and forecast data
