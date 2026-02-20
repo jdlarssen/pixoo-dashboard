@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Installation:
+  1. Edit paths below to match your system
+  2. Copy to LaunchAgents: cp com.divoom-hub.dashboard.plist ~/Library/LaunchAgents/
+  3. Load: launchctl load ~/Library/LaunchAgents/com.divoom-hub.dashboard.plist
+  4. Check status: launchctl list | grep divoom
+  5. Stop: launchctl unload ~/Library/LaunchAgents/com.divoom-hub.dashboard.plist
+  6. View logs: tail -f /tmp/divoom-hub.log
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.divoom-hub.dashboard</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/EDIT/PATH/TO/divoom-hub/.venv/bin/python</string>
+        <string>/EDIT/PATH/TO/divoom-hub/src/main.py</string>
+        <string>--ip</string>
+        <string>192.168.1.100</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/EDIT/PATH/TO/divoom-hub</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/divoom-hub.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/tmp/divoom-hub.err</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>DIVOOM_IP</key>
+        <string>192.168.1.100</string>
+
+        <!-- Optional: Discord message override (remove if not using) -->
+        <key>DISCORD_BOT_TOKEN</key>
+        <string>YOUR_DISCORD_BOT_TOKEN</string>
+
+        <key>DISCORD_CHANNEL_ID</key>
+        <string>YOUR_DISCORD_CHANNEL_ID</string>
+    </dict>
+</dict>
+</plist>
