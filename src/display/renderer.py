@@ -24,6 +24,7 @@ from src.display.layout import (
     DATE_ZONE,
     DIVIDER_1,
     DIVIDER_2,
+    MESSAGE_X,
     TEXT_X,
     WEATHER_ZONE,
     urgency_color,
@@ -217,10 +218,11 @@ def _render_message(
     text: str,
     fonts: dict,
 ) -> None:
-    """Render a persistent message in the bottom portion of the weather zone.
+    """Render a persistent message in the bottom-right of the weather zone.
 
-    Uses the tiny (4x6) font. Truncates to fit within 64px display width.
-    Renders up to 2 lines starting at zone_y + 10 (replaces high/low row).
+    Uses the tiny (4x6) font. Positioned at MESSAGE_X (middle column of the
+    weather zone 3x3 grid), occupying grid positions 8 and 9 (bottom-middle
+    and bottom-right). Renders up to 2 lines starting at zone_y + 10.
 
     Args:
         draw: PIL ImageDraw instance.
@@ -229,18 +231,18 @@ def _render_message(
         fonts: Font dictionary with "tiny" (4x6) key.
     """
     font = fonts["tiny"]
-    max_width = 64 - TEXT_X - 1  # 1px right margin
+    max_width = 64 - MESSAGE_X - 1  # 1px right margin from MESSAGE_X start
 
     # Split into lines that fit within max_width
     lines = _wrap_text(text, font, max_width)
 
-    # Render up to 2 lines in the bottom portion of the weather zone
+    # Render up to 2 lines in the bottom-right portion of the weather zone
     # Starts at zone_y + 10 (replaces high/low row, which is suppressed during messages)
     line_height = 7  # 6px font + 1px gap
     start_y = zone_y + 10  # Replaces hilo row (hilo suppressed when message active)
     for i, line in enumerate(lines[:2]):
         draw.text(
-            (TEXT_X, start_y + i * line_height),
+            (MESSAGE_X, start_y + i * line_height),
             line,
             font=font,
             fill=COLOR_MESSAGE,
