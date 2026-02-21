@@ -39,11 +39,11 @@ Archived to `.planning/milestones/v1.0-ROADMAP.md`
   1. Rain indicator text ("Regn") is clearly readable against rain animation particles on the physical Pixoo 64 at 2+ meters
   2. All 8 weather animation types (rain, snow, sun, fog, thunder, cloudy, partly cloudy, clear night) show readable text with no color collision against their animation layer
   3. Automated tests assert color-identity properties (rain particles are blue-dominant, snow particles are white-ish, text color contrasts with all particle colors) to prevent future regression
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 07-01: TBD
-- [ ] 07-02: TBD
+- [ ] 07-01-PLAN.md -- Color palette tuning (text colors + particle RGB values for all 8 animation types)
+- [ ] 07-02-PLAN.md -- Color-identity regression tests (channel-dominance + contrast assertions)
 
 ### Phase 8: Norwegian README
 **Goal**: A reader can understand, install, configure, run, and maintain Divoom Hub from the README alone -- entirely in Norwegian
@@ -68,5 +68,5 @@ Phases execute in numeric order: 7 → 8
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 7. Weather Color Fix | v1.1 | 0/? | Not started | - |
+| 7. Weather Color Fix | v1.1 | 0/2 | Not started | - |
 | 8. Norwegian README | v1.1 | 0/? | Not started | - |
