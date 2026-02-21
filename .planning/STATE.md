@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 
 ## Current Position
 
-Phase: 5 of 5 (Verification and Cleanup)
-Plan: 1 of 1 in current phase
-Status: Phase 5 Complete -- all v1.0 audit gaps closed, 19/19 requirements verified
-Last activity: 2026-02-21 -- Phase 4 VERIFICATION.md, staleness dot tests, dead code removal
+Phase: 6 of 6 (Tech Debt Cleanup)
+Plan: 0 of 0 in current phase
+Status: Phase 6 added -- tech debt cleanup from v1.0 audit
+Last activity: 2026-02-21 -- Added Phase 6 for tech debt items
 
 Progress: [██████████] 100%
 
@@ -39,6 +39,10 @@ Progress: [██████████] 100%
 *Updated after each plan completion*
 
 ## Accumulated Context
+
+### Roadmap Evolution
+
+- Phase 6 added: Tech Debt Cleanup (dead constant, stale docstring, Pillow deprecation, SUMMARY frontmatter)
 
 ### Decisions
 
