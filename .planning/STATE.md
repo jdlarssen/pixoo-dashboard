@@ -5,47 +5,31 @@
 See: .planning/PROJECT.md (updated 2026-02-21)
 
 **Core value:** Glance at the display and instantly know: what time it is, when the next buses leave, and what the weather is doing -- without pulling out your phone.
-**Current focus:** v1.1 milestone complete -- all phases verified
+**Current focus:** All milestones complete. No active work.
 
 ## Current Position
 
-Milestone: v1.1 Documentation & Polish
-Phase: 8 of 8 (Norwegian README) -- COMPLETE
-Plan: 2 of 2 in current phase -- COMPLETE
-Status: All phases complete, verified. Milestone ready for audit.
-Last activity: 2026-02-21 — Phase 8 verified, all 15 DOC requirements PASS
+Milestone: v1.1 Documentation & Polish -- SHIPPED
+Phase: All phases complete (7-8)
+Status: Milestone archived. No active milestone.
+Last activity: 2026-02-21 -- v1.1 milestone archived and tagged
 
-Progress: [██████████] 100%
+## Milestone History
 
-## Performance Metrics
-
-**Velocity:**
-- Total plans completed: 4 (v1.1)
-- Average duration: 1.5min
-- Total execution time: 6min
-
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 7. Weather Color Fix | 2/2 | 2min | 1min |
-| 8. Norwegian README | 2/2 | 4min | 2min |
+| Milestone | Phases | Plans | Shipped |
+|-----------|--------|-------|---------|
+| v1.0 MVP | 1-6 | 15 | 2026-02-21 |
+| v1.1 Documentation & Polish | 7-8 | 4 | 2026-02-21 |
 
 ## Accumulated Context
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions from v1.1:
-
-- [Phase 7]: RGB-only color changes, preserve alpha values
-- [Phase 8]: Norwegian bokmaal with informal "du" tone
-- [Phase 8]: API docs in collapsible `<details>` blocks
-- [Phase 8]: Safe placeholder values (Oslo center coords, NSR:Quay:XXXXX)
+Full log in PROJECT.md Key Decisions table.
 
 ### Pending Todos
 
-None -- v1.1 milestone complete.
+None.
 
 ### Blockers/Concerns
 
@@ -54,5 +38,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: Phase 8 verified PASS. v1.1 milestone all phases complete. Ready for milestone audit.
+Stopped at: v1.1 milestone archived and tagged. No active milestone.
 Resume file: None
