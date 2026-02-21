@@ -10,9 +10,32 @@ from the async Discord bot thread to the synchronous main rendering loop.
 """
 
 import logging
+import re
 import threading
 
 logger = logging.getLogger(__name__)
+
+
+def sanitize_for_bdf(text: str) -> str | None:
+    """Strip characters that BDF bitmap fonts cannot render.
+
+    BDF fonts only support Latin-1 (code points 0-255). Characters outside
+    this range (emoji, CJK, etc.) cause UnicodeEncodeError in PIL's
+    font.getbbox(). This function removes them before text reaches the
+    renderer.
+
+    Args:
+        text: Raw message text (may contain emoji, Unicode, etc.).
+
+    Returns:
+        Sanitized text with only Latin-1 characters, or None if nothing
+        renderable remains. Consecutive whitespace is collapsed.
+    """
+    # Remove all characters with code points > 255 (outside Latin-1)
+    cleaned = "".join(ch for ch in text if ord(ch) <= 255)
+    # Collapse any whitespace left behind by removed characters
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned if cleaned else None
 
 
 class MessageBridge:
@@ -29,11 +52,15 @@ class MessageBridge:
     def set_message(self, text: str | None) -> None:
         """Set or clear the current display message.
 
+        Sanitizes text to remove characters outside Latin-1 (code points
+        > 255) that BDF bitmap fonts cannot render. If only non-renderable
+        characters remain, the message is cleared (set to None).
+
         Args:
             text: Message text to display, or None to clear.
         """
         with self._lock:
-            self._message = text
+            self._message = sanitize_for_bdf(text) if text is not None else None
 
     @property
     def current_message(self) -> str | None:
