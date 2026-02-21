@@ -179,9 +179,8 @@ def render_weather_zone(
         fill=temp_color,
     )
 
-    # High/low below current temp -- tiny font, soft teal
-    # Suppressed when Discord message is active (message occupies this area)
-    if state.message_text is None and state.weather_high is not None and state.weather_low is not None:
+    # High/low below current temp -- tiny font, soft teal (always visible)
+    if state.weather_high is not None and state.weather_low is not None:
         hilo_text = f"{state.weather_high}/{state.weather_low}"
         draw.text(
             (TEXT_X, zone_y + 10),
@@ -190,18 +189,15 @@ def render_weather_zone(
             fill=COLOR_WEATHER_HILO,
         )
 
-    # Rain indicator -- right of current temp
-    if state.message_text is None:
-        if state.weather_precip_mm is not None and state.weather_precip_mm > 0:
-            temp_bbox = fonts["small"].getbbox(temp_text)
-            temp_width = temp_bbox[2] - temp_bbox[0] if temp_bbox else len(temp_text) * 6
-            rain_text = f"{state.weather_precip_mm:.1f}mm"
-            draw.text(
-                (TEXT_X + temp_width + 5, zone_y + 2),
-                rain_text,
-                font=fonts["tiny"],
-                fill=COLOR_WEATHER_RAIN,
-            )
+    # Rain indicator -- below high/low line (always visible)
+    if state.weather_precip_mm is not None and state.weather_precip_mm > 0:
+        rain_text = f"{state.weather_precip_mm:.1f}mm"
+        draw.text(
+            (TEXT_X, zone_y + 17),
+            rain_text,
+            font=fonts["tiny"],
+            fill=COLOR_WEATHER_RAIN,
+        )
 
     # Message overlay
     if state.message_text is not None:
@@ -218,11 +214,11 @@ def _render_message(
     text: str,
     fonts: dict,
 ) -> None:
-    """Render a persistent message in the bottom-right of the weather zone.
+    """Render a persistent Discord message on the right side of the weather zone.
 
-    Uses the tiny (4x6) font. Positioned at MESSAGE_X (middle column of the
-    weather zone 3x3 grid), occupying grid positions 8 and 9 (bottom-middle
-    and bottom-right). Renders up to 2 lines starting at zone_y + 10.
+    Uses the tiny (4x6) font. Positioned at MESSAGE_X (x=22), rendering up to
+    3 lines starting at zone_y + 1 (aligned with the current temperature).
+    Coexists with temp/hilo/precip on the left side.
 
     Args:
         draw: PIL ImageDraw instance.
@@ -236,11 +232,11 @@ def _render_message(
     # Split into lines that fit within max_width
     lines = _wrap_text(text, font, max_width)
 
-    # Render up to 2 lines in the bottom-right portion of the weather zone
-    # Starts at zone_y + 10 (replaces high/low row, which is suppressed during messages)
+    # Render up to 3 lines on the right side of the weather zone
+    # Starts at zone_y + 1 (aligned with current temp row)
     line_height = 7  # 6px font + 1px gap
-    start_y = zone_y + 10  # Replaces hilo row (hilo suppressed when message active)
-    for i, line in enumerate(lines[:2]):
+    start_y = zone_y + 1  # First line of zone (aligned with temp)
+    for i, line in enumerate(lines[:3]):
         draw.text(
             (MESSAGE_X, start_y + i * line_height),
             line,
@@ -279,16 +275,17 @@ def _wrap_text(text: str, font, max_width: int) -> list[str]:
 
     lines.append(current_line)
 
-    # Truncate last visible line with "..." if there are more lines
-    if len(lines) > 2:
-        last_line = lines[1]
+    # Truncate last visible line with "..." if there are more lines than fit
+    max_lines = 3
+    if len(lines) > max_lines:
+        last_line = lines[max_lines - 1]
         # Try to fit with ellipsis
         while last_line:
             test = last_line + "..."
             bbox = font.getbbox(test)
             width = bbox[2] - bbox[0] if bbox else len(test) * 5
             if width <= max_width:
-                lines[1] = test
+                lines[max_lines - 1] = test
                 break
             last_line = last_line[:-1]
 
