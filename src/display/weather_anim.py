@@ -8,8 +8,10 @@ Alpha values tuned for LED hardware visibility (65-180 range).
 
 Color palette: vivid, LED-friendly colors per weather type.
 Rain=blue, snow=bright white, sun=warm yellow, fog=soft white, clouds=grey-white.
+Night clear=twinkling white/blue stars.
 """
 
+import math
 import random
 
 from PIL import Image, ImageDraw
@@ -440,7 +442,90 @@ class FogAnimation(WeatherAnimation):
         self._spawn_near(3)
 
 
-# Factory: weather group name -> animation class
+class ClearNightAnimation(WeatherAnimation):
+    """Twinkling stars for clear nighttime skies at two depths.
+
+    Far stars (behind text): dim, slow twinkle, cool white.
+    Near stars (in front of text): brighter, warm white, gentle twinkle.
+    Stars randomly fade in and out to create a twinkling effect.
+    """
+
+    def __init__(self, width: int = 64, height: int = 24) -> None:
+        super().__init__(width, height)
+        self.far_stars: list[dict] = []
+        self.near_stars: list[dict] = []
+        self._spawn_far(12)
+        self._spawn_near(5)
+
+    def _spawn_far(self, count: int) -> None:
+        for _ in range(count):
+            self.far_stars.append({
+                "x": random.randint(0, self.width - 1),
+                "y": random.randint(0, self.height - 1),
+                "alpha": random.randint(40, 90),
+                "phase": random.uniform(0, 6.28),   # random start phase
+                "speed": random.uniform(0.08, 0.2),  # twinkle speed
+            })
+
+    def _spawn_near(self, count: int) -> None:
+        for _ in range(count):
+            self.near_stars.append({
+                "x": random.randint(0, self.width - 1),
+                "y": random.randint(0, self.height - 1),
+                "alpha": random.randint(120, 180),
+                "phase": random.uniform(0, 6.28),
+                "speed": random.uniform(0.1, 0.25),
+            })
+
+    def tick(self) -> tuple[Image.Image, Image.Image]:
+        bg = self._empty()
+        fg = self._empty()
+        bg_draw = ImageDraw.Draw(bg)
+        fg_draw = ImageDraw.Draw(fg)
+
+        # Far stars -- behind text, cool white, single pixel
+        for star in self.far_stars:
+            star["phase"] += star["speed"]
+            # Sinusoidal twinkle: alpha oscillates around base value
+            twinkle = math.sin(star["phase"])
+            alpha = int(star["alpha"] + twinkle * 30)
+            alpha = max(15, min(alpha, 120))
+            x, y = star["x"], star["y"]
+            if 0 <= x < self.width and 0 <= y < self.height:
+                bg_draw.point((x, y), fill=(180, 200, 255, alpha))
+
+        # Near stars -- in front of text, warm white, + shape for brighter ones
+        for star in self.near_stars:
+            star["phase"] += star["speed"]
+            twinkle = math.sin(star["phase"])
+            alpha = int(star["alpha"] + twinkle * 40)
+            alpha = max(60, min(alpha, 220))
+            x, y = star["x"], star["y"]
+            color = (255, 250, 230, alpha)
+            if 0 <= x < self.width and 0 <= y < self.height:
+                fg_draw.point((x, y), fill=color)
+                # Cross arms for brighter moments
+                if alpha > 150:
+                    dim_color = (255, 250, 230, alpha // 2)
+                    if 0 <= x - 1 < self.width:
+                        fg_draw.point((x - 1, y), fill=dim_color)
+                    if 0 <= x + 1 < self.width:
+                        fg_draw.point((x + 1, y), fill=dim_color)
+                    if 0 <= y - 1 < self.height:
+                        fg_draw.point((x, y - 1), fill=dim_color)
+                    if 0 <= y + 1 < self.height:
+                        fg_draw.point((x, y + 1), fill=dim_color)
+
+        return bg, fg
+
+    def reset(self) -> None:
+        self.far_stars.clear()
+        self.near_stars.clear()
+        self._spawn_far(12)
+        self._spawn_near(5)
+
+
+# Factory: weather group name -> animation class (daytime)
 _ANIMATION_MAP: dict[str, type[WeatherAnimation]] = {
     "clear": SunAnimation,
     "partcloud": SunAnimation,
@@ -452,16 +537,30 @@ _ANIMATION_MAP: dict[str, type[WeatherAnimation]] = {
     "fog": FogAnimation,
 }
 
+# Night overrides: groups that should use a different animation at night
+_NIGHT_ANIMATION_MAP: dict[str, type[WeatherAnimation]] = {
+    "clear": ClearNightAnimation,
+    "partcloud": ClearNightAnimation,
+}
 
-def get_animation(weather_group: str) -> WeatherAnimation:
-    """Get an animation instance for the given weather group.
+
+def get_animation(weather_group: str, *, is_night: bool = False) -> WeatherAnimation:
+    """Get an animation instance for the given weather group and time of day.
+
+    At night, "clear" and "partcloud" use twinkling stars instead of sunrays.
+    Other weather groups (rain, snow, etc.) are the same day and night.
 
     Args:
         weather_group: One of the icon group names from weather_icons.py
                        (clear, partcloud, cloudy, rain, sleet, snow, thunder, fog).
+        is_night: True if it's nighttime (from MET symbol_code suffix).
 
     Returns:
         A WeatherAnimation instance that produces overlay frames.
     """
+    if is_night:
+        cls = _NIGHT_ANIMATION_MAP.get(weather_group)
+        if cls is not None:
+            return cls()
     cls = _ANIMATION_MAP.get(weather_group, CloudAnimation)
     return cls()

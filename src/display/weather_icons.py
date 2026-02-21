@@ -89,15 +89,15 @@ def _draw_sun(size: int) -> Image.Image:
 
 
 def _draw_moon(size: int) -> Image.Image:
-    """White/gray crescent moon."""
+    """White/gray crescent moon -- recognizable at 10px on LED."""
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     cx, cy = size // 2, size // 2
-    r = 3
-    # Full circle in light gray
-    draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(200, 210, 220, 255))
-    # Overlapping dark circle to create crescent
-    draw.ellipse([cx - r + 2, cy - r - 1, cx + r + 2, cy + r - 1], fill=(0, 0, 0, 0))
+    r = 4
+    # Full circle in light silver-blue (shifted right by 1 for centering)
+    draw.ellipse([cx - r + 1, cy - r, cx + r + 1, cy + r], fill=(220, 225, 235, 255))
+    # Overlapping transparent circle to carve out crescent (shifted +3 from main)
+    draw.ellipse([cx - r + 4, cy - r, cx + r + 4, cy + r], fill=(0, 0, 0, 0))
     return img
 
 
