@@ -36,14 +36,16 @@ Progress: [██████████] 100%
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
+Recent decisions from v1.1:
 
-- [v1.1 roadmap]: Color fix before README so documentation describes the corrected animation system
-- [v1.1 roadmap]: Change RGB channels only; do not adjust alpha values (empirically tuned in v1.0)
+- [Phase 7]: RGB-only color changes, preserve alpha values
+- [Phase 8]: Norwegian bokmaal with informal "du" tone
+- [Phase 8]: API docs in collapsible `<details>` blocks
+- [Phase 8]: Safe placeholder values (Oslo center coords, NSR:Quay:XXXXX)
 
 ### Pending Todos
 
-1. Weather animation and rain text colors indistinguishable (display) — addressed by Phase 7
+None -- v1.1 milestone complete.
 
 ### Blockers/Concerns
 

@@ -31,14 +31,13 @@ Glance at the display and instantly know: what time it is, when the next buses l
 - ✓ Graceful error states with last known data (RLBL-02) — v1.0
 - ✓ Auto-restart via launchd service wrapper (RLBL-03) — v1.0
 - ✓ Push text message to temporarily override display via Discord (MSG-01) — v1.0
+- ✓ Fix weather animation/rain text color indistinguishability (FARGE-01, FARGE-02, FARGE-03) — v1.1 Phase 7
+- ✓ Comprehensive Norwegian README with full project documentation (DOC-01 through DOC-15) — v1.1 Phase 8
+- ✓ "Built with Claude Code" transparency — badge and development process section (DOC-08) — v1.1 Phase 8
 
 ### Active
 
-<!-- Current milestone: v1.1 Documentation & Polish -->
-
-- [ ] Comprehensive Norwegian README with full project documentation
-- [ ] "Built with Claude Code" transparency — badge and development process section
-- [ ] Fix weather animation/rain text color indistinguishability
+None — v1.1 milestone complete.
 
 ### Out of Scope
 
@@ -58,7 +57,7 @@ Zone layout: clock 14px, date 9px, divider 1px, bus 19px, divider 1px, weather 2
 APIs: Entur JourneyPlanner GraphQL (bus), MET Norway Locationforecast 2.0 (weather).
 Bus stop: Ladeveien — NSR:Quay:73154 (Sentrum) and NSR:Quay:73152 (Lade/Strindheim).
 Weather animations: rain, snow, sun, fog, thunder with 3D depth layering (bg/fg compositing around text).
-1 pending todo: weather animation and rain text colors indistinguishable on display.
+Weather color issue fixed in v1.1 Phase 7. Norwegian README (414 lines) added in v1.1 Phase 8.
 
 ## Constraints
 
@@ -85,15 +84,15 @@ Weather animations: rain, snow, sun, fog, thunder with 3D depth layering (bg/fg 
 | Discord bot for message override | User already uses Discord; thread-safe MessageBridge | ✓ Good — clean integration with lock-based thread safety |
 | 3D depth animation system | bg/fg tuple composited around text for depth effect | ✓ Good — rain/snow particles pass through text naturally |
 | Alpha values 65-150 for LED visibility | Original 15-50 invisible on physical hardware | ✓ Good — confirmed visible after compositing fix |
+| Color fix: RGB only, no alpha changes | Alpha was empirically tuned in v1.0; preserve it | ✓ Good — vivid colors with preserved depth effect |
+| Norwegian bokmaal with informal "du" tone | User preference; personal hobby project | ✓ Good — warm, approachable documentation |
+| API docs in collapsible `<details>` blocks | Keep README scannable for new readers | ✓ Good — reference-heavy sections don't dominate |
+| Safe placeholder values in README | Prevent personal data leakage (GPS, tokens, quay IDs) | ✓ Good — Oslo center coords, NSR:Quay:XXXXX |
 
-## Current Milestone: v1.1 Documentation & Polish
+## Completed Milestones
 
-**Goal:** Make the project accessible with a comprehensive Norwegian README and fix the remaining display color issue.
-
-**Target features:**
-- Full Norwegian README (overview, setup, architecture, API docs, launchd service, Discord)
-- Claude Code transparency (badge + AI-assisted development section)
-- Weather animation color fix (rain/snow particles vs text)
+- **v1.0 MVP** — Shipped 2026-02-21. Full dashboard with clock, bus, weather, Discord override, birthday easter egg.
+- **v1.1 Documentation & Polish** — Shipped 2026-02-21. Weather color fix (Phase 7) + comprehensive Norwegian README (Phase 8, 414 lines, 15 DOC requirements).
 
 ---
-*Last updated: 2026-02-21 after v1.1 milestone start*
+*Last updated: 2026-02-21 after v1.1 Phase 8 completion*
