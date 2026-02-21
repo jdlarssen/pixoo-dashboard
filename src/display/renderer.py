@@ -118,38 +118,39 @@ def _draw_bus_line(
         cursor_x += text_width
 
 
+def _composite_layer(img: Image.Image, layer: Image.Image, zone_y: int) -> None:
+    """Alpha-composite an RGBA layer onto the image at the weather zone position."""
+    zone_region = img.crop((0, zone_y, layer.width, zone_y + layer.height)).convert("RGBA")
+    composited = Image.alpha_composite(zone_region, layer)
+    img.paste(composited.convert("RGB"), (0, zone_y))
+
+
 def render_weather_zone(
     draw: ImageDraw.ImageDraw,
     img: Image.Image,
     state: DisplayState,
     fonts: dict,
-    anim_frame: Image.Image | None = None,
+    anim_layers: tuple[Image.Image, Image.Image] | None = None,
 ) -> None:
-    """Render the weather zone with temperature, high/low, and rain indicator.
+    """Render the weather zone with 3D layered animation.
 
-    Layout within the 24px weather zone (y=40 to y=63):
-    - Row 1 (y+1): Current temperature + rain indicator
-    - Row 2 (y+11): High/low temperatures in soft teal
-
-    Animation background is composited first, then text drawn on top.
+    Compositing order for depth effect:
+    1. Background animation layer (behind text -- far/dim particles)
+    2. Weather text (temperature, high/low, rain)
+    3. Foreground animation layer (in front of text -- near/bright particles)
 
     Args:
         draw: PIL ImageDraw instance.
-        img: The base RGB image (for compositing animation overlay).
+        img: The base RGB image (for compositing animation overlays).
         state: Current display state with weather data.
         fonts: Font dictionary with "small" (5x8) and "tiny" (4x6) keys.
-        anim_frame: Optional RGBA animation overlay (64x24).
+        anim_layers: Optional (bg_layer, fg_layer) RGBA overlays (64x24 each).
     """
     zone_y = WEATHER_ZONE.y
 
-    # Composite animation background if available
-    if anim_frame is not None:
-        # Single-pass alpha composite: extract the zone region, composite once, paste back.
-        # Previous code applied alpha twice (alpha_composite + paste mask), squashing
-        # effective opacity from ~20% to ~4% -- invisible on LED hardware.
-        zone_region = img.crop((0, zone_y, anim_frame.width, zone_y + anim_frame.height)).convert("RGBA")
-        composited = Image.alpha_composite(zone_region, anim_frame)
-        img.paste(composited.convert("RGB"), (0, zone_y))
+    # 1. Composite background layer (behind text)
+    if anim_layers is not None:
+        _composite_layer(img, anim_layers[0], zone_y)
 
     if state.weather_temp is None:
         # No weather data -- show placeholder
@@ -161,7 +162,7 @@ def render_weather_zone(
         )
         return
 
-    # Current temperature -- use small font for readability
+    # 2. Draw weather text on top of background layer
     temp_value = state.weather_temp
     if temp_value < 0:
         temp_color = COLOR_WEATHER_TEMP_NEG
@@ -177,36 +178,36 @@ def render_weather_zone(
         fill=temp_color,
     )
 
-    # Calculate width of temperature text for positioning high/low
-    temp_bbox = fonts["small"].getbbox(temp_text)
-    temp_width = temp_bbox[2] - temp_bbox[0] if temp_bbox else len(temp_text) * 6
-
-    # High/low on same row, right of current temp -- tiny font, dim gray
+    # High/low below current temp -- tiny font, soft teal
     if state.weather_high is not None and state.weather_low is not None:
         hilo_text = f"{state.weather_high}/{state.weather_low}"
-        hilo_x = TEXT_X + temp_width + 5  # 5px gap
         draw.text(
-            (hilo_x, zone_y + 2),  # slight y offset to align with small font baseline
+            (TEXT_X, zone_y + 10),
             hilo_text,
             font=fonts["tiny"],
             fill=COLOR_WEATHER_HILO,
         )
 
-    # Rain indicator -- show precipitation amount if > 0
-    # When message is active, skip rain to make room for message text
+    # Rain indicator -- right of current temp
     if state.message_text is None:
         if state.weather_precip_mm is not None and state.weather_precip_mm > 0:
+            temp_bbox = fonts["small"].getbbox(temp_text)
+            temp_width = temp_bbox[2] - temp_bbox[0] if temp_bbox else len(temp_text) * 6
             rain_text = f"{state.weather_precip_mm:.1f}mm"
             draw.text(
-                (TEXT_X, zone_y + 11),
+                (TEXT_X + temp_width + 5, zone_y + 2),
                 rain_text,
                 font=fonts["tiny"],
                 fill=COLOR_WEATHER_RAIN,
             )
 
-    # Message overlay -- persistent Discord message in bottom of weather zone
+    # Message overlay
     if state.message_text is not None:
         _render_message(draw, zone_y, state.message_text, fonts)
+
+    # 3. Composite foreground layer (in front of text)
+    if anim_layers is not None:
+        _composite_layer(img, anim_layers[1], zone_y)
 
 
 def _render_message(
@@ -347,7 +348,7 @@ def _draw_birthday_sparkles(draw: ImageDraw.ImageDraw, date_str: str) -> None:
 def render_frame(
     state: DisplayState,
     fonts: dict,
-    anim_frame: Image.Image | None = None,
+    anim_frame: tuple[Image.Image, Image.Image] | None = None,
 ) -> Image.Image:
     """Render the dashboard state into a 64x64 RGB PIL Image.
 
@@ -356,9 +357,9 @@ def render_frame(
 
     Args:
         state: Current display data (time string, date string).
-        fonts: Dictionary with keys "large", "small", "tiny" mapping
+        fonts: Dictionary with keys "small", "tiny" mapping
                to PIL ImageFont objects.
-        anim_frame: Optional RGBA animation overlay for weather zone (64x24).
+        anim_frame: Optional (bg_layer, fg_layer) RGBA tuple for weather zone (64x24 each).
 
     Returns:
         A 64x64 RGB PIL Image ready for pushing to the device.
@@ -424,8 +425,8 @@ def render_frame(
         fill=COLOR_DIVIDER,
     )
 
-    # Weather zone -- temperature, high/low, rain indicator with animated background
-    render_weather_zone(draw, img, state, fonts, anim_frame)
+    # Weather zone -- temperature, high/low, rain with 3D layered animation
+    render_weather_zone(draw, img, state, fonts, anim_layers=anim_frame)
 
     # Staleness indicator for weather data (orange dot at top-right of weather zone)
     if state.weather_stale and not state.weather_too_old:

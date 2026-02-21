@@ -4,15 +4,15 @@ from pathlib import Path
 
 from PIL import Image
 
-from src.config import FONT_DIR, FONT_LARGE, FONT_SMALL, FONT_TINY
+from src.config import FONT_DIR, FONT_SMALL, FONT_TINY
 from src.display.fonts import load_fonts
+from src.display.layout import BUS_ZONE, COLOR_STALE_INDICATOR, WEATHER_ZONE
 from src.display.renderer import render_frame
 from src.display.state import DisplayState
 
 # Load actual fonts for integration testing
 _raw_fonts = load_fonts(FONT_DIR)
 FONTS = {
-    "large": _raw_fonts[FONT_LARGE],
     "small": _raw_fonts[FONT_SMALL],
     "tiny": _raw_fonts[FONT_TINY],
 }
@@ -335,9 +335,10 @@ class TestWeatherZoneRendering:
             weather_precip_mm=2.1,
             weather_is_day=True,
         )
-        # Create a mock animation frame (64x24 RGBA)
-        anim_frame = Image.new("RGBA", (64, 24), (80, 160, 255, 30))
-        frame = render_frame(state, FONTS, anim_frame=anim_frame)
+        # Create mock animation layers (bg + fg, each 64x24 RGBA)
+        bg_layer = Image.new("RGBA", (64, 24), (80, 160, 255, 30))
+        fg_layer = Image.new("RGBA", (64, 24), (80, 160, 255, 20))
+        frame = render_frame(state, FONTS, anim_frame=(bg_layer, fg_layer))
         assert isinstance(frame, Image.Image)
         assert frame.size == (64, 64)
         assert frame.mode == "RGB"
@@ -378,3 +379,72 @@ class TestWeatherZoneRendering:
         output_path = Path("/tmp/test_dashboard_weather.png")
         frame.save(output_path)
         assert output_path.exists(), "Failed to save weather dashboard image"
+
+
+class TestStalenessIndicator:
+    """Tests for the staleness indicator dot rendering."""
+
+    def test_bus_staleness_dot_renders_when_stale(self):
+        """Orange dot appears at (62, BUS_ZONE.y+1) when bus_stale=True and bus_too_old=False."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            bus_direction1=(5, 12, 25),
+            bus_direction2=(3, 8, 18),
+            bus_stale=True,
+            bus_too_old=False,
+        )
+        frame = render_frame(state, FONTS)
+        pixel = frame.getpixel((62, BUS_ZONE.y + 1))
+        assert pixel == COLOR_STALE_INDICATOR, (
+            f"Expected orange dot {COLOR_STALE_INDICATOR} at (62, {BUS_ZONE.y + 1}), got {pixel}"
+        )
+
+    def test_bus_staleness_dot_absent_when_not_stale(self):
+        """No orange dot when bus_stale=False."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            bus_direction1=(5, 12, 25),
+            bus_direction2=(3, 8, 18),
+            bus_stale=False,
+        )
+        frame = render_frame(state, FONTS)
+        pixel = frame.getpixel((62, BUS_ZONE.y + 1))
+        assert pixel != COLOR_STALE_INDICATOR, (
+            "Orange dot should not appear when bus_stale=False"
+        )
+
+    def test_bus_staleness_dot_absent_when_too_old(self):
+        """No orange dot when bus_too_old=True (suppresses the dot -- shows dash placeholders instead)."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            bus_stale=True,
+            bus_too_old=True,
+        )
+        frame = render_frame(state, FONTS)
+        pixel = frame.getpixel((62, BUS_ZONE.y + 1))
+        assert pixel != COLOR_STALE_INDICATOR, (
+            "Orange dot should not appear when bus_too_old=True"
+        )
+
+    def test_weather_staleness_dot_renders_when_stale(self):
+        """Orange dot appears at (62, WEATHER_ZONE.y+1) when weather_stale=True and weather_too_old=False."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            weather_temp=8,
+            weather_symbol="partlycloudy_day",
+            weather_high=12,
+            weather_low=3,
+            weather_precip_mm=0.0,
+            weather_is_day=True,
+            weather_stale=True,
+            weather_too_old=False,
+        )
+        frame = render_frame(state, FONTS)
+        pixel = frame.getpixel((62, WEATHER_ZONE.y + 1))
+        assert pixel == COLOR_STALE_INDICATOR, (
+            f"Expected orange dot {COLOR_STALE_INDICATOR} at (62, {WEATHER_ZONE.y + 1}), got {pixel}"
+        )

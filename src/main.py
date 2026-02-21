@@ -10,6 +10,7 @@ Usage:
 
 import argparse
 import logging
+import os
 import sys
 import time
 from datetime import datetime
@@ -26,7 +27,6 @@ from src.config import (
     DISCORD_BOT_TOKEN,
     DISCORD_CHANNEL_ID,
     FONT_DIR,
-    FONT_LARGE,
     FONT_SMALL,
     FONT_TINY,
     WEATHER_LAT,
@@ -58,11 +58,10 @@ def build_font_map(font_dir: str) -> dict:
         font_dir: Directory containing BDF font files.
 
     Returns:
-        Dictionary with keys "large", "small", "tiny" mapping to PIL fonts.
+        Dictionary with keys "small", "tiny" mapping to PIL fonts.
     """
     raw_fonts = load_fonts(font_dir)
     return {
-        "large": raw_fonts[FONT_LARGE],
         "small": raw_fonts[FONT_SMALL],
         "tiny": raw_fonts[FONT_TINY],
     }
@@ -90,6 +89,22 @@ def main_loop(
         save_frame: If True, save each rendered frame to debug_frame.png.
         message_bridge: Optional MessageBridge from Discord bot for message override.
     """
+    # --- TEST MODE: hardcode weather for visual testing ---
+    # Set TEST_WEATHER env var to: clear, rain, snow, fog (cycles on restart)
+    test_weather_mode = os.environ.get("TEST_WEATHER")
+    test_weather_map = {
+        "clear": WeatherData(temperature=30, symbol_code="clearsky_day", high_temp=32, low_temp=22, precipitation_mm=0.0, is_day=True),
+        "rain": WeatherData(temperature=30, symbol_code="rain_day", high_temp=32, low_temp=22, precipitation_mm=5.0, is_day=True),
+        "snow": WeatherData(temperature=30, symbol_code="snow_day", high_temp=32, low_temp=22, precipitation_mm=2.0, is_day=True),
+        "fog": WeatherData(temperature=30, symbol_code="fog", high_temp=32, low_temp=22, precipitation_mm=0.0, is_day=True),
+        "cloudy": WeatherData(temperature=30, symbol_code="cloudy", high_temp=32, low_temp=22, precipitation_mm=0.0, is_day=True),
+        "sun": WeatherData(temperature=30, symbol_code="clearsky_day", high_temp=32, low_temp=22, precipitation_mm=0.0, is_day=True),
+        "thunder": WeatherData(temperature=30, symbol_code="rainandthunder_day", high_temp=32, low_temp=22, precipitation_mm=8.0, is_day=True),
+    }
+    if test_weather_mode:
+        logger.info("TEST MODE: weather=%s, temp=30°C, daytime", test_weather_mode)
+    # --- END TEST MODE ---
+
     last_state = None
     last_bus_fetch = 0.0  # monotonic() is always > 60 on a running system
     last_weather_fetch = 0.0
@@ -133,7 +148,18 @@ def main_loop(
                 logger.warning("Bus fetch failed, using last-good data (age=%.0fs)", now_mono - last_good_bus_time if last_good_bus_time > 0 else 0)
 
         # Independent 600-second weather data refresh
-        if now_mono - last_weather_fetch >= WEATHER_REFRESH_INTERVAL:
+        if test_weather_mode and test_weather_mode in test_weather_map:
+            # TEST MODE: use hardcoded weather, skip API
+            if weather_data is None:
+                weather_data = test_weather_map[test_weather_mode]
+                last_good_weather = weather_data
+                last_good_weather_time = now_mono
+                new_group = symbol_to_group(weather_data.symbol_code)
+                if new_group != last_weather_group:
+                    weather_anim = get_animation(new_group)
+                    last_weather_group = new_group
+                    logger.info("TEST: weather animation: %s", new_group)
+        elif now_mono - last_weather_fetch >= WEATHER_REFRESH_INTERVAL:
             fresh_weather = fetch_weather_safe(WEATHER_LAT, WEATHER_LON)
             last_weather_fetch = now_mono
             if fresh_weather:
