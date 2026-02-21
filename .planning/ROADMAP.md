@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Weather** - Yr/MET weather data with pixel art icons
 - [x] **Phase 4: Polish and Reliability** - Urgency coloring, brightness, error handling, service wrapper, and push messages
 - [x] **Phase 5: Verification and Cleanup** - Phase 4 verification artifact, missing test, dead code removal, checkbox updates
-- [ ] **Phase 6: Tech Debt Cleanup** - Dead constant, stale docstring, Pillow deprecation fix, SUMMARY frontmatter
+- [x] **Phase 6: Tech Debt Cleanup** - Dead constant, stale docstring, Pillow deprecation fix, SUMMARY frontmatter
 
 ## Phase Details
 
@@ -114,7 +114,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 3. Weather | 3/3 | Complete | 2026-02-20 |
 | 4. Polish and Reliability | 5/5 | Complete | 2026-02-20 |
 | 5. Verification and Cleanup | 1/1 | Complete    | 2026-02-21 |
-| 6. Tech Debt Cleanup | 0/2 | In progress | — |
+| 6. Tech Debt Cleanup | 2/2 | Complete | 2026-02-21 |
 
 ### Phase 6: Tech Debt Cleanup
 **Goal**: Resolve all tech debt items identified in the v1.0 milestone audit — dead code, stale docs, deprecation warnings, and structural format gaps
@@ -127,5 +127,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 **Plans**: 2 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — Dead code removal, stale docstring fix, and Pillow deprecation remediation
-- [ ] 06-02-PLAN.md — Add requirements_completed frontmatter to all 13 SUMMARY files
+- [x] 06-01-PLAN.md — Dead code removal, stale docstring fix, and Pillow deprecation remediation
+- [x] 06-02-PLAN.md — Add requirements_completed frontmatter to all 13 SUMMARY files
