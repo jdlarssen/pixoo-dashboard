@@ -113,6 +113,7 @@ def main_loop(
     weather_data: WeatherData | None = None
     weather_anim: WeatherAnimation | None = None
     last_weather_group: str | None = None
+    last_weather_night: bool | None = None
     needs_push = False
 
     # Staleness tracking -- preserve last-good data through API failures
@@ -156,10 +157,12 @@ def main_loop(
                 last_good_weather = weather_data
                 last_good_weather_time = now_mono
                 new_group = symbol_to_group(weather_data.symbol_code)
-                if new_group != last_weather_group:
-                    weather_anim = get_animation(new_group)
+                is_night = not weather_data.is_day
+                if new_group != last_weather_group or is_night != last_weather_night:
+                    weather_anim = get_animation(new_group, is_night=is_night)
                     last_weather_group = new_group
-                    logger.info("TEST: weather animation: %s", new_group)
+                    last_weather_night = is_night
+                    logger.info("TEST: weather animation: %s (night=%s)", new_group, is_night)
         elif now_mono - last_weather_fetch >= WEATHER_REFRESH_INTERVAL:
             fresh_weather = fetch_weather_safe(WEATHER_LAT, WEATHER_LON)
             last_weather_fetch = now_mono
@@ -173,12 +176,14 @@ def main_loop(
                     weather_data.symbol_code,
                     weather_data.precipitation_mm,
                 )
-                # Swap animation if weather group changed
+                # Swap animation if weather group or day/night changed
                 new_group = symbol_to_group(weather_data.symbol_code)
-                if new_group != last_weather_group:
-                    weather_anim = get_animation(new_group)
+                is_night = not weather_data.is_day
+                if new_group != last_weather_group or is_night != last_weather_night:
+                    weather_anim = get_animation(new_group, is_night=is_night)
                     last_weather_group = new_group
-                    logger.info("Weather animation: %s", new_group)
+                    last_weather_night = is_night
+                    logger.info("Weather animation: %s (night=%s)", new_group, is_night)
             else:
                 # API failed -- keep using last-good data
                 weather_data = last_good_weather

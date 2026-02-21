@@ -16,6 +16,7 @@ from PIL import Image
 
 from src.display.layout import COLOR_WEATHER_RAIN
 from src.display.weather_anim import (
+    ClearNightAnimation,
     CloudAnimation,
     FogAnimation,
     RainAnimation,
@@ -147,17 +148,19 @@ class TestAnimationVisibility:
         )
 
     def test_tick_returns_two_layers(self):
-        """All animations must return (bg_layer, fg_layer) tuple."""
+        """All animations (day and night) must return (bg_layer, fg_layer) tuple."""
         for name in ["clear", "rain", "snow", "cloudy", "thunder", "fog"]:
-            anim = get_animation(name)
-            result = anim.tick()
-            assert isinstance(result, tuple), f"{name} tick() should return tuple"
-            assert len(result) == 2, f"{name} tick() should return 2 layers"
-            bg, fg = result
-            assert bg.size == (64, 24), f"{name} bg size {bg.size} != (64, 24)"
-            assert bg.mode == "RGBA", f"{name} bg mode {bg.mode} != RGBA"
-            assert fg.size == (64, 24), f"{name} fg size {fg.size} != (64, 24)"
-            assert fg.mode == "RGBA", f"{name} fg mode {fg.mode} != RGBA"
+            for is_night in (False, True):
+                label = f"{name}/{'night' if is_night else 'day'}"
+                anim = get_animation(name, is_night=is_night)
+                result = anim.tick()
+                assert isinstance(result, tuple), f"{label} tick() should return tuple"
+                assert len(result) == 2, f"{label} tick() should return 2 layers"
+                bg, fg = result
+                assert bg.size == (64, 24), f"{label} bg size {bg.size} != (64, 24)"
+                assert bg.mode == "RGBA", f"{label} bg mode {bg.mode} != RGBA"
+                assert fg.size == (64, 24), f"{label} fg size {fg.size} != (64, 24)"
+                assert fg.mode == "RGBA", f"{label} fg mode {fg.mode} != RGBA"
 
     def test_get_animation_returns_correct_types(self):
         assert isinstance(get_animation("rain"), RainAnimation)
@@ -294,3 +297,84 @@ class TestColorIdentity:
             f"Thunder blue-dominant proportion ({proportion:.2f}) too low -- "
             f"rain component should produce at least 30% blue pixels"
         )
+
+
+class TestNightAnimations:
+    """Verify night-specific animations and day/night animation selection."""
+
+    def test_clear_night_returns_star_animation(self):
+        """get_animation('clear', is_night=True) should return ClearNightAnimation."""
+        anim = get_animation("clear", is_night=True)
+        assert isinstance(anim, ClearNightAnimation), (
+            f"Expected ClearNightAnimation, got {type(anim).__name__}"
+        )
+
+    def test_partcloud_night_returns_star_animation(self):
+        """get_animation('partcloud', is_night=True) should return ClearNightAnimation."""
+        anim = get_animation("partcloud", is_night=True)
+        assert isinstance(anim, ClearNightAnimation), (
+            f"Expected ClearNightAnimation, got {type(anim).__name__}"
+        )
+
+    def test_clear_day_returns_sun_animation(self):
+        """get_animation('clear') should still return SunAnimation by default."""
+        anim = get_animation("clear")
+        assert isinstance(anim, SunAnimation), (
+            f"Expected SunAnimation, got {type(anim).__name__}"
+        )
+
+    def test_clear_day_explicit_returns_sun_animation(self):
+        """get_animation('clear', is_night=False) should return SunAnimation."""
+        anim = get_animation("clear", is_night=False)
+        assert isinstance(anim, SunAnimation), (
+            f"Expected SunAnimation, got {type(anim).__name__}"
+        )
+
+    def test_rain_night_same_as_day(self):
+        """Rain animation should be the same class day and night."""
+        day_anim = get_animation("rain", is_night=False)
+        night_anim = get_animation("rain", is_night=True)
+        assert type(day_anim) is type(night_anim), (
+            f"Rain day ({type(day_anim).__name__}) != night ({type(night_anim).__name__})"
+        )
+
+    def test_clear_night_tick_returns_two_layers(self):
+        """ClearNightAnimation tick should return (bg, fg) RGBA layers."""
+        anim = ClearNightAnimation()
+        bg, fg = anim.tick()
+        assert bg.size == (64, 24), f"bg size {bg.size} != (64, 24)"
+        assert bg.mode == "RGBA", f"bg mode {bg.mode} != RGBA"
+        assert fg.size == (64, 24), f"fg size {fg.size} != (64, 24)"
+        assert fg.mode == "RGBA", f"fg mode {fg.mode} != RGBA"
+
+    def test_clear_night_has_visible_pixels(self):
+        """Star animation should produce visible pixels after a few ticks."""
+        anim = ClearNightAnimation()
+        max_alpha = 0
+        total_pixels = 0
+        for _ in range(5):
+            bg, fg = anim.tick()
+            for layer in (bg, fg):
+                alpha_band = layer.split()[3]
+                for a in alpha_band.get_flattened_data():
+                    if a > 0:
+                        total_pixels += 1
+                    max_alpha = max(max_alpha, a)
+        assert max_alpha >= 60, (
+            f"Star max alpha {max_alpha} too low for LED visibility"
+        )
+        assert total_pixels > 0, "No visible star pixels produced"
+
+    def test_clear_night_stars_are_cool_or_warm_white(self):
+        """Star particles should be white-ish (cool or warm), not colored."""
+        anim = ClearNightAnimation()
+        colors = _sample_particle_rgb(anim, num_ticks=5)
+        assert len(colors) > 0, "No star particles sampled"
+        for r, g, b in colors:
+            min_ch = min(r, g, b)
+            max_ch = max(r, g, b)
+            spread = max_ch - min_ch
+            assert spread <= 80, (
+                f"Star pixel ({r}, {g}, {b}) spread {spread} too high -- "
+                f"should be white-ish"
+            )
