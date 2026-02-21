@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** Glance at the display and instantly know: what time it is, when the next buses leave, and what the weather is doing -- without pulling out your phone.
-**Current focus:** Phase 5: Verification and Cleanup (Complete)
+**Current focus:** Phase 6: Tech Debt Cleanup (Complete)
 
 ## Current Position
 
 Phase: 6 of 6 (Tech Debt Cleanup)
-Plan: 0 of 0 in current phase
-Status: Phase 6 added -- tech debt cleanup from v1.0 audit
-Last activity: 2026-02-21 -- Added Phase 6 for tech debt items
+Plan: 2 of 2 in current phase
+Status: Phase 6 complete -- all tech debt items resolved
+Last activity: 2026-02-21 -- Executed plans 06-01 and 06-02
 
 Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
-- Average duration: 7 min
-- Total execution time: 1.0 hours
+- Total plans completed: 10
+- Average duration: 6 min
+- Total execution time: 1.1 hours
 
 **By Phase:**
 
@@ -31,9 +31,10 @@ Progress: [██████████] 100%
 | 02-bus-departures | 2 | 15 min | 7.5 min |
 | 03-weather | 3 | 12 min | 4 min |
 | 05-verification-and-cleanup | 1 | 5 min | 5 min |
+| 06-tech-debt-cleanup | 2 | 4 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 03-01 (3 min), 03-02 (5 min), 03-03 (4 min), 05-01 (5 min)
+- Last 5 plans: 03-03 (4 min), 05-01 (5 min), 06-01 (2 min), 06-02 (2 min)
 - Trend: Consistent
 
 *Updated after each plan completion*
@@ -80,6 +81,9 @@ Recent decisions affecting current work:
 - [04-05]: Temperature color: bold warm yellow (255,200,50) to stand out against all animations
 - [05-01]: Traceability table Phase column set to Phase 4 for verified requirements (implemented in Phase 4, verified in Phase 5)
 - [05-01]: FONT_LARGE constant kept in config.py -- inert, removal outside audit scope
+- [06-01]: FONT_LARGE and PUSH_INTERVAL removed from config.py (both dead -- zero imports)
+- [06-01]: get_flattened_data() replaces deprecated getdata() in all test files; Pillow>=12.1.0 pinned
+- [06-02]: requirements-completed field corrected in 4 SUMMARY files (03-01, 03-02, 03-03, 05-01)
 
 ### Pending Todos
 
@@ -93,5 +97,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: All 5 phases complete -- v1.0 milestone fully verified, all 19 requirements complete
+Stopped at: All 6 phases complete -- tech debt cleanup done, all v1.0 audit items resolved
 Resume file: None
