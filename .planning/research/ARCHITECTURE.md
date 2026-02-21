@@ -1,513 +1,278 @@
-# Architecture Research
+# Architecture Patterns
 
-**Domain:** Embedded LED pixel display dashboard (Divoom Pixoo 64)
-**Researched:** 2026-02-20
-**Confidence:** MEDIUM-HIGH
+**Domain:** v1.1 integration -- Norwegian README + weather color fix on existing Pixoo 64 dashboard
+**Researched:** 2026-02-21
+**Confidence:** HIGH (existing codebase fully audited, both changes are well-scoped)
 
-## Standard Architecture
-
-### System Overview
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         DATA SOURCES                                │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
-│  │ EnTur API    │  │ Yr/MET API   │  │ System Clock │              │
-│  │ (GraphQL)    │  │ (REST/JSON)  │  │ (local)      │              │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘              │
-│         │                 │                  │                      │
-├─────────┴─────────────────┴──────────────────┴──────────────────────┤
-│                       DATA COLLECTORS                               │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
-│  │ Bus Fetcher  │  │ Weather      │  │ Time         │              │
-│  │ (60s cycle)  │  │ Fetcher      │  │ Provider     │              │
-│  │              │  │ (10-15min)   │  │ (continuous) │              │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘              │
-│         │                 │                  │                      │
-├─────────┴─────────────────┴──────────────────┴──────────────────────┤
-│                        DATA STORE (in-memory)                       │
-│  ┌──────────────────────────────────────────────────────────┐       │
-│  │  DisplayState: { bus, weather, time, message_override }  │       │
-│  └──────────────────────────┬───────────────────────────────┘       │
-│                             │                                       │
-├─────────────────────────────┴───────────────────────────────────────┤
-│                        RENDER ENGINE                                │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
-│  │ Layout       │  │ PIL/Pillow   │  │ Pixel Font   │              │
-│  │ Manager      │  │ Canvas       │  │ Renderer     │              │
-│  │ (zones)      │  │ (64x64 RGB)  │  │              │              │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘              │
-│         │                 │                  │                      │
-├─────────┴─────────────────┴──────────────────┴──────────────────────┤
-│                        DISPLAY DRIVER                               │
-│  ┌──────────────────────────────────────────────────────────┐       │
-│  │  Pixoo HTTP Client (Draw/SendHttpGif → device LAN IP)   │       │
-│  │  Rate-limited: max 1 push/second                        │       │
-│  └──────────────────────────┬───────────────────────────────┘       │
-│                             │                                       │
-├─────────────────────────────┴───────────────────────────────────────┤
-│                        HARDWARE                                     │
-│  ┌──────────────────────────────────────────────────────────┐       │
-│  │  Divoom Pixoo 64 (64x64 RGB LED, Wi-Fi, HTTP on :80)   │       │
-│  └──────────────────────────────────────────────────────────┘       │
-└─────────────────────────────────────────────────────────────────────┘
-
-Side channel (interrupt):
-  ┌──────────────┐
-  │ Message API  │──→ DisplayState.message_override ──→ Render Engine
-  │ (HTTP/CLI)   │
-  └──────────────┘
-```
-
-### Component Responsibilities
-
-| Component | Responsibility | Typical Implementation |
-|-----------|----------------|------------------------|
-| Bus Fetcher | Queries EnTur GraphQL for next departures from Ladeveien quays | `aiohttp` POST to `api.entur.io/journey-planner/v3/graphql`, 60s interval |
-| Weather Fetcher | Queries Yr/MET locationforecast/2.0 for Trondheim weather | `aiohttp` GET to `api.met.no`, 10-15min interval, respects `Expires` header |
-| Time Provider | Supplies current time/date in Norwegian locale | Python `datetime` with `locale` or manual Norwegian day/month names |
-| Data Store | Holds current display state, notifies renderer on change | Simple dataclass or dict, no persistence needed |
-| Layout Manager | Defines pixel zones for each info block on the 64x64 canvas | Static zone definitions (x, y, width, height per section) |
-| PIL Canvas | Composites text, icons, and shapes into a 64x64 RGB image | `PIL.Image.new("RGB", (64, 64))` + `PIL.ImageDraw` |
-| Pixel Font Renderer | Draws text in tiny pixel fonts readable at low resolution | Custom bitmap font or PICO-8 font from pixoo library |
-| Pixoo HTTP Client | Sends rendered frame to device over LAN | HTTP POST to `http://<device-ip>/post` with `Draw/SendHttpGif` payload |
-| Message API | Accepts custom messages that temporarily override the display | Simple HTTP endpoint or CLI command writing to data store |
-
-## Recommended Project Structure
+## Current Architecture (As-Built v1.0)
 
 ```
 divoom-hub/
 ├── src/
-│   ├── main.py              # Entry point, scheduler setup, main loop
-│   ├── config.py            # Device IP, API keys, stop IDs, intervals
-│   ├── collectors/          # Data source fetchers
-│   │   ├── __init__.py
-│   │   ├── bus.py           # EnTur GraphQL client
-│   │   ├── weather.py       # Yr/MET REST client
-│   │   └── time_provider.py # Norwegian time/date formatting
-│   ├── display/             # Rendering pipeline
-│   │   ├── __init__.py
-│   │   ├── state.py         # DisplayState dataclass
-│   │   ├── layout.py        # Zone definitions for 64x64 canvas
-│   │   ├── renderer.py      # PIL compositor (state → 64x64 image)
-│   │   ├── fonts.py         # Bitmap font definitions/loader
-│   │   └── icons.py         # Weather icon sprites (pre-rendered)
-│   ├── device/              # Pixoo communication
-│   │   ├── __init__.py
-│   │   └── pixoo_client.py  # HTTP driver for Pixoo 64
-│   └── messages/            # Custom message injection
-│       ├── __init__.py
-│       └── handler.py       # Message override logic
-├── assets/
-│   ├── fonts/               # Pixel font files (if custom)
-│   └── icons/               # Weather icon sprites (8x8 or 12x12 pixel art)
-├── tests/
-│   ├── test_bus.py
-│   ├── test_weather.py
-│   ├── test_renderer.py
-│   └── test_pixoo_client.py
-├── pyproject.toml
-└── .env                     # Device IP, stop IDs (not committed)
+│   ├── main.py                    # Entry point, main loop, data refresh scheduling
+│   ├── config.py                  # .env-based config (DEVICE_IP, API keys, intervals)
+│   ├── device/
+│   │   └── pixoo_client.py        # Pixoo 64 connection, rate-limited push, brightness
+│   ├── display/
+│   │   ├── state.py               # DisplayState dataclass (equality for dirty flag)
+│   │   ├── layout.py              # Zone definitions + ALL color constants
+│   │   ├── renderer.py            # PIL compositor: state + fonts + anim -> 64x64 RGB
+│   │   ├── weather_anim.py        # 8 animation classes, bg/fg depth layers (RGBA)
+│   │   ├── weather_icons.py       # 10px programmatic pixel art icons, symbol mapping
+│   │   └── fonts.py               # BDF-to-PIL font loader
+│   └── providers/
+│       ├── clock.py               # Norwegian time/date formatting
+│       ├── bus.py                  # Entur GraphQL bus departures
+│       ├── weather.py             # MET Norway Locationforecast 2.0
+│       └── discord_bot.py         # MessageBridge + bot thread for display override
+├── assets/fonts/                  # BDF bitmap fonts (4x6, 5x8)
+├── tests/                         # 96 tests (clock, bus, weather, renderer, anim, fonts)
+├── .env.example                   # Configuration template
+├── .env                           # User's actual config (gitignored)
+├── pyproject.toml                 # Project metadata, dependencies
+├── com.divoom-hub.dashboard.plist # macOS launchd service wrapper
+└── debug_frame.png                # Last rendered frame (for development)
 ```
 
-### Structure Rationale
+**No README.md exists.** The project root has zero documentation files.
 
-- **collectors/:** Each data source is an independent module with its own fetch cycle. Bus and weather have very different refresh rates and error modes. Separation makes testing trivial (mock the HTTP call, verify parsing).
-- **display/:** The rendering pipeline is the core complexity. Separating state, layout, fonts, icons, and the compositor allows iterating on the 64x64 layout without touching data fetching or device communication.
-- **device/:** Thin wrapper around the Pixoo HTTP API. Could swap to a different display without touching anything else. Also allows a "simulator" mode for development without hardware.
-- **messages/:** Isolated so the interrupt/override mechanism does not entangle with the main display loop.
+## Component Boundaries
 
-## Architectural Patterns
+| Component | Responsibility | Communicates With |
+|-----------|---------------|-------------------|
+| `config.py` | Load .env, validate, expose constants | All modules import from it |
+| `layout.py` | Zone pixel coords, ALL color constants | `renderer.py` imports zones + colors |
+| `weather_anim.py` | 8 animation types, produces (bg, fg) RGBA layers | `renderer.py` composites them, `main.py` selects animation |
+| `renderer.py` | Composites DisplayState + fonts + anim into 64x64 RGB | Reads from `layout.py`, `state.py`, `weather_icons.py` |
+| `state.py` | DisplayState dataclass with `from_now()` factory | `main.py` creates, `renderer.py` reads |
+| `main.py` | Main loop, scheduling, data refresh coordination | Orchestrates everything |
+| `pixoo_client.py` | Device push, rate limiting, brightness | Called by `main.py` |
+| `providers/*.py` | Fetch data from external APIs | Called by `main.py`, results flow into DisplayState |
 
-### Pattern 1: PIL-Based Full-Frame Rendering (Recommended)
+## v1.1 Changes: What Integrates Where
 
-**What:** Compose the entire 64x64 display as a PIL Image in Python, then push the complete frame to the Pixoo as a raw image via `Draw/SendHttpGif`. Every pixel is under our control.
+### Change 1: Norwegian README (README.md at project root)
 
-**When to use:** Always, for this project. This gives complete control over layout, fonts, and icons on a 64x64 canvas where every pixel matters.
+**Type:** NEW FILE -- zero integration with existing code.
 
-**Trade-offs:**
-- PRO: Total control over every pixel, can use any font/icon, consistent rendering
-- PRO: Testable without hardware (save PNG, visual diff)
-- PRO: No dependency on undocumented native Pixoo font rendering
-- CON: Must implement own text rendering (bitmap fonts)
-- CON: Slightly more work upfront than native text commands
+**File:** `/README.md` (project root)
 
-**Why not native `Draw/SendHttpText`:** The native text command has limited, poorly documented font options (font IDs are not publicly listed, some font/character combos crash the device). On a 64x64 display where every pixel matters, we need pixel-perfect control. Native text also cannot mix text and icons on the same screen in a single composed layout.
+**Integration points:** None. The README is a documentation file. It describes the existing architecture but does not touch any source code.
 
-**Example:**
+**Content sources (data to document, not code changes):**
+- Project overview: from `PROJECT.md` context
+- Setup instructions: from `.env.example` (config template)
+- Architecture diagram: from existing `src/` structure
+- Zone layout: from `layout.py` (CLOCK_ZONE, DATE_ZONE, etc.)
+- API documentation: from `bus.py` (Entur) and `weather.py` (MET Norway)
+- Service setup: from `com.divoom-hub.dashboard.plist`
+- Discord integration: from `discord_bot.py`
+- Claude Code badge: static markdown badge element
+
+**Dependencies on existing code:** Read-only. README reads from the codebase to describe it; no code imports the README.
+
+**Test impact:** None. README does not change any behavior.
+
+### Change 2: Weather Animation/Rain Text Color Fix
+
+**Type:** MODIFY EXISTING FILES -- targeted color constant changes.
+
+**Problem (from todo):** Rain/snow animation particles and rain indicator text ("1/1mm") are both grey/blue, making them indistinguishable on the physical LED display. User reported: "The raindrops, or is it snow? I don't know, they are grey. So are the letters for 1/1."
+
+**Root cause:** The rain particles use `(40, 90, 200)` for far drops and `(60, 140, 255)` for near drops. Snow particles use `(200, 210, 230)` for far and `(255, 255, 255)` for near. The rain indicator text uses `COLOR_WEATHER_RAIN = (50, 180, 255)` -- vivid blue. On the LED, the rain particles and the rain text are both blue-ish tones that blend together. Snow particles in grey-white are also difficult to distinguish from rain.
+
+#### Files to Modify
+
+| File | What Changes | Why |
+|------|-------------|-----|
+| `src/display/weather_anim.py` | Rain particle fill colors in `RainAnimation.tick()` | Make rain particles distinctly blue (brighter, more saturated) vs current muted blue |
+| `src/display/weather_anim.py` | Snow particle fill colors in `SnowAnimation.tick()` | Make snow clearly white/bright, not grey-ish (current `(200, 210, 230)` is grey) |
+| `src/display/layout.py` | `COLOR_WEATHER_RAIN` constant | Change rain text color to a distinct hue from rain particle blue (e.g., cyan, or keep blue but change particle colors) |
+
+#### Specific Code Locations
+
+**`weather_anim.py` -- RainAnimation.tick() (lines 76-95):**
 ```python
-from PIL import Image, ImageDraw
-
-def render_frame(state: DisplayState) -> Image.Image:
-    img = Image.new("RGB", (64, 64), color=(0, 0, 0))
-    draw = ImageDraw.Draw(img)
-
-    # Time zone: top area
-    draw_time(draw, state.time, x=0, y=0)
-
-    # Date zone: below time
-    draw_date(draw, state.date_str, x=0, y=12)
-
-    # Bus zone: middle
-    draw_bus_departures(draw, state.bus_departures, x=0, y=20)
-
-    # Weather zone: bottom
-    draw_weather(draw, state.weather, x=0, y=44)
-
-    return img
+# Current far drop color:
+bg_draw.line([...], fill=(40, 90, 200, 100))     # muted blue, alpha 100
+# Current near drop color:
+fg_draw.line([...], fill=(60, 140, 255, 200))     # medium blue, alpha 200
 ```
+These need to shift to ensure rain reads as distinct blue water droplets, not grey.
 
-### Pattern 2: Scheduler-Driven Data Collection
-
-**What:** Use `asyncio` with timed tasks (or `APScheduler`) to run each data collector at its own interval. Collectors write to shared state; renderer reads from shared state.
-
-**When to use:** When data sources have different refresh cadences (bus=60s, weather=600s, time=every frame).
-
-**Trade-offs:**
-- PRO: Each source refreshes independently, failure in one does not block others
-- PRO: Minimizes API calls (weather does not re-fetch every 60s)
-- CON: Shared state needs thread/async safety (trivial with asyncio)
-
-**Example:**
+**`weather_anim.py` -- SnowAnimation.tick() (lines 154-176):**
 ```python
-import asyncio
-
-async def bus_collector(state: DisplayState):
-    while True:
-        try:
-            state.bus_departures = await fetch_bus_departures()
-        except Exception as e:
-            log.warning(f"Bus fetch failed: {e}")
-            # Keep stale data, mark as stale
-        await asyncio.sleep(60)
-
-async def weather_collector(state: DisplayState):
-    while True:
-        try:
-            state.weather = await fetch_weather()
-        except Exception as e:
-            log.warning(f"Weather fetch failed: {e}")
-        await asyncio.sleep(600)
-
-async def render_loop(state: DisplayState, pixoo_client):
-    while True:
-        frame = render_frame(state)
-        await pixoo_client.push_image(frame)
-        await asyncio.sleep(1)  # Max 1 push/second
+# Current far flake color:
+bg_draw.point((x, y), fill=(200, 210, 230, 90))   # grey-blue, alpha 90
+# Current near flake crystal color (via _draw_crystal):
+color = (255, 255, 255, 180)                        # white, alpha 180
 ```
+Far flakes are grey (`200, 210, 230`) which looks similar to rain. They should be brighter white.
 
-### Pattern 3: Message Override with Timeout
-
-**What:** Custom messages temporarily replace the normal display, then automatically revert after a timeout.
-
-**When to use:** For the "push a message to the display" requirement.
-
-**Trade-offs:**
-- PRO: Simple state flag, no complex routing
-- CON: Only one message at a time (fine for this use case)
-
-**Example:**
+**`layout.py` -- COLOR_WEATHER_RAIN (line 61):**
 ```python
-@dataclass
-class DisplayState:
-    bus_departures: list = field(default_factory=list)
-    weather: WeatherData | None = None
-    time: datetime | None = None
-    message_override: str | None = None
-    message_expires: datetime | None = None
-
-def render_frame(state: DisplayState) -> Image.Image:
-    if state.message_override and datetime.now() < state.message_expires:
-        return render_message(state.message_override)
-    if state.message_override:
-        state.message_override = None  # Expired, clear it
-    return render_dashboard(state)
+COLOR_WEATHER_RAIN = (50, 180, 255)   # Vivid blue for rain indicator text
 ```
+This is visually close to rain particle blue. Change to a distinct hue that contrasts with both rain and snow particle colors.
 
-## Data Flow
+#### Integration Constraints
 
-### Main Data Flow
+1. **Color palette coherence:** Weather zone already uses these colors:
+   - `COLOR_WEATHER_TEMP = (255, 200, 50)` -- warm yellow for temperature
+   - `COLOR_WEATHER_TEMP_NEG = (80, 200, 255)` -- cyan-blue for negative temp
+   - `COLOR_WEATHER_HILO = (120, 180, 160)` -- soft teal for high/low
+   - `COLOR_WEATHER_RAIN = (50, 180, 255)` -- vivid blue for rain text
+   New colors must not clash with these existing constants.
 
-```
-[EnTur API]                    [Yr/MET API]            [System Clock]
-     │                              │                        │
-     │ GraphQL POST (60s)           │ GET (10-15min)         │ (continuous)
-     │                              │                        │
-     v                              v                        v
-[Bus Collector]             [Weather Collector]       [Time Provider]
-     │                              │                        │
-     │ parse departures             │ parse forecast          │ format NO
-     │                              │                        │
-     v                              v                        v
-┌────────────────────────────────────────────────────────────────┐
-│                    DisplayState (in-memory)                     │
-│  .bus_departures = [{line, dest, minutes_until}, ...]          │
-│  .weather = {temp, symbol_code, high, low, rain_expected}      │
-│  .time = "14:32"                                               │
-│  .date_str = "tor 20. feb"                                     │
-│  .message_override = None | "Custom text"                      │
-└────────────────────────────┬───────────────────────────────────┘
-                             │
-                             v
-                    [Render Engine]
-                    PIL Image.new("RGB", (64,64))
-                             │
-                    compose zones:
-                    ├── time text (top)
-                    ├── date text
-                    ├── bus lines + minutes
-                    ├── weather icon + temp
-                    └── rain indicator
-                             │
-                             v
-                    [64x64 RGB Image]
-                             │
-                    convert to base64 RGB pixel array
-                             │
-                             v
-                    [Pixoo HTTP Client]
-                    POST http://<ip>/post
-                    {"Command": "Draw/SendHttpGif",
-                     "PicNum": 1, "PicOffset": 0,
-                     "PicWidth": 64, "PicSpeed": 1000,
-                     "PicData": "<base64>"}
-                             │
-                             v
-                    [Pixoo 64 Display]
-```
+2. **Alpha compositing pipeline:** Colors are composited via `_composite_layer()` in `renderer.py` (lines 121-125). This function does `Image.alpha_composite(zone_region, layer)` -- a single alpha application (the double-alpha bug was fixed in v1.0 plan 03-03). New alpha values must work through this single-pass composite.
 
-### Pixoo Wire Protocol Detail
+3. **3D depth contract:** `weather_anim.py` produces `(bg_layer, fg_layer)` tuples. Background layer renders behind text (dimmer), foreground renders in front (brighter). This depth layering must be preserved -- far particles stay dimmer than near particles.
 
-The Pixoo 64 accepts HTTP POST requests to `http://<device-ip>/post` (port 80). The payload for pushing a full frame:
+4. **Other animations affected:** Changing the color strategy for rain/snow may suggest reviewing all 8 animation types for visual consistency, but only rain and snow are explicitly broken. Cloud, sun, thunder, fog are distinguishable. Thunder reuses `RainAnimation` internally, so rain color changes propagate to thunder automatically.
 
-```json
-{
-    "Command": "Draw/SendHttpGif",
-    "PicNum": 1,
-    "PicOffset": 0,
-    "PicWidth": 64,
-    "PicSpeed": 1000,
-    "PicData": "<base64-encoded RGB pixel data>"
-}
-```
+5. **Test impact:** `tests/test_weather_anim.py` tests animation frame generation. Color changes should not break structural tests (they verify frame shapes and particle counts, not specific color values). No test changes expected.
 
-**Image encoding process:**
-1. Create 64x64 RGB PIL Image
-2. Get raw pixel data: `list(img.getdata())` produces 4096 `(R, G, B)` tuples
-3. Flatten to byte array: `[R, G, B, R, G, B, ...]` (64 * 64 * 3 = 12,288 bytes)
-4. Base64 encode the byte array
-5. Send as `PicData` string in the JSON payload
+#### Color Fix Strategy
 
-**Critical rate limit:** Do not push more than 1 frame per second. The device becomes unresponsive after rapid pushes. After approximately 300 pushes, the device may stop responding entirely (firmware bug); use `refresh_connection_automatically=True` in the pixoo library or periodically reset the internal counter.
+The core problem is **rain particles vs rain text** both being blue, and **rain particles vs snow particles** both being grey-ish.
 
-### EnTur Departure Query
+**Recommended approach -- differentiate by weather type color identity:**
 
-```graphql
-{
-  quay(id: "NSR:Quay:<QUAY_ID>") {
-    name
-    estimatedCalls(numberOfDepartures: 4) {
-      expectedDepartureTime
-      destinationDisplay {
-        frontText
-      }
-      serviceJourney {
-        line {
-          publicCode
-        }
-      }
-    }
-  }
-}
-```
+| Element | Current Color | Recommended Color | Rationale |
+|---------|--------------|-------------------|-----------|
+| Rain far drops | `(40, 90, 200, 100)` grey-blue | `(70, 130, 255, 100)` brighter blue | Make rain clearly blue, not grey |
+| Rain near drops | `(60, 140, 255, 200)` medium blue | `(80, 160, 255, 200)` vivid blue | Slightly brighter near drops for depth |
+| Snow far flakes | `(200, 210, 230, 90)` grey | `(220, 230, 255, 90)` cool white | White, not grey -- clearly snow |
+| Snow near crystal | `(255, 255, 255, 180)` white | Keep as-is | Already bright white |
+| Rain text ("1/1mm") | `(50, 180, 255)` vivid blue | `(100, 220, 255)` light cyan | Distinct from rain particle blue, still reads as "water" |
 
-**Endpoint:** `POST https://api.entur.io/journey-planner/v3/graphql`
-**Required header:** `ET-Client-Name: <company>-<application>` (e.g., `jdl-divoomhub`)
-**Stop IDs:** Use `stoppested.entur.org` to find NSR:Quay IDs for Ladeveien (two quays, one per direction). Query each quay separately to get direction-specific departures.
+The key insight: rain particles should be vivid blue, snow particles should be bright white, and rain text should be light cyan to differentiate from particle blue. This creates three distinct visual channels.
 
-### Yr/MET Weather Query
+## Data Flow for Color Fix
 
 ```
-GET https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=63.43&lon=10.40
+Weather condition changes (main.py)
+  │
+  v
+get_animation(weather_group)          # weather_anim.py -- selects animation class
+  │
+  v
+animation.tick()                       # produces (bg_layer, fg_layer) RGBA
+  │                                    # << COLOR CHANGES HERE in fill= parameters >>
+  v
+render_weather_zone(...)              # renderer.py
+  ├── _composite_layer(bg_layer)      # behind text
+  ├── draw.text(rain_text, COLOR_WEATHER_RAIN)  # << COLOR CHANGE HERE >>
+  └── _composite_layer(fg_layer)      # in front of text
+  │
+  v
+render_frame() -> 64x64 RGB Image
+  │
+  v
+pixoo_client.push_frame()
 ```
 
-**Required header:** `User-Agent: divoom-hub/1.0 github.com/<user>/divoom-hub`
-**Caching:** Store `Expires` and `Last-Modified` headers. Use `If-Modified-Since` on subsequent requests. Respect 304 Not Modified responses. Do not request more often than the `Expires` header indicates.
-**Response fields used:**
-- `timeseries[0].data.instant.details.air_temperature` (current temp)
-- `timeseries[0].data.next_1_hours.summary.symbol_code` (weather icon)
-- Extract today's high/low from timeseries entries
-- `precipitation_amount` in `next_1_hours` or `next_6_hours` for rain indicator
+The color changes are purely in the rendering data (fill colors and color constants). No flow changes, no structural changes, no API changes.
 
-**Weather icons:** The `symbol_code` (e.g., `clearsky_day`, `rain`, `partlycloudy_night`) maps directly to filenames in the `metno/weathericons` GitHub repo (MIT licensed, available as PNG/SVG). These must be converted to tiny pixel art sprites (8x8 or 12x12) for the 64x64 display.
+## Patterns to Follow
 
-## Rendering Pipeline Detail
+### Pattern 1: Color Constants in layout.py
 
-### Canvas Zones (Preliminary Layout)
+**What:** All user-visible colors are defined as named constants in `layout.py`, imported by `renderer.py`.
 
-```
-┌────────────────────────────────────────────────────────────────┐
-│  64 pixels wide                                                │
-│                                                                │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │ TIME (large)                              00:00          │  │ y=0..11
-│  │ 14:32                                                    │  │
-│  ├──────────────────────────────────────────────────────────┤  │
-│  │ DATE                                   tor 20. feb      │  │ y=12..19
-│  ├──────────────────────────────────────────────────────────┤  │
-│  │ BUS DIR 1                                                │  │ y=20..31
-│  │ 3 Sentrum     4m                                         │  │
-│  │ 3 Sentrum    19m                                         │  │
-│  ├──────────────────────────────────────────────────────────┤  │
-│  │ BUS DIR 2                                                │  │ y=32..43
-│  │ 3 Lade        2m                                         │  │
-│  │ 3 Lade       17m                                         │  │
-│  ├──────────────────────────────────────────────────────────┤  │
-│  │ WEATHER       [icon] 4°C  H:7° L:1°  [rain]            │  │ y=44..63
-│  └──────────────────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────┘
-```
+**When:** For text colors and UI element colors that form the design palette.
 
-**Font requirements:** At 64x64, a readable character is roughly 3x5 or 4x6 pixels. The PICO-8 font built into the `pixoo` library renders at approximately 4 pixels wide per character. With a 64-pixel width, that allows roughly 16 characters per line (with minimal spacing). This is tight but workable for bus departure info.
+**Current practice:** `renderer.py` imports `COLOR_WEATHER_RAIN` from `layout.py`. Any rain text color change goes in `layout.py`.
 
-### Bitmap Font Strategy
+**Note:** Animation particle colors are currently hardcoded inline in `weather_anim.py` as `fill=(R, G, B, A)` tuples in each `tick()` method. These are NOT in `layout.py`. This is an existing pattern -- the animation colors were always inline because they include alpha values and are animation-specific, not part of the static UI palette. Keep this pattern for v1.1; refactoring to layout.py constants is optional polish.
 
-Use the PICO-8 pixel font from the `pixoo` library for consistency, or define a custom bitmap font. The `pixoo` library supports characters: `0-9 a-z A-Z !'()+,-<=>?[]^_:;./{|}~$@%` which covers Norwegian time/date needs, but Norwegian characters (e, o with diacritics) may need custom glyph additions.
+### Pattern 2: New Documentation at Root
 
-**Important:** Norwegian characters like a-ring, o-slash, ae are not in the PICO-8 character set. Options:
-1. Use ASCII approximations in date strings (e.g., "feb" not "feb" is fine, but day names like "onsdag" are fine, "lordag" instead of "lordag" may work)
-2. Add custom bitmap glyphs for the 3-4 Norwegian special characters needed
-3. Use PIL's built-in bitmap font rendering with a pixel-appropriate .pil/.pbm font
+**What:** README.md is a single file at the project root. No docs/ directory, no multi-file documentation structure.
 
-### Weather Icon Pipeline
+**When:** This project is small enough (17 source files, 2,321 LOC) that a single comprehensive README covers everything.
 
-1. Start from `metno/weathericons` SVG files (MIT licensed)
-2. Pre-render to tiny pixel art sprites (8x8, 10x10, or 12x12 pixels)
-3. Store as PNG files in `assets/icons/`
-4. Map `symbol_code` from Yr API to icon filename
-5. Paste icon onto canvas at weather zone position using `img.paste()`
+**Rationale:** Adding a docs/ folder for a project this size is over-engineering. The README should be self-contained with all sections: overview, setup, architecture, API docs, service config, development.
 
-This is a manual pixel art step -- the SVG icons must be hand-adapted to look good at 8-12 pixels. Automated downscaling of SVGs will produce unreadable blobs. Budget time for this.
+### Pattern 3: Test Mode for Visual Verification
 
-## Anti-Patterns
+**What:** `main.py` supports `TEST_WEATHER=rain python src/main.py --simulated --save-frame` to visually verify animation rendering.
 
-### Anti-Pattern 1: Using Native Pixoo Text Commands for Dashboard
+**When:** After color changes, use this to verify the new colors look correct on the simulated display or in `debug_frame.png`.
 
-**What people do:** Use `Draw/SendHttpText` for text areas and try to compose a dashboard from multiple native text overlays.
-**Why it's wrong:** Native text commands operate independently -- you cannot precisely control pixel-level layout when mixing text zones. Font options are limited and poorly documented. Some font/character combos crash the device. You lose the ability to render icons and text in a unified composition.
-**Do this instead:** Render the entire 64x64 frame as a PIL Image and push as a single frame via `Draw/SendHttpGif`. Full control, no surprises.
+**Why relevant:** The color fix cannot be fully verified in unit tests -- it requires visual inspection on actual LED hardware or at minimum the simulator. The test mode is the existing tool for this.
 
-### Anti-Pattern 2: Pushing Frames Too Fast
+## Anti-Patterns to Avoid
 
-**What people do:** Push a new frame every time any data changes, or run the render loop faster than 1 Hz.
-**Why it's wrong:** The Pixoo 64 becomes unresponsive when pushed faster than ~1 frame/second. After ~300 rapid pushes, it stops responding entirely until connection reset.
-**Do this instead:** Render loop at 1-second intervals maximum. If nothing changed, skip the push. Use a "dirty" flag on the display state.
+### Anti-Pattern 1: Extracting Animation Colors to Config
 
-### Anti-Pattern 3: Coupling Data Fetching to Rendering
+**What:** Moving animation particle colors to `config.py` or `.env` as configurable values.
+**Why bad:** These are visual design decisions tuned for specific LED hardware, not user preferences. Making them configurable would create a false sense of flexibility while making the visual design harder to maintain as a coherent whole. The 3D depth system requires careful balance between bg/fg alpha values.
+**Instead:** Keep animation colors as hardcoded fill values in `weather_anim.py`. Keep the palette consistent by reviewing all animation types together during the color fix.
 
-**What people do:** Fetch bus data inside the render function, blocking the display update while waiting for network.
-**Why it's wrong:** Network failures or slow responses freeze the display. Bus API timeout should not prevent time from updating.
-**Do this instead:** Async collectors write to shared state. Renderer reads state independently. If a collector fails, stale data is still displayed (better than a frozen display).
+### Anti-Pattern 2: Adding an English README Alongside Norwegian
 
-### Anti-Pattern 4: Not Handling Yr Caching Headers
+**What:** Creating both README.md (English) and README.no.md (Norwegian).
+**Why bad:** The project requirement is specifically a Norwegian README. The user preference is Norwegian language for this personal dashboard project. Maintaining two README files doubles documentation maintenance.
+**Instead:** Single README.md in Norwegian. Code comments and docstrings remain in English (they already are and should stay that way).
 
-**What people do:** Poll `api.met.no` every few minutes regardless of cache headers.
-**Why it's wrong:** MET.no will throttle or block your client. The API returns `Expires` headers for a reason -- compact forecasts update roughly every hour for the near-term.
-**Do this instead:** Store the `Expires` and `Last-Modified` headers. Only re-request after expiry, using `If-Modified-Since`. Handle 304 gracefully.
+### Anti-Pattern 3: Changing Compositing Logic During Color Fix
 
-## Integration Points
+**What:** Modifying `_composite_layer()` in `renderer.py` while fixing colors.
+**Why bad:** The compositing was fixed in v1.0 phase 03-03 after a thorough debug session. It works correctly now (single alpha application). Changing it alongside color values makes it impossible to isolate which change affected the visual result.
+**Instead:** Only change fill color values and color constants. If compositing issues resurface, that is a separate investigation.
 
-### External Services
+## Build Order Recommendation
 
-| Service | Integration Pattern | Notes |
-|---------|---------------------|-------|
-| EnTur Journey Planner v3 | GraphQL POST, 60s polling | Header: `ET-Client-Name`. Stop IDs from `stoppested.entur.org`. Returns real-time estimated departures. |
-| Yr/MET Locationforecast 2.0 | REST GET, cache-driven polling | Header: `User-Agent` (mandatory, 403 without). Respect `Expires`, use `If-Modified-Since`. Compact format sufficient. |
-| Pixoo 64 Device | HTTP POST to `<ip>/post`, max 1/s | LAN-only. `Draw/SendHttpGif` for full-frame push. `Draw/SendHttpText` available but not recommended for dashboard. |
-| Weather Icons (metno/weathericons) | Static asset, build-time | Download SVGs, hand-convert to pixel art sprites, bundle in `assets/`. MIT licensed. |
+**Color fix first, then README.**
 
-### Internal Boundaries
+### Rationale:
 
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| Collectors -> State | Direct write (async-safe) | Each collector owns its slice of state. No cross-collector dependencies. |
-| State -> Renderer | Read-only access | Renderer never mutates state. Reads current snapshot to compose frame. |
-| Renderer -> Pixoo Client | PIL Image hand-off | Renderer produces `Image`, client converts to wire format and POSTs. |
-| Message Handler -> State | Write `message_override` | Sets override text + expiry timestamp. Renderer checks before normal render. |
+1. **Color fix informs README content.** The README should document the current state of the project, including weather animations. If colors are wrong when the README is written, the README would describe a broken state. Fix first, document the fixed state.
 
-## Build Order (Dependencies)
+2. **Color fix has test dependencies.** The fix needs visual verification (`TEST_WEATHER` mode, `--save-frame`, ideally hardware test). This is faster to iterate on without the context switch of writing documentation.
 
-The architecture has clear dependency layers. Build bottom-up:
+3. **README has zero code dependencies.** The README can be written at any point since it does not modify any source files. It reads FROM the codebase but does not write TO it.
+
+4. **Independent work streams.** These two changes touch completely different files with zero overlap:
+   - Color fix: `src/display/weather_anim.py`, `src/display/layout.py`
+   - README: `README.md` (new file at root)
+
+### Suggested Phase Structure:
 
 ```
-Phase 1: Device Communication
-  └── Pixoo HTTP client (can push a solid-color test frame)
-  └── Simulator mode (save PNG locally for testing without device)
+Phase 1: Weather Color Fix
+  Files modified: weather_anim.py, layout.py
+  Verification: TEST_WEATHER=rain/snow --save-frame, visual inspection
+  Risk: Low (color values only, no structural changes)
 
-Phase 2: Render Engine
-  └── PIL canvas creation, bitmap font rendering
-  └── Static test: render a hardcoded time/bus/weather layout to PNG
-  └── Depends on: Phase 1 (to see results on device)
-
-Phase 3: Data Collectors (can be parallelized)
-  ├── Bus collector (EnTur GraphQL)
-  ├── Weather collector (Yr/MET)
-  └── Time provider (trivial)
-  └── Depends on: nothing (can test with mock data)
-
-Phase 4: Integration
-  └── Scheduler wiring (asyncio tasks)
-  └── State management, dirty-flag optimization
-  └── Depends on: Phases 1, 2, 3
-
-Phase 5: Custom Messages
-  └── Message injection API
-  └── Override/timeout logic
-  └── Depends on: Phase 4
-
-Phase 6: Polish
-  └── Weather icon pixel art
-  └── Norwegian locale refinement
-  └── Error recovery, logging, systemd service
-  └── Depends on: Phase 4
+Phase 2: Norwegian README
+  Files created: README.md
+  Content sources: PROJECT.md, .env.example, layout.py, all src/ modules
+  Verification: Read-through, ensure all sections match actual codebase
+  Risk: None (documentation only)
 ```
 
-**Key insight:** The render engine and data collectors can be developed in parallel. The render engine can be tested with hardcoded data and PNG output. The collectors can be tested with print statements. They meet at the integration phase.
+## File Change Summary
 
-## Library Decision: pixoo Library vs Raw HTTP
+| File | Action | Change Type | Lines Affected |
+|------|--------|-------------|---------------|
+| `README.md` | CREATE | New documentation file | N/A (new) |
+| `src/display/weather_anim.py` | MODIFY | Fill color tuples in RainAnimation.tick(), SnowAnimation.tick() | ~4 lines (2 rain colors, 2 snow colors) |
+| `src/display/layout.py` | MODIFY | `COLOR_WEATHER_RAIN` constant value | 1 line |
 
-**Recommendation: Use the `pixoo` Python library initially, with the option to drop to raw HTTP if needed.**
+**Total code changes: ~5 lines across 2 files.**
+**Total new files: 1 (README.md).**
 
-The `pixoo` library (v0.9.2, Python 3.10+, PyPI) provides:
-- `draw_pixel()`, `draw_text()`, `draw_image()`, `push()` primitives
-- Built-in PICO-8 pixel font
-- Simulator mode (tkinter GUI) for development without hardware
-- Automatic connection refresh to work around the ~300-push firmware bug
-- `send_image(PIL.Image)` for pushing complete PIL Image frames
-
-However, the library's built-in drawing primitives are limited for a complex dashboard. The recommended approach is:
-1. Use `pixoo` library for **device communication** (`push()`, connection management, simulator)
-2. Use **PIL/Pillow directly** for compositing the 64x64 frame (more flexible than pixoo's draw methods)
-3. Hand the composed PIL Image to `pixoo.send_image()` for transmission
-
-This gives us the best of both worlds: pixoo handles the finicky device protocol, PIL handles the rendering.
-
-**Fallback:** If the `pixoo` library causes issues (it is a community project, NC-SA licensed), the raw HTTP protocol is simple enough to implement directly: one HTTP POST with a JSON payload containing base64-encoded pixel data.
+No test changes expected. No config changes. No dependency changes. No architectural changes.
 
 ## Sources
 
-- [SomethingWithComputers/pixoo](https://github.com/SomethingWithComputers/pixoo) - Primary Python library for Pixoo 64 (MEDIUM-HIGH confidence, verified via PyPI + GitHub README)
-- [Grayda/pixoo_api NOTES.md](https://github.com/Grayda/pixoo_api/blob/main/NOTES.md) - Reverse-engineered API documentation (MEDIUM confidence, community-sourced)
-- [itsmikethetech/Pixoo-64-Tools](https://github.com/itsmikethetech/Pixoo-64-Tools) - Reference architecture for Pixoo 64 projects (MEDIUM confidence)
-- [EnTur Journey Planner v3](https://developer.entur.org/pages-journeyplanner-journeyplanner/) - Official departure board API (HIGH confidence, official docs)
-- [EnTur GraphQL query example](https://www.bitbrb.com/electronics/graphql-querying-a-bus) - Practical GraphQL query for bus departures (MEDIUM confidence, verified against official API structure)
-- [hfurubotten/enturclient](https://github.com/hfurubotten/enturclient) - Python client for EnTur departures (MEDIUM confidence)
-- [Yr Locationforecast HowTO](https://developer.yr.no/doc/locationforecast/HowTO/) - Official Yr API usage guide (HIGH confidence, official docs)
-- [MET Locationforecast data model](https://docs.api.met.no/doc/locationforecast/datamodel.html) - Official data model docs (HIGH confidence)
-- [metno/weathericons](https://github.com/metno/weathericons) - Official weather icon set (HIGH confidence, MIT licensed)
-- [Home Assistant Pixoo64 text blueprint](https://community.home-assistant.io/t/divoom-pixoo64-send-text-4-lines/554428) - `Draw/SendHttpText` payload format (MEDIUM confidence, community-verified)
-- [Divoom official API docs](http://doc.divoom-gz.com/web/#/12) - Official but poorly maintained API reference (LOW-MEDIUM confidence)
+- Codebase audit: all 17 source files read and analyzed (HIGH confidence)
+- Debug session: `.planning/debug/weather-animation-too-subtle.md` -- compositing fix history (HIGH confidence)
+- Todo: `.planning/todos/done/2026-02-20-weather-animation-and-rain-text-colors-indistinguishable.md` -- problem statement (HIGH confidence)
+- Project context: `.planning/PROJECT.md` -- requirements and constraints (HIGH confidence)
 
 ---
-*Architecture research for: Divoom Pixoo 64 Entryway Dashboard*
-*Researched: 2026-02-20*
+*Architecture research for: Divoom Hub v1.1 Documentation & Polish*
+*Researched: 2026-02-21*

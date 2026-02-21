@@ -1,236 +1,178 @@
 # Project Research Summary
 
-**Project:** Divoom Hub — Pixoo 64 Entryway Dashboard
-**Domain:** Embedded LED pixel display dashboard with live transit and weather data
-**Researched:** 2026-02-20
+**Project:** Divoom Hub v1.1 — Documentation & Polish
+**Domain:** LED dashboard documentation and display color accessibility
+**Researched:** 2026-02-21
 **Confidence:** HIGH
 
 ## Executive Summary
 
-This project is a single-purpose, always-on information dashboard running on a 64x64 LED pixel display (Divoom Pixoo 64). The core problem is constraint: 4,096 pixels must display the current time, today's date in Norwegian, next bus departures from Ladeveien in both directions, current temperature, and a weather icon — simultaneously, at a glance, without rotation. Research conclusively establishes that the correct approach is full-frame pixel rendering: compose the entire 64x64 display as a PIL/Pillow image in Python, then push it to the device via the `Draw/SendHttpGif` HTTP API. Every serious Pixoo 64 dashboard project (pixoo-weather, Home Assistant integration, Node-RED dashboards) converges on this approach. The Pixoo's native text commands cannot coexist with pixel-buffer rendering on the same screen, and the native fonts lack Norwegian character support — making PIL-based custom rendering mandatory, not optional.
+Divoom Hub v1.1 is a tightly scoped polish milestone with exactly two deliverables: a Norwegian-language README and a weather animation color fix. Research across all four areas converges on the same conclusion — this is low-risk, well-understood work that requires no new dependencies, no architectural changes, and no new tooling. The existing Python/Pillow/pixoo stack is complete as-is. The entire code surface is five lines across two files (`layout.py`, `weather_anim.py`) plus a new `README.md`. Complexity is documentation quality and hardware color validation, not engineering.
 
-The recommended stack is lean and purpose-fit: Python 3.13 with the `pixoo` library (v0.9.2) for device communication, Pillow for image rendering, `metno-locationforecast` for Yr weather data, and direct GraphQL queries via `requests` for Entur transit data. Asyncio is optional — a simple synchronous refresh loop is sufficient for two API calls per minute. The architecture decomposes cleanly into four layers: data collectors (bus + weather + time), shared in-memory state, a render engine (PIL compositor), and a thin device driver. These layers can be developed and tested independently, which is critical for a hardware-dependent project where the display may not always be accessible.
+The recommended build order is color fix first, README second. The color fix should inform the README's description of the animation system, and it requires physical Pixoo 64 hardware testing as the acceptance gate — not just unit tests. The core color problem is that rain indicator text (`COLOR_WEATHER_RAIN`) and rain animation particles share the same blue hue family, making the text invisible during rain. The fix requires coordinating particle and text colors as a unit: rain particles should be vivid blue, snow particles should be bright cool-white, and rain text should shift to bright white `(255, 255, 255)` — which provides maximum luminance contrast against every animation type and is the industry-standard choice for informational text on LED displays.
 
-The three risks that matter most are: (1) the Pixoo firmware locks up after ~300 push calls — the connection refresh mechanism must be built in from day one, not added later; (2) the Yr API will ban your IP if you ignore HTTP caching headers — cache-first design is required from the start; (3) fitting all required information into 64x64 pixels at readable font sizes is genuinely hard — layout must be designed with pixel budgets before any code is written. All three risks are preventable if addressed early. None require abandoning the chosen approach.
+The Norwegian README has one clear risk: privacy. The project's `.env` file contains the user's home GPS coordinates, specific bus stop IDs, and Discord tokens. Example values in the README must use safe placeholders, not the real values. A pre-commit secrets grep is mandatory. Beyond that, the README work is straightforward: Norwegian Bokmal, shields.io badge for Claude Code attribution, standard GitHub README structure, no documentation generators, no dual-language maintenance burden.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The Python ecosystem owns this domain. The `pixoo` library (SomethingWithComputers, v0.9.2) is the uncontested choice for Pixoo 64 communication — it wraps the device's HTTP protocol, provides a Tkinter simulator for development without hardware, handles the ~300-push connection refresh bug, and accepts PIL Image objects directly. Pillow (v12.1.1) handles all image composition. For weather, `metno-locationforecast` (v2.1.0, Dec 2024) is preferred over the older `yr-weather` library and handles caching headers automatically. For transit, direct GraphQL queries via `requests` are better than the stale `enturclient` (last updated July 2022). No SDK, no framework overhead — the scope doesn't warrant it.
+No stack changes are needed for v1.1. The existing dependencies (Python 3.12+, Pillow >=12.1.0, pixoo, discord.py, python-dotenv) handle everything. The Norwegian README requires no tooling — GitHub renders UTF-8 Markdown natively, including ae/oe/aa. The Claude Code attribution badge is a static shields.io image link with no runtime dependency.
 
-The one area of genuine uncertainty is pixel fonts with Norwegian character support. BDF bitmap fonts at 5x7 pixels that also cover Latin Extended (ae, oe, aa) may require testing multiple options before finding one that works. This is flagged as a hands-on experimentation task during Phase 1, not a research problem that can be pre-solved.
-
-**Core technologies:**
-- **Python 3.13**: Application runtime — the Pixoo ecosystem is Python-dominant; no comparable Node.js or Go options exist
-- **pixoo 0.9.2**: Pixoo 64 LAN communication — most mature library, includes simulator, handles device quirks, accepts PIL Image directly
-- **Pillow 12.1.1**: 64x64 frame rendering — accepted by the pixoo library via `draw_image()`; provides full pixel-level control
-- **metno-locationforecast 2.1.0**: MET Norway/Yr weather API — handles caching automatically, actively maintained, supports Python 3.13
-- **requests 2.32.x**: Entur GraphQL HTTP client — direct GraphQL POST is simpler and safer than any available SDK
-- **asyncio (stdlib)**: Periodic task scheduling — zero dependencies, handles multi-interval refresh natively; sync alternative is also viable
-- **pytest + ruff**: Testing and linting — standard Python tooling
+**Core technologies (unchanged from v1.0):**
+- Python 3.12+: runtime — keep as-is, no version constraint changes needed
+- Pillow >=12.1.0 (12.1.1 available): image rendering and RGBA compositing — version constraint already correct
+- pixoo (unpinned): Pixoo 64 LAN communication — keep as-is
+- discord.py >=2.0: message override bot — keep as-is
+- pytest + ruff: test suite (96 tests) and linting — keep as-is
 
 ### Expected Features
 
-The layout constraint (single screen, all data visible simultaneously) is the defining design challenge. Research from existing Pixoo 64 projects shows this is achievable with three vertical zones: time/date at top (~20px), bus departures in the middle (~24px), weather at bottom (~20px). At a readable 5-pixel-wide font with 1-pixel spacing, roughly 10 characters per row and 8 rows are available. Every pixel must be intentional.
-
 **Must have (table stakes):**
-- Current time in large pixel font — dominant visual element, readable from 2+ meters
-- Today's date in Norwegian ("tor 20. feb") — short day name + day number + short month
-- Next 2 bus departures, direction 1 (line number + minutes until departure)
-- Next 2 bus departures, direction 2 (line number + minutes until departure)
-- Current temperature from Yr
-- Weather icon (pixel art sprite, ~12x12 pixels)
-- Auto-refresh: bus every 60s, weather every 10-15min (respecting Yr cache headers)
-- Single-screen layout — no rotation, no scrolling, all data simultaneously visible
+- Prosjektbeskrivelse (project overview) — first thing readers see; photo of running display strongly recommended
+- Installasjon + Oppsett (install and config) — clone to running in 5 minutes; reference `.env.example` for config table
+- Bruk (usage) — document `--simulated`, `--save-frame`, and `TEST_WEATHER` env var
+- Kjore som tjeneste (launchd service) — step-by-step from plist to `launchctl`
+- Rain particle vs rain text distinguishability fix — primary reported hardware bug; blocks v1.1 completion
+- Verification of all 8 animation types after color change — systematic check, not just rain
 
-**Should have (differentiators — high value, low effort):**
-- Bus departure countdown coloring: green (>10 min), yellow (3-10 min), red (<3 min)
-- Auto-brightness: dim at night via `SetBrightness` API on a schedule
-- Screen schedule: off at bedtime, on in morning via `set_screen()` API
-- Today's high/low temperature ("H:5 L:-2" in small font)
-- Rain expected indicator (single icon or color cue near weather zone)
-- Graceful error states: staleness indicator when API fails rather than serving stale data silently
+**Should have (differentiators):**
+- "Bygget med Claude Code" badge and transparency section — explicitly requested in milestone; badge at top, methodology note in Utvikling section
+- Skjermoppsett (zone layout diagram) — ASCII art of 64px budget makes the project tangible
+- Arkitektur (module map + data flow) — providers -> DisplayState -> renderer -> pixoo; valuable for anyone forking
+- API documentation (Entur + MET Norway) — gotchas like ET-Client-Name header, If-Modified-Since caching, rate limits
+- Vaeranimasjoner (animation system description) — 3D depth layering, bg/fg compositing, 6 animation types
+- Discord-meldinger, birthday easter egg, error resilience, Norwegian character support sections
 
-**Should have (moderate effort):**
-- Custom push message: temporary text overlay with auto-expiry timeout
-- Weekend/weekday mode: reclaim bus departure pixels for more weather data on weekends
-
-**Defer (v2+):**
-- Animated transitions — device crashes after ~40 frames; adds complexity without value at 64x64
-- Multi-page rotation — explicitly against user requirement
-- Mobile app or web UI for configuration
-- Multi-device support
+**Defer (not in v1.1 scope):**
+- English-language README alongside Norwegian — doubles maintenance, no benefit for a personal project
+- Nynorsk variant — irrelevant for this project and user
+- Auto-generated API reference (Sphinx/MkDocs) — over-engineering for 2,321 LOC project
+- Configurable color palette — 1-2 constant changes is the right scope, not a configuration system
+- Per-weather-condition text color overrides — adds complexity without gain
 
 ### Architecture Approach
 
-The architecture is a four-layer pipeline: independent data collectors write to a shared in-memory `DisplayState` dataclass; the render engine reads state and composes a 64x64 PIL Image; the device driver converts the image to base64 RGB and POSTs it to the Pixoo's HTTP endpoint. Layers are decoupled — collectors fail independently (stale data is kept), the renderer never mutates state, and the device driver is swappable with a simulator. This is the architecture used by every mature Pixoo 64 project. Build it bottom-up: device driver first (tested with a solid-color frame), then render engine (tested with hardcoded data and PNG output), then collectors (tested with print statements), then wire them together.
+v1.1 changes are entirely additive and non-breaking. The color fix touches the rendering layer only — fill color values in `weather_anim.py` and one constant in `layout.py`. The compositing pipeline itself (`_composite_layer()` in `renderer.py`) must not be touched; it was debugged and fixed in v1.0 and must remain isolated from color work. The README is a new file at the project root with zero code integration — it reads from the codebase but nothing reads it. Thunder animation inherits from `RainAnimation`, so rain particle color changes propagate to thunder automatically without a separate change.
 
-**Major components:**
-1. **Data Collectors** (`collectors/`) — Bus fetcher (Entur GraphQL, 60s cycle), weather fetcher (Yr REST, cache-driven), time provider (Norwegian locale formatting)
-2. **DisplayState** (`display/state.py`) — In-memory dataclass holding current bus departures, weather, time, and message override; single source of truth for the renderer
-3. **Render Engine** (`display/renderer.py`, `layout.py`, `fonts.py`, `icons.py`) — PIL compositor that reads DisplayState and produces a 64x64 RGB Image; testable without hardware
-4. **Pixoo Device Driver** (`device/pixoo_client.py`) — Thin wrapper around `pixoo` library; converts PIL Image to wire format, enforces 1-push/second rate limit, manages connection refresh
-5. **Message Handler** (`messages/handler.py`) — Optional: writes message override + expiry to DisplayState; renderer checks override before normal render path
+**Components affected by v1.1:**
+1. `src/display/weather_anim.py` — rain and snow particle fill colors (~4 lines in `tick()` methods)
+2. `src/display/layout.py` — `COLOR_WEATHER_RAIN` constant (1 line)
+3. `README.md` (new) — documentation file drawing on all existing modules as content sources
+
+**Components that must NOT change:**
+1. `renderer.py` `_composite_layer()` — working compositing logic, do not touch alongside color changes
+2. `config.py`, `state.py`, providers — no scope for v1.1
 
 ### Critical Pitfalls
 
-1. **Pixoo 300-push lockup** — The device firmware locks up completely (requires power cycle) after ~300 `push()` calls. A dashboard pushing every 60 seconds hits this in 5 hours. Prevention: enable `refresh_connection_automatically=True` in the pixoo library from the very first integration. This is non-negotiable in Phase 1.
+1. **Color fix creates new text/particle color collision** — If rain particles become vivid blue but rain text stays blue too, the original indistinguishability bug recurs in a different color. Choose particle and text colors as a coordinated palette: rain particles vivid blue, rain text bright white `(255, 255, 255)` for maximum contrast against every animation type. White has no conflict with blue rain, grey clouds, yellow sun, grey fog, or white snow (snow occupies different zone space).
 
-2. **Yr API IP ban from bad caching** — MET Norway actively bans IPs that ignore `Expires` and `If-Modified-Since` caching headers, with no documented unban timeline. Prevention: use `metno-locationforecast` library (caching built-in) and never roll custom HTTP calls to the MET API endpoint. Also truncate coordinates to 4 decimal places maximum.
+2. **Color changes look correct on screen but fail on LED hardware** — PIL PNG previews on a monitor cannot validate LED rendering. LEDs have minimum brightness thresholds, non-linear brightness curves, and a different color gamut than LCD screens. Physical Pixoo 64 hardware testing is the only valid acceptance gate for color work. Do not sign off on color changes without viewing them on the actual device at 2+ meters.
 
-3. **Norwegian characters crash native text API** — The Pixoo's `Draw/SendHttpText` does not support ae, oe, aa. Certain font/character combos crash the device. Prevention: this is already addressed by using PIL-based full-frame rendering (the only workable approach anyway). Never use native text commands for this project.
+3. **Alpha values must stay within empirically validated ranges** — The alpha ranges in `weather_anim.py` (bg_layer 40-100, fg_layer 90-200) were tuned specifically for LED visibility during v1.0 debugging. Change RGB channels only; do not adjust alpha values alongside color changes. Changing both simultaneously makes it impossible to isolate regressions.
 
-4. **Entur rate limiting via generic or missing client name** — Entur rate-limits by `ET-Client-Name` header. Shared or missing names get heavily throttled. Prevention: include unique `ET-Client-Name: jdl-divoomhub` header from the first request; poll no faster than every 60 seconds; use Quay IDs (not StopPlace IDs) for direction-specific departures.
+4. **README exposes personal location data** — The user's real GPS coordinates, bus stop IDs (NSR:Quay:73154, NSR:Quay:73152), and Discord tokens must never appear in the README. Use explicit placeholders (`192.168.1.XXX`, `NSR:Quay:XXXXX`, Oslo city center `59.9139, 10.7522`). Grep the README against `.env` values before committing.
 
-5. **Cramming too much into 64x64** — At readable font sizes (5x7px minimum), roughly 10 characters per line and 8 lines are available. This is tight. Prevention: design the pixel layout with exact budgets on paper before writing any rendering code. The layout is the hardest design problem in this project.
+5. **Missing color regression tests** — Existing `test_weather_anim.py` tests check alpha thresholds only, not colors. After the fix, add color-identity assertions: rain particles must be blue-channel-dominant, snow particles must have roughly equal high RGB values (white-ish). Without these, a future change can silently revert the fix.
 
 ## Implications for Roadmap
 
-Architecture research defines a clear bottom-up build order based on layer dependencies. FEATURES.md defines MVP scope. PITFALLS.md maps each pitfall to the phase where it must be prevented. The phase structure below integrates all three.
+Two clean, independent phases with a clear ordering rationale. All research points to this structure.
 
-### Phase 1: Foundation — Device Driver + Render Engine + Layout
+### Phase 1: Weather Color Fix
 
-**Rationale:** Everything else depends on being able to push a pixel-correct frame to the display. The pixel budget must be locked here, before any data integration, to prevent the cramming pitfall from cascading into later phases. Norwegian font support must be validated here since it determines the entire rendering approach.
+**Rationale:** Fix the code first, then document the fixed state. The README should describe how the animation system looks in its correct form. Hardware testing is the bottleneck; complete it while focused on code, before switching context to writing.
 
-**Delivers:** A working 64x64 pixel compositor that pushes a hardcoded but correctly laid-out dashboard frame to the Pixoo, demonstrating Norwegian time/date rendering, correct zone proportions, and sustained operation (8+ hours) without device lockup.
+**Delivers:** Distinguishable rain, snow, and text colors on the physical Pixoo 64 display; color-identity test assertions that prevent future regression.
 
-**Addresses:**
-- Full-frame PIL rendering approach (FEATURES.md: "What MUST Be Custom-Rendered")
-- Norwegian character support via bitmap font (FEATURES.md: "Today's date in Norwegian")
-- Pixel layout zones locked with exact pixel budgets (FEATURES.md: "Layout Analysis")
-- Single-screen all-data-visible constraint validated
+**Addresses:** Rain particle vs rain text indistinguishability (primary reported bug); snow vs rain visual distinction; systematic verification of all 8 animation types.
 
 **Avoids:**
-- Pixoo 300-push lockup (PITFALLS #1) — `refresh_connection_automatically=True` from first integration
-- Layout cramming (PITFALLS #5) — pixel budget designed on paper before code is written
-- Native text API crashes (PITFALLS #2) — PIL rendering decided here; native text commands never used
+- Pitfall 1: Coordinate particle and text colors as a unit, not independently — rain particles blue, rain text white
+- Pitfall 2: Physical hardware testing as acceptance gate — PNG previews are insufficient
+- Pitfall 3: Keep alpha ranges unchanged; change RGB channels only
+- Pitfall 5: Add color-identity tests in the same commit as the color fix
 
-**Research flag:** NEEDS PHASE RESEARCH — Norwegian bitmap font with Latin Extended characters at 5x7px needs hands-on testing. Candidate fonts (Matrix-Fonts, font8x8, Cozette, Tamzen) exist but the right choice requires iteration against the simulator. Cannot be resolved without trying them.
+**Files changed:**
+- `src/display/weather_anim.py` — RainAnimation and SnowAnimation fill colors (~4 lines)
+- `src/display/layout.py` — `COLOR_WEATHER_RAIN` constant (1 line)
+- `tests/test_weather_anim.py` — color-identity assertions (new)
 
----
+**Research flag:** Standard patterns — no research needed. Color constants are fully audited, recommended values are clear, compositing architecture is well understood.
 
-### Phase 2: Bus Departures
+### Phase 2: Norwegian README
 
-**Rationale:** Bus data is the highest-urgency functional requirement — it is the primary reason this dashboard exists. Building it second (after the rendering pipeline is proven) means real data populates a real layout immediately. The Entur integration is straightforward but requires quay ID lookup before code is written.
+**Rationale:** Documentation of the fixed codebase. No code risk. The README reads from all existing source files as content, but modifies nothing. Can be iterated freely without risk of breaking functionality.
 
-**Delivers:** Real-time bus departures from Ladeveien (both directions) displayed in correct layout zones, refreshing every 60 seconds, with graceful fallback when the API fails.
+**Delivers:** Complete Norwegian-language README.md at the project root with Claude Code attribution badge and transparency section.
 
-**Uses:** `requests` for GraphQL POST to Entur Journey Planner v3
-
-**Implements:** Bus Fetcher collector, `DisplayState.bus_departures`, bus rendering zone in Render Engine
-
-**Avoids:**
-- Entur rate limiting (PITFALLS #4) — unique `ET-Client-Name` header, 60s polling minimum, from first request
-- Querying StopPlace instead of Quay — specific NSR:Quay IDs required for direction-specific data (PITFALLS gotcha table)
-- Stale data shown as fresh — mark data with timestamp; show staleness indicator on failure
-
-**Research flag:** STANDARD PATTERNS — Entur GraphQL API is well-documented with official IDE for testing. Quay ID discovery via stoppested.entur.org is a mechanical lookup task. No deep research needed, but quay IDs must be found before implementation begins.
-
----
-
-### Phase 3: Weather Integration
-
-**Rationale:** Weather is the second functional data source. It is simpler than bus data (one API call every ~hour vs every 60s) but has more severe failure modes (IP ban). Building after bus means the caching layer is designed deliberately, not retrofitted under time pressure.
-
-**Delivers:** Current temperature, weather icon (pixel art sprite), high/low temperatures displayed in weather zone, with proper HTTP caching that will not trigger MET Norway rate limits or bans.
-
-**Uses:** `metno-locationforecast 2.1.0` (caching headers handled automatically)
-
-**Implements:** Weather Fetcher collector, `DisplayState.weather`, weather rendering zone, pixel art weather icon sprites in `assets/icons/`
+**Addresses:** All table-stakes documentation sections (overview, install, config, usage, launchd service) plus differentiator sections (architecture, APIs, Discord, animations, birthday easter egg, error resilience, Norwegian character support).
 
 **Avoids:**
-- Yr API IP ban (PITFALLS #3) — use `metno-locationforecast` library, not raw HTTP; coordinates to 4 decimals max
-- symbol_code day/night confusion (PITFALLS "looks done but isn't") — handle `_day`/`_night`/`_polartwilight` suffixes explicitly
-- UTC/local timezone errors — use timezone-aware datetime for Norwegian CET/CEST conversion
+- Pitfall 4: Privacy — use placeholder values throughout, grep README against `.env` before committing
+- Norwegian language pitfall: Keep English technical terms in English (API, LED, pip, Python, README, fork, commit); write descriptive text in idiomatic Bokmal
+- Claude Code attribution pitfall: Frame as development methodology note, not a disclaimer; badge near top, detailed note in Utvikling section
 
-**Research flag:** STANDARD PATTERNS — `metno-locationforecast` is well-documented and handles the hard parts. Weather icon pixel art is a manual design task (hand-draw 8-12px sprites from the metno SVG set); budget creative time for it, not research time.
+**Files changed:**
+- `README.md` (new file at project root)
 
----
-
-### Phase 4: Polish and Differentiators
-
-**Rationale:** Once both data sources are live and the core layout is proven against real-world conditions, add the features that make the dashboard genuinely excellent to use daily. All of these are high-value, low-risk additions that build on the established pipeline.
-
-**Delivers:** Bus countdown coloring, auto-brightness + screen schedule, graceful error state indicators, and optionally a custom push message mechanism.
-
-**Addresses:**
-- Bus departure countdown coloring — green/yellow/red based on minutes remaining
-- Auto-brightness night dimming via `SetBrightness` API
-- Screen schedule on/off via `set_screen()` API
-- Graceful error states with staleness indicators
-- Custom push message with expiry timeout (optional)
-
-**Avoids:**
-- Stale data displayed as fresh without indication (PITFALLS "looks done but isn't") — staleness indicators added here
-- WiFi disconnection silently breaking display — reconnection logic verified during extended testing
-
-**Research flag:** STANDARD PATTERNS — `SetBrightness` and `set_screen()` APIs are documented and well-used. Message override is a straightforward state flag with timestamp. No deep research needed.
-
----
+**Research flag:** Standard patterns — no research needed. README structure, Norwegian Bokmal conventions, shields.io badge format, and anti-features (dual-language, Sphinx) are all clearly defined by research.
 
 ### Phase Ordering Rationale
 
-- **Device driver before everything:** Integrating with the real device must happen early to surface firmware quirks (300-push lockup, buffer artifacts) before they become production surprises that require architectural rework.
-- **Layout locked before data:** The pixel budget is the binding constraint. Data integrations must have a stable rendering target. Retrofitting layout after data is wired in requires rewriting the renderer.
-- **Bus before weather:** Bus is the primary use case and higher-frequency data. If only one data source works, it should be bus. Weather also has more dangerous failure modes (IP ban) that benefit from being designed deliberately, not rushed.
-- **Polish last:** Auto-brightness and screen scheduling are zero-risk additions that require a stable base. Custom push messages require the DisplayState architecture to be settled first.
+- Color fix must precede README so the README documents the corrected animation system, not the broken one
+- Color fix has a hardware testing dependency; front-loading it avoids a late-cycle context switch back to code after documentation is underway
+- The two phases touch zero overlapping files — they could theoretically run in parallel, but sequential is safer given hardware testing is the bottleneck and the README should reference the fixed state
+- No phase requires additional library research during planning; both are fully specified by existing codebase knowledge
 
 ### Research Flags
 
-**Needs phase research:**
-- **Phase 1:** Norwegian bitmap font selection — candidate fonts need real testing in the simulator. Cannot determine the right choice without hands-on testing against the 5x7px target size. Flag for `/gsd:research-phase` during planning.
+Phases needing deeper research during planning: None. Both phases are fully characterized by this research cycle.
 
-**Standard patterns (skip research-phase):**
-- **Phase 2:** Entur GraphQL — official docs + GraphQL IDE are sufficient; quay ID lookup is a mechanical one-time task
-- **Phase 3:** Yr/MET weather — `metno-locationforecast` library handles complexity; pixel art icons are creative work, not research
-- **Phase 4:** Polish features — all APIs involved are documented and stable
+Phases with standard patterns (skip research-phase): Both phases. The color constants approach, compositing constraints, README structure, and Norwegian documentation conventions are all established.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Core technologies (pixoo, Pillow, metno-locationforecast, requests) all verified via official sources, PyPI, and cross-validated by multiple real-world Pixoo 64 projects. No contested choices. |
-| Features | HIGH | Feature requirements are clear from project definition. What is technically feasible at 64x64 pixels is well-established from existing projects. Layout pixel math is verifiable. |
-| Architecture | HIGH | PIL-based full-frame rendering is the documented consensus approach across all serious Pixoo 64 dashboard projects. Layer decomposition is standard and well-validated. Wire protocol is reverse-engineered and confirmed by multiple sources. |
-| Pitfalls | MEDIUM | Device firmware bugs (300-push lockup, buffer artifacts) are documented by multiple community sources but behavior may vary across firmware versions. Yr caching rules sourced from official docs (HIGH confidence). Entur rate limiting pattern from real HA incident (MEDIUM confidence). |
+| Stack | HIGH | Codebase directly audited; no new dependencies needed; version constraints verified against PyPI |
+| Features | HIGH | Both features derived from existing codebase analysis and a user-reported hardware bug; scope is precise and bounded |
+| Architecture | HIGH | All 17 source files read and analyzed; debug history consulted; exact line numbers identified for all changes |
+| Pitfalls | HIGH | Pitfalls derive from actual codebase inspection, documented v1.0 debug sessions, and identified test suite gaps |
 
-**Overall confidence: HIGH**
+**Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Norwegian pixel font:** No pre-vetted font is confirmed to work at 5x7px with full Latin Extended coverage on this specific rendering pipeline. Requires hands-on testing in Phase 1. Fallback: use a small TrueType pixel font (Cozette, Terminus) with `fontmode='1'` to disable anti-aliasing.
-
-- **Ladeveien quay IDs:** Specific NSR:Quay IDs for Ladeveien (both directions) must be looked up via `stoppested.entur.org` before Phase 2 development begins. This is a 5-minute mechanical task, not a research problem, but it blocks Phase 2 implementation.
-
-- **Weather icon pixel art:** The MET Norway weather symbol set (SVG) must be manually redrawn as 8x12 or 12x12 pixel art sprites. Automated SVG downscaling produces unreadable blobs at this resolution. Budget design time in Phase 3.
-
-- **Pixoo firmware version:** The 300-push lockup behavior is documented for firmware versions in use as of 2024-2025. Verify during Phase 1 soak testing (run for 8+ hours continuously). If the device has newer firmware, behavior may differ.
-
-- **`pixoo` library license:** CC-BY-NC-SA 4.0 (non-commercial, share-alike). Fine for a personal project; worth noting if the project ever becomes public or commercial.
+- **Exact rain text color needs hardware validation:** STACK.md recommends orange `(255, 140, 60)` while FEATURES.md recommends white `(255, 255, 255)`. White is the stronger recommendation (maximum contrast against every animation type, industry-standard LED signage choice), but validate on physical hardware in Phase 1 — do not resolve by analysis alone. The 4x6 tiny font used for rain text makes readability non-negotiable.
+- **`COLOR_WEATHER_TEMP_NEG` cyan borderline case:** `(80, 200, 255)` could conflict with rain particles during sub-zero rain (sleet). STACK.md flags this as an edge case. Monitor during Phase 1 hardware testing; fix only if the problem is visible on the actual display.
+- **Snow far flake color:** Current `(200, 210, 230, 90)` is grey-ish and may be indistinguishable from rain at a glance. ARCHITECTURE.md recommends `(220, 230, 255, 90)` (cool white). Include in the Phase 1 color audit alongside rain.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- [SomethingWithComputers/pixoo](https://github.com/SomethingWithComputers/pixoo) — Pixoo 64 Python library, device protocol, simulator, connection refresh behavior
-- [MET Weather API / Yr Developer Docs](https://developer.yr.no/doc/locationforecast/HowTO/) — Official Locationforecast 2.0 usage guide, caching requirements, coordinate truncation rules
-- [metno-locationforecast on PyPI](https://pypi.org/project/metno-locationforecast/) — v2.1.0, Dec 2024, Python 3.9-3.13 support confirmed
-- [Entur Developer Docs](https://developer.entur.org/) — Journey Planner v3 GraphQL API, ET-Client-Name requirement, rate limiting policy
-- [Pillow docs](https://pillow.readthedocs.io/en/stable/) — ImageFont, ImageDraw API references
-- [metno/weathericons](https://github.com/metno/weathericons) — Official weather icon set, MIT licensed, symbol_code mapping
+- Codebase audit: all 17 source files directly read — color values, compositing pipeline, test suite gaps, exact line numbers
+- `.planning/debug/weather-animation-too-subtle.md` — documented root cause analysis from v1.0 compositing debug session
+- `.planning/todos/done/2026-02-20-weather-animation-and-rain-text-colors-indistinguishable.md` — user-reported bug with specific hardware symptoms
+- `.env.example` and `.gitignore` — what is protected vs what would be exposed in README
+- [About READMEs - GitHub Docs](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes) — README rendering, naming, placement
+- [Standard README](https://github.com/RichardLitt/standard-readme) — section structure and ordering conventions
+- [Pillow 12.1.1 on PyPI](https://pypi.org/project/pillow/) — version verification
+- [Shields.io Static Badge API](https://shields.io/badges) — badge format and Claude brand color `D97757`
+- [Color Difference - Wikipedia](https://en.wikipedia.org/wiki/Color_difference) — perceptual color distance theory, JND thresholds
 
 ### Secondary (MEDIUM confidence)
-- [Grayda/pixoo_api NOTES.md](https://github.com/Grayda/pixoo_api/blob/main/NOTES.md) — Reverse-engineered API command reference; covers undocumented device behavior including 300-push lockup
-- [pixoo-rest](https://github.com/4ch1m/pixoo-rest) — Confirms PIL Image workflow for Pixoo 64 production use
-- [pixoo-homeassistant](https://github.com/gickowtf/pixoo-homeassistant) — Reference architecture for PIL-based compositing with multiple element types
-- [Entur rate limit HA issue #86547](https://github.com/home-assistant/core/issues/86547) — Real-world rate limiting incident with documented root cause and fix
-- [HA Community: Pixoo 64 thread](https://community.home-assistant.io/t/divoom-pixoo-64/420660) — Community reports on device firmware behavior, buffer artifacts
-- [MoonBench tiny pixel fonts](https://moonbench.xyz/projects/tiny-pixel-art-fonts/) — Font readability analysis for LED matrices at small sizes
+- [LED Sign Color Combos for Visibility](https://www.ledsignsupply.com/designing-eye-catching-content-for-outdoor-led-signs/) — white/yellow on dark as top LED readability combinations
+- [Signage and Color Contrast](https://www.designworkplan.com/read/signage-and-color-contrast) — 70% brightness differential threshold for assured legibility
+- [Visme: Color Blind Friendly Palettes](https://visme.co/blog/color-blind-friendly-palette/) — blue-orange as safest color-blind-friendly pair
+- [Smashing Magazine: Designing for Colorblindness](https://www.smashingmagazine.com/2024/02/designing-for-colorblindness/) — channel separation principles
+- [iterate/olorm](https://github.com/iterate/olorm) — real Norwegian-language README using "Installasjon" terminology
 
 ### Tertiary (LOW confidence)
-- [Divoom official API docs](http://doc.divoom-gz.com/web/#/12?page_id=196) — Official but sparse; did not load content during research; cross-validated via community sources
-- [Pixel-Font-Gen for Pixoo](https://github.com/gickowtf/Pixel-Font-Gen) — Custom font generation tool; limited documentation
+- [NRK Open Source](https://nrkno.github.io/) — Norwegian org README conventions (English default); limited sample size, inferred from pattern observation
+- Norwegian documentation conventions via NAV GitHub organization — inferred from pattern observation
 
 ---
-*Research completed: 2026-02-20*
+*Research completed: 2026-02-21*
 *Ready for roadmap: yes*
