@@ -27,8 +27,8 @@ Requirements for Documentation & Polish milestone. Each maps to roadmap phases.
 
 ### Fargefiks (Weather Colors)
 
-- [ ] **FARGE-01**: Rain indicator text is visually distinct from rain animation particles on LED display
-- [ ] **FARGE-02**: All 8 weather animation types verified for text/animation contrast
+- [x] **FARGE-01**: Rain indicator text is visually distinct from rain animation particles on LED display
+- [x] **FARGE-02**: All 8 weather animation types verified for text/animation contrast
 - [ ] **FARGE-03**: Color-identity regression tests prevent future color clashes
 
 ## Future Requirements
@@ -65,8 +65,8 @@ None -- v1.1 is a focused polish milestone.
 | DOC-13 | Phase 8 | Pending |
 | DOC-14 | Phase 8 | Pending |
 | DOC-15 | Phase 8 | Pending |
-| FARGE-01 | Phase 7 | Pending |
-| FARGE-02 | Phase 7 | Pending |
+| FARGE-01 | Phase 7 | Complete |
+| FARGE-02 | Phase 7 | Complete |
 | FARGE-03 | Phase 7 | Pending |
 
 **Coverage:**
