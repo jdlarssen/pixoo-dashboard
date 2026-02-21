@@ -89,15 +89,42 @@ def _draw_sun(size: int) -> Image.Image:
 
 
 def _draw_moon(size: int) -> Image.Image:
-    """White/gray crescent moon -- recognizable at 10px on LED."""
+    """Hand-crafted crescent moon bitmap -- recognizable at 10px on LED.
+
+    At 10x10 pixel resolution, mathematical circle/ellipse approaches produce
+    rasterization artifacts (diagonal stripes, blobs). A hand-crafted pixel
+    bitmap gives a clean, recognizable crescent shape.
+    """
+    # fmt: off
+    # Hand-crafted 10x10 crescent moon (right-facing, wider at middle)
+    #   . . . . # # . . . .
+    #   . . # # # # . . . .
+    #   . # # # # . . . . .
+    #   . # # # . . . . . .
+    #   # # # # . . . . . .
+    #   # # # # . . . . . .
+    #   . # # # . . . . . .
+    #   . # # # # . . . . .
+    #   . . # # # # . . . .
+    #   . . . . # # . . . .
+    pixels = [
+        (4, 0), (5, 0),
+        (2, 1), (3, 1), (4, 1), (5, 1),
+        (1, 2), (2, 2), (3, 2), (4, 2),
+        (1, 3), (2, 3), (3, 3),
+        (0, 4), (1, 4), (2, 4), (3, 4),
+        (0, 5), (1, 5), (2, 5), (3, 5),
+        (1, 6), (2, 6), (3, 6),
+        (1, 7), (2, 7), (3, 7), (4, 7),
+        (2, 8), (3, 8), (4, 8), (5, 8),
+        (4, 9), (5, 9),
+    ]
+    # fmt: on
+    moon_color = (255, 220, 100, 255)  # warm golden yellow (like moonlight)
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    cx, cy = size // 2, size // 2
-    r = 4
-    # Full circle in light silver-blue (shifted right by 1 for centering)
-    draw.ellipse([cx - r + 1, cy - r, cx + r + 1, cy + r], fill=(220, 225, 235, 255))
-    # Overlapping transparent circle to carve out crescent (shifted +3 from main)
-    draw.ellipse([cx - r + 4, cy - r, cx + r + 4, cy + r], fill=(0, 0, 0, 0))
+    for x, y in pixels:
+        if x < size and y < size:
+            img.putpixel((x, y), moon_color)
     return img
 
 
