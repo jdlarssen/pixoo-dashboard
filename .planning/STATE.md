@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-02-21)
 
 **Core value:** Glance at the display and instantly know: what time it is, when the next buses leave, and what the weather is doing -- without pulling out your phone.
-**Current focus:** Phase 7 - Weather Color Fix
+**Current focus:** Phase 8 - Norwegian README
 
 ## Current Position
 
 Milestone: v1.1 Documentation & Polish
-Phase: 7 of 8 (Weather Color Fix)
-Plan: 2 of 2 in current phase
-Status: All plans complete, ready for verification
-Last activity: 2026-02-21 — Completed 07-02 color-identity regression tests
+Phase: 8 of 8 (Norwegian README)
+Plan: 1 of 2 in current phase
+Status: Executing plan 08-01 complete, 08-02 next
+Last activity: 2026-02-21 — Completed 08-01 core README sections
 
-Progress: [██████████] 100%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -29,7 +29,7 @@ Progress: [██████████] 100%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 7. Weather Color Fix | 2/2 | 2min | 1min |
-| 8. Norwegian README | — | — | — |
+| 8. Norwegian README | 1/2 | 2min | 2min |
 
 ## Accumulated Context
 
@@ -52,5 +52,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: Completed 07-02-PLAN.md (color-identity regression tests) -- Phase 7 all plans done
+Stopped at: Completed 08-01-PLAN.md (core README) -- executing 08-02 next
 Resume file: None
