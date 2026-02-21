@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** Glance at the display and instantly know: what time it is, when the next buses leave, and what the weather is doing -- without pulling out your phone.
-**Current focus:** Phase 3: Weather (Complete, including gap closure)
+**Current focus:** Phase 5: Verification and Cleanup (Complete)
 
 ## Current Position
 
-Phase: 3 of 4 (Weather)
-Plan: 3 of 3 in current phase
-Status: Phase 3 Complete -- gap closure plan executed, ready for Phase 4
-Last activity: 2026-02-20 -- Completed 03-03-PLAN.md (gap closure)
+Phase: 5 of 5 (Verification and Cleanup)
+Plan: 1 of 1 in current phase
+Status: Phase 5 Complete -- all v1.0 audit gaps closed, 19/19 requirements verified
+Last activity: 2026-02-21 -- Phase 4 VERIFICATION.md, staleness dot tests, dead code removal
 
-Progress: [████████░░] 78%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
+- Total plans completed: 8
 - Average duration: 7 min
-- Total execution time: 0.9 hours
+- Total execution time: 1.0 hours
 
 **By Phase:**
 
@@ -30,9 +30,10 @@ Progress: [████████░░] 78%
 | 01-foundation | 2 | 24 min | 12 min |
 | 02-bus-departures | 2 | 15 min | 7.5 min |
 | 03-weather | 3 | 12 min | 4 min |
+| 05-verification-and-cleanup | 1 | 5 min | 5 min |
 
 **Recent Trend:**
-- Last 5 plans: 02-02 (12 min), 03-01 (3 min), 03-02 (5 min), 03-03 (4 min)
+- Last 5 plans: 03-01 (3 min), 03-02 (5 min), 03-03 (4 min), 05-01 (5 min)
 - Trend: Consistent
 
 *Updated after each plan completion*
@@ -68,6 +69,13 @@ Recent decisions affecting current work:
 - [03-03]: Single-pass alpha_composite replaces double-alpha paste+mask pattern (was squashing opacity to ~4%)
 - [03-03]: Rate limiter 0.3s (was 1.0s) with 0.35s sleep to prevent jitter-induced frame drops
 - [03-03]: Animation alphas in 65-150 range for LED visibility (was 15-50, invisible on hardware)
+- [04-05]: Weather animations use 3D depth: tick() returns (bg, fg) tuple composited around text
+- [04-05]: Animations span full weather zone (7,8,9) -- particles pass through text for depth effect
+- [04-05]: Sun = diagonal falling sunray particles; fog = drifting cloud blobs; thunder = jagged bolts
+- [04-05]: High/low temp moved below current temp; rain indicator moved right of current temp
+- [04-05]: Temperature color: bold warm yellow (255,200,50) to stand out against all animations
+- [05-01]: Traceability table Phase column set to Phase 4 for verified requirements (implemented in Phase 4, verified in Phase 5)
+- [05-01]: FONT_LARGE constant kept in config.py -- inert, removal outside audit scope
 
 ### Pending Todos
 
@@ -80,6 +88,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-20
-Stopped at: Phase 3 complete (gap closure done) -- ready for Phase 4 planning
+Last session: 2026-02-21
+Stopped at: All 5 phases complete -- v1.0 milestone fully verified, all 19 requirements complete
 Resume file: None
