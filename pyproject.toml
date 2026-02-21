@@ -1,12 +1,13 @@
 [project]
-name = "divoom-hub"
-version = "0.1.0"
-description = "Pixoo 64 smart display hub: clock, bus times, and weather at a glance"
+name = "pixoo-dashboard"
+version = "1.0.0"
+description = "Always-on Pixoo 64 dashboard: clock, bus departures, and weather at a glance"
 requires-python = ">=3.10"
 dependencies = [
     "pixoo",
     "Pillow>=12.1.0",
     "discord.py>=2.0",
+    "python-dotenv>=1.0",
 ]
 
 [project.optional-dependencies]

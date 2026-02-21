@@ -1,8 +1,10 @@
-"""Animated weather backgrounds for the 64x24 weather zone.
+"""Animated weather overlays for the 64x24 weather zone with depth layers.
 
-Provides ambient animation overlays (RGBA) that render behind weather text.
-Alpha values are tuned for LED hardware visibility (65-150 range) -- lower
-values produce no visible light on the Pixoo 64's LED matrix.
+Each animation produces two RGBA layers:
+- bg_layer: rendered BEHIND text (far/dim particles for depth)
+- fg_layer: rendered IN FRONT of text (near/bright particles for 3D effect)
+
+Alpha values tuned for LED hardware visibility (65-180 range).
 
 Color palette: vivid, LED-friendly colors per weather type.
 Rain=blue, snow=bright white, sun=warm yellow, fog=soft white, clouds=grey-white.
@@ -14,252 +16,437 @@ from PIL import Image, ImageDraw
 
 
 class WeatherAnimation:
-    """Base class for weather zone background animations.
+    """Base class for weather zone animations with depth layers.
 
-    Produces 64x24 RGBA overlay images. Subclasses override tick() to
-    generate per-frame particle effects.
+    Produces two 64x24 RGBA overlay images per tick:
+    - bg_layer: composited before text (behind)
+    - fg_layer: composited after text (in front)
     """
 
     def __init__(self, width: int = 64, height: int = 24) -> None:
         self.width = width
         self.height = height
 
-    def tick(self) -> Image.Image:
-        """Return the next animation frame as an RGBA image."""
+    def _empty(self) -> Image.Image:
         return Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
+
+    def tick(self) -> tuple[Image.Image, Image.Image]:
+        """Return (bg_layer, fg_layer) as RGBA images."""
+        return self._empty(), self._empty()
 
     def reset(self) -> None:
         """Reset animation state to initial conditions."""
 
 
-class ClearAnimation(WeatherAnimation):
-    """Minimal animation for clear skies -- transparent overlay.
-
-    Uses default 64x24 zone size.
-    """
-
-    def tick(self) -> Image.Image:
-        return Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
-
-
 class RainAnimation(WeatherAnimation):
-    """Falling blue raindrop particles (2px vertical streaks).
+    """Falling blue raindrops at two depths.
 
-    Color: vivid blue (80, 160, 255) -- clearly reads as water drops on LED.
+    Far drops (behind text): dimmer, shorter, slower.
+    Near drops (in front of text): brighter, longer, faster.
     """
 
     def __init__(self, width: int = 64, height: int = 24) -> None:
         super().__init__(width, height)
-        self.drops: list[list[int]] = []
-        self._spawn_drops(22)
+        self.far_drops: list[list[int]] = []
+        self.near_drops: list[list[int]] = []
+        self._spawn_far(14)
+        self._spawn_near(8)
 
-    def _spawn_drops(self, count: int) -> None:
-        """Create initial raindrop positions spread across the zone."""
+    def _spawn_far(self, count: int) -> None:
         for _ in range(count):
-            self.drops.append([
+            self.far_drops.append([
                 random.randint(0, self.width - 1),
                 random.randint(0, self.height - 1),
             ])
 
-    def tick(self) -> Image.Image:
-        img = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(img)
-        for drop in self.drops:
-            # Draw raindrop as a 1x2 vertical streak for LED visibility
+    def _spawn_near(self, count: int) -> None:
+        for _ in range(count):
+            self.near_drops.append([
+                random.randint(0, self.width - 1),
+                random.randint(0, self.height - 1),
+            ])
+
+    def tick(self) -> tuple[Image.Image, Image.Image]:
+        bg = self._empty()
+        fg = self._empty()
+        bg_draw = ImageDraw.Draw(bg)
+        fg_draw = ImageDraw.Draw(fg)
+
+        # Far drops -- behind text, dimmer, 2px streak
+        for drop in self.far_drops:
             x, y = drop[0], drop[1]
             if 0 <= x < self.width and 0 <= y < self.height:
-                draw.line([(x, y), (x, min(y + 1, self.height - 1))], fill=(80, 160, 255, 120))
-            # Move down with slight horizontal drift (slower for ~3 FPS)
-            drop[1] += random.randint(1, 2)
+                bg_draw.line([(x, y), (x, min(y + 1, self.height - 1))], fill=(40, 90, 200, 100))
+            drop[1] += 1
             drop[0] += random.choice([-1, 0, 0, 0])
-            # Wrap to top when off-screen
             if drop[1] >= self.height:
                 drop[1] = 0
                 drop[0] = random.randint(0, self.width - 1)
-        return img
+
+        # Near drops -- in front of text, brighter, 3px streak, faster
+        for drop in self.near_drops:
+            x, y = drop[0], drop[1]
+            if 0 <= x < self.width and 0 <= y < self.height:
+                fg_draw.line([(x, y), (x, min(y + 2, self.height - 1))], fill=(60, 140, 255, 200))
+            drop[1] += random.randint(2, 3)
+            drop[0] += random.choice([-1, 0, 0, 0])
+            if drop[1] >= self.height:
+                drop[1] = 0
+                drop[0] = random.randint(0, self.width - 1)
+
+        return bg, fg
 
     def reset(self) -> None:
-        self.drops.clear()
-        self._spawn_drops(22)
+        self.far_drops.clear()
+        self.near_drops.clear()
+        self._spawn_far(14)
+        self._spawn_near(8)
 
 
 class SnowAnimation(WeatherAnimation):
-    """Gently falling white snowflake particles (2x1 rectangles).
+    """Snow crystals at two depths.
 
-    Color: bright white with blue tint (220, 230, 255) -- reads as snow/ice on LED.
+    Far flakes (behind): smaller single pixel, dimmer, slow drift.
+    Near flakes (in front): + shaped crystal, bright white, gentle fall.
     """
 
     def __init__(self, width: int = 64, height: int = 24) -> None:
         super().__init__(width, height)
-        self.flakes: list[list[int]] = []
-        self._spawn_flakes(15)
+        self.far_flakes: list[list[int]] = []
+        self.near_flakes: list[list[int]] = []
+        self._spawn_far(10)
+        self._spawn_near(6)
 
-    def _spawn_flakes(self, count: int) -> None:
+    def _spawn_far(self, count: int) -> None:
         for _ in range(count):
-            self.flakes.append([
+            self.far_flakes.append([
                 random.randint(0, self.width - 1),
                 random.randint(0, self.height - 1),
             ])
 
-    def tick(self) -> Image.Image:
-        img = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(img)
-        for flake in self.flakes:
+    def _spawn_near(self, count: int) -> None:
+        for _ in range(count):
+            self.near_flakes.append([
+                random.randint(1, self.width - 2),
+                random.randint(0, self.height - 1),
+            ])
+
+    def _draw_crystal(self, draw: ImageDraw.Draw, x: int, y: int, alpha: int) -> None:
+        """Draw a 3x3 snow crystal (+ shape)."""
+        color = (255, 255, 255, alpha)
+        if 0 <= x < self.width and 0 <= y < self.height:
+            draw.point((x, y), fill=color)
+        if 0 <= x - 1 < self.width and 0 <= y < self.height:
+            draw.point((x - 1, y), fill=color)
+        if 0 <= x + 1 < self.width and 0 <= y < self.height:
+            draw.point((x + 1, y), fill=color)
+        if 0 <= x < self.width and 0 <= y - 1 < self.height:
+            draw.point((x, y - 1), fill=color)
+        if 0 <= x < self.width and 0 <= y + 1 < self.height:
+            draw.point((x, y + 1), fill=color)
+
+    def tick(self) -> tuple[Image.Image, Image.Image]:
+        bg = self._empty()
+        fg = self._empty()
+        bg_draw = ImageDraw.Draw(bg)
+        fg_draw = ImageDraw.Draw(fg)
+
+        # Far flakes -- behind text, single pixel, dim
+        for flake in self.far_flakes:
             x, y = flake[0], flake[1]
             if 0 <= x < self.width and 0 <= y < self.height:
-                # Draw snowflake as a 2x1 horizontal rectangle for LED visibility
-                draw.rectangle([x, y, min(x + 1, self.width - 1), y], fill=(220, 230, 255, 110))
-            # Slow descent with horizontal drift (already slow enough for ~3 FPS)
-            flake[1] += random.randint(1, 2)
+                bg_draw.point((x, y), fill=(200, 210, 230, 90))
+            flake[1] += random.choice([0, 0, 1])
             flake[0] += random.choice([-1, 0, 0, 1])
+            flake[0] = max(0, min(flake[0], self.width - 1))
             if flake[1] >= self.height:
                 flake[1] = 0
                 flake[0] = random.randint(0, self.width - 1)
-        return img
+
+        # Near flakes -- in front of text, + crystal, bright
+        for flake in self.near_flakes:
+            x, y = flake[0], flake[1]
+            self._draw_crystal(fg_draw, x, y, 180)
+            flake[1] += random.randint(0, 1)
+            flake[0] += random.choice([-1, 0, 0, 1])
+            flake[0] = max(1, min(flake[0], self.width - 2))
+            if flake[1] >= self.height:
+                flake[1] = 0
+                flake[0] = random.randint(1, self.width - 2)
+
+        return bg, fg
 
     def reset(self) -> None:
-        self.flakes.clear()
-        self._spawn_flakes(15)
+        self.far_flakes.clear()
+        self.near_flakes.clear()
+        self._spawn_far(10)
+        self._spawn_near(6)
 
 
 class CloudAnimation(WeatherAnimation):
-    """Slowly drifting grey-white cloud blobs.
-
-    Color: subtle grey-white (160, 170, 180) -- reads as clouds drifting on LED.
-    """
+    """Drifting grey-white cloud blobs at two depths."""
 
     def __init__(self, width: int = 64, height: int = 24) -> None:
         super().__init__(width, height)
-        # 3 cloud blobs at different positions and speeds (halved for ~3 FPS)
-        self.clouds: list[dict] = [
-            {"x": 5.0, "y": 4, "w": 12, "h": 6, "speed": 0.15},
-            {"x": 30.0, "y": 10, "w": 10, "h": 5, "speed": 0.1},
-            {"x": 50.0, "y": 16, "w": 14, "h": 5, "speed": 0.2},
+        self.far_clouds: list[dict] = [
+            {"x": 5.0, "y": 4, "w": 12, "h": 6, "speed": 0.08},
+            {"x": 40.0, "y": 14, "w": 10, "h": 5, "speed": 0.06},
+        ]
+        self.near_clouds: list[dict] = [
+            {"x": 25.0, "y": 8, "w": 14, "h": 6, "speed": 0.2},
         ]
 
-    def tick(self) -> Image.Image:
-        img = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(img)
-        for cloud in self.clouds:
-            x = int(cloud["x"])
-            y = cloud["y"]
-            w = cloud["w"]
-            h = cloud["h"]
-            # Draw cloud as overlapping ellipses -- alpha tuned for LED visibility
-            draw.ellipse(
-                [x, y, x + w, y + h],
-                fill=(160, 170, 180, 80),
-            )
-            draw.ellipse(
-                [x + w // 3, y - 1, x + w + w // 3, y + h - 1],
-                fill=(160, 170, 180, 65),
-            )
-            # Drift right, wrap around
+    def tick(self) -> tuple[Image.Image, Image.Image]:
+        bg = self._empty()
+        fg = self._empty()
+        bg_draw = ImageDraw.Draw(bg)
+        fg_draw = ImageDraw.Draw(fg)
+
+        # Far clouds -- behind text, dimmer
+        for cloud in self.far_clouds:
+            x, y, w, h = int(cloud["x"]), cloud["y"], cloud["w"], cloud["h"]
+            bg_draw.ellipse([x, y, x + w, y + h], fill=(140, 150, 160, 60))
+            bg_draw.ellipse([x + w // 3, y - 1, x + w + w // 3, y + h - 1], fill=(140, 150, 160, 45))
             cloud["x"] += cloud["speed"]
             if cloud["x"] > self.width:
                 cloud["x"] = float(-cloud["w"])
-        return img
+
+        # Near clouds -- in front of text, brighter
+        for cloud in self.near_clouds:
+            x, y, w, h = int(cloud["x"]), cloud["y"], cloud["w"], cloud["h"]
+            fg_draw.ellipse([x, y, x + w, y + h], fill=(180, 190, 200, 90))
+            fg_draw.ellipse([x + w // 3, y - 1, x + w + w // 3, y + h - 1], fill=(180, 190, 200, 70))
+            cloud["x"] += cloud["speed"]
+            if cloud["x"] > self.width:
+                cloud["x"] = float(-cloud["w"])
+
+        return bg, fg
 
     def reset(self) -> None:
-        self.clouds[0]["x"] = 5.0
-        self.clouds[1]["x"] = 30.0
-        self.clouds[2]["x"] = 50.0
+        self.far_clouds[0]["x"] = 5.0
+        self.far_clouds[1]["x"] = 40.0
+        self.near_clouds[0]["x"] = 25.0
 
 
 class SunAnimation(WeatherAnimation):
-    """Warm glow pulsing effect for sunny conditions.
+    """Sunrays beaming downward at two depths.
 
-    Color: warm yellow-orange (255, 200, 80) for sun rays/shimmer on LED.
+    Far rays (behind): dimmer, thinner, slower.
+    Near rays (in front): brighter, longer, faster -- beaming over text.
     """
 
     def __init__(self, width: int = 64, height: int = 24) -> None:
         super().__init__(width, height)
-        self._tick_count = 0
+        self.far_rays: list[list[float]] = []
+        self.near_rays: list[list[float]] = []
+        self._spawn_far(9)
+        self._spawn_near(5)
 
-    def tick(self) -> Image.Image:
-        img = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(img)
-        # Pulsing glow: alpha oscillates between 50 and 90 for LED visibility
-        self._tick_count += 1
-        phase = (self._tick_count % 20) / 20.0
-        alpha = int(50 + 40 * abs(phase - 0.5) * 2)
-        # Warm gradient from top-left corner
-        draw.ellipse(
-            [-10, -10, 25, 18],
-            fill=(255, 200, 80, alpha),
-        )
-        return img
+    def _spawn_far(self, count: int) -> None:
+        for _ in range(count):
+            self.far_rays.append([
+                float(random.randint(0, self.width - 1)),
+                float(random.randint(0, self.height - 1)),
+                random.uniform(0.5, 0.9),   # slower
+                random.randint(2, 4),        # shorter
+                random.randint(70, 110),     # dimmer
+            ])
+
+    def _spawn_near(self, count: int) -> None:
+        for _ in range(count):
+            self.near_rays.append([
+                float(random.randint(0, self.width - 1)),
+                float(random.randint(0, self.height - 1)),
+                random.uniform(1.0, 1.8),    # faster
+                random.randint(4, 7),         # longer
+                random.randint(130, 180),     # brighter
+            ])
+
+    def _draw_ray(self, draw: ImageDraw.Draw, ray: list[float], color: tuple) -> None:
+        x, y, speed, length, alpha = ray[0], ray[1], ray[2], int(ray[3]), int(ray[4])
+        x1, y1 = int(x), int(y)
+        x2, y2 = int(x + length * 0.5), int(y + length)
+        if 0 <= x1 < self.width and 0 <= y1 < self.height:
+            draw.line(
+                [(x1, y1), (min(x2, self.width - 1), min(y2, self.height - 1))],
+                fill=(*color, alpha),
+            )
+        ray[0] += speed * 0.4
+        ray[1] += speed
+        if ray[1] >= self.height or ray[0] >= self.width:
+            ray[0] = float(random.randint(0, self.width - 1))
+            ray[1] = 0.0
+
+    def tick(self) -> tuple[Image.Image, Image.Image]:
+        bg = self._empty()
+        fg = self._empty()
+        bg_draw = ImageDraw.Draw(bg)
+        fg_draw = ImageDraw.Draw(fg)
+
+        for ray in self.far_rays:
+            self._draw_ray(bg_draw, ray, (220, 180, 60))
+
+        for ray in self.near_rays:
+            self._draw_ray(fg_draw, ray, (255, 230, 90))
+
+        return bg, fg
 
     def reset(self) -> None:
-        self._tick_count = 0
+        self.far_rays.clear()
+        self.near_rays.clear()
+        self._spawn_far(9)
+        self._spawn_near(5)
 
 
 class ThunderAnimation(WeatherAnimation):
-    """Rain with occasional yellow-white lightning flash.
+    """Rain with lightning bolts and bright flashes.
 
-    Base rain in blue + yellow/white flash (255, 255, 100) for lightning on LED.
+    Lightning strikes every ~4 seconds, lasts 3 frames:
+    - Frame 1: bright white flash + jagged bolt
+    - Frame 2: bolt afterglow
+    - Frame 3: dim fade
     """
 
     def __init__(self, width: int = 64, height: int = 24) -> None:
         super().__init__(width, height)
         self._rain = RainAnimation(width, height)
         self._tick_count = 0
+        self._flash_remaining = 0
+        self._bolt_x = 0
 
-    def tick(self) -> Image.Image:
-        img = self._rain.tick()
+    def _draw_bolt(self, draw: ImageDraw.Draw, start_x: int, alpha: int) -> None:
+        """Draw a jagged lightning bolt from top to bottom."""
+        color = (255, 255, 200, alpha)
+        x = start_x
+        y = 0
+        while y < self.height - 2:
+            # Jagged segments: go down 2-4px with random horizontal jag
+            seg_len = random.randint(2, 4)
+            next_y = min(y + seg_len, self.height - 1)
+            jag = random.choice([-3, -2, -1, 1, 2, 3])
+            next_x = max(0, min(x + jag, self.width - 1))
+            draw.line([(x, y), (next_x, next_y)], fill=color, width=1)
+            x, y = next_x, next_y
+
+    def tick(self) -> tuple[Image.Image, Image.Image]:
+        bg, fg = self._rain.tick()
         self._tick_count += 1
-        # Flash every ~20 ticks (roughly every 7 seconds at ~3 FPS)
-        if self._tick_count % 20 == 0:
-            draw = ImageDraw.Draw(img)
-            # Yellow-white lightning flash across zone
-            draw.rectangle(
-                [0, 0, self.width - 1, self.height - 1],
-                fill=(255, 255, 100, 150),
-            )
-        return img
+
+        # Trigger new lightning every ~12 ticks (~4 seconds at 3 FPS)
+        if self._tick_count % 12 == 0:
+            self._flash_remaining = 3
+            self._bolt_x = random.randint(10, self.width - 10)
+
+        if self._flash_remaining > 0:
+            fg_draw = ImageDraw.Draw(fg)
+            bg_draw = ImageDraw.Draw(bg)
+
+            if self._flash_remaining == 3:
+                # Bright flash + bolt
+                bg_draw.rectangle(
+                    [0, 0, self.width - 1, self.height - 1],
+                    fill=(255, 255, 180, 120),
+                )
+                self._draw_bolt(fg_draw, self._bolt_x, 220)
+            elif self._flash_remaining == 2:
+                # Bolt afterglow
+                self._draw_bolt(fg_draw, self._bolt_x, 150)
+            else:
+                # Dim fade
+                bg_draw.rectangle(
+                    [0, 0, self.width - 1, self.height - 1],
+                    fill=(200, 200, 150, 40),
+                )
+
+            self._flash_remaining -= 1
+
+        return bg, fg
 
     def reset(self) -> None:
         self._rain.reset()
         self._tick_count = 0
+        self._flash_remaining = 0
 
 
 class FogAnimation(WeatherAnimation):
-    """Slow-moving horizontal fog bands.
+    """Fog clouds at two depths drifting through the right side of the zone.
 
-    Color: soft white (180, 190, 200) wisps -- reads as fog/mist on LED.
+    Far clouds (behind): dimmer, smaller, slower.
+    Near clouds (in front): brighter, larger, drift over text for 3D misty effect.
     """
 
     def __init__(self, width: int = 64, height: int = 24) -> None:
         super().__init__(width, height)
-        self._offset = 0.0
+        self.far_blobs: list[dict] = []
+        self.near_blobs: list[dict] = []
+        self._spawn_far(3)
+        self._spawn_near(3)
 
-    def tick(self) -> Image.Image:
-        img = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(img)
-        self._offset += 0.08  # slower for ~3 FPS (was 0.15 at ~1 effective FPS)
-        # Draw horizontal fog bands at varying positions (spread across 24px zone)
-        for i, base_y in enumerate([3, 9, 15, 21]):
-            y = int(base_y + (self._offset + i * 1.5) % 3 - 1)
-            if 0 <= y < self.height:
-                alpha = 70 + (i % 2) * 30  # LED-visible alpha range
-                x_start = int((self._offset * (i + 1)) % 5)
-                draw.line(
-                    [(x_start, y), (self.width - 1 - x_start, y)],
-                    fill=(180, 190, 200, alpha),
-                )
-        return img
+    def _spawn_far(self, count: int) -> None:
+        for _ in range(count):
+            self.far_blobs.append({
+                "x": float(random.randint(21, self.width + 20)),
+                "y": random.randint(4, 10),
+                "w": random.randint(6, 10),
+                "h": random.randint(3, 4),
+                "speed": random.uniform(0.05, 0.12),
+                "alpha": random.randint(40, 65),
+            })
+
+    def _spawn_near(self, count: int) -> None:
+        for _ in range(count):
+            self.near_blobs.append({
+                "x": float(random.randint(21, self.width + 20)),
+                "y": random.randint(3, 11),
+                "w": random.randint(10, 16),
+                "h": random.randint(4, 6),
+                "speed": random.uniform(0.12, 0.25),
+                "alpha": random.randint(70, 110),
+            })
+
+    def _draw_blob(self, draw: ImageDraw.Draw, blob: dict, bright: bool) -> None:
+        x = int(blob["x"])
+        y, w, h, alpha = blob["y"], blob["w"], blob["h"], blob["alpha"]
+        base = (200, 210, 220) if bright else (160, 170, 180)
+        draw.ellipse([x, y, x + w, y + h], fill=(*base, alpha))
+        draw.ellipse([x + w // 4, y - 1, x + w - w // 4, y + h - 2], fill=(*base, max(alpha - 25, 30)))
+
+    def tick(self) -> tuple[Image.Image, Image.Image]:
+        bg = self._empty()
+        fg = self._empty()
+        bg_draw = ImageDraw.Draw(bg)
+        fg_draw = ImageDraw.Draw(fg)
+
+        for blob in self.far_blobs:
+            self._draw_blob(bg_draw, blob, bright=False)
+            blob["x"] -= blob["speed"]
+            if blob["x"] + blob["w"] < 21:
+                blob["x"] = float(self.width + random.randint(0, 10))
+                blob["y"] = random.randint(4, 10)
+
+        for blob in self.near_blobs:
+            self._draw_blob(fg_draw, blob, bright=True)
+            blob["x"] -= blob["speed"]
+            if blob["x"] + blob["w"] < 21:
+                blob["x"] = float(self.width + random.randint(0, 10))
+                blob["y"] = random.randint(3, 11)
+
+        return bg, fg
 
     def reset(self) -> None:
-        self._offset = 0.0
+        self.far_blobs.clear()
+        self.near_blobs.clear()
+        self._spawn_far(3)
+        self._spawn_near(3)
 
 
 # Factory: weather group name -> animation class
 _ANIMATION_MAP: dict[str, type[WeatherAnimation]] = {
-    "clear": ClearAnimation,
-    "partcloud": ClearAnimation,  # subtle -- icon already shows condition
+    "clear": SunAnimation,
+    "partcloud": SunAnimation,
     "cloudy": CloudAnimation,
     "rain": RainAnimation,
-    "sleet": RainAnimation,  # similar visual to rain
+    "sleet": RainAnimation,
     "snow": SnowAnimation,
     "thunder": ThunderAnimation,
     "fog": FogAnimation,

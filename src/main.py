@@ -33,6 +33,7 @@ from src.config import (
     WEATHER_LON,
     WEATHER_REFRESH_INTERVAL,
     get_target_brightness,
+    validate_config,
 )
 from src.display.renderer import render_frame
 from src.display.state import DisplayState
@@ -250,7 +251,8 @@ def main_loop(
 
 def main() -> None:
     """Parse arguments and start the dashboard."""
-    parser = argparse.ArgumentParser(description="Divoom Hub - Pixoo 64 Dashboard")
+    validate_config()
+    parser = argparse.ArgumentParser(description="Pixoo Dashboard - Pixoo 64 Dashboard")
     parser.add_argument(
         "--ip",
         default=DEVICE_IP,

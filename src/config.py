@@ -1,7 +1,13 @@
-"""Configuration constants for Divoom Hub."""
+"""Configuration constants for Pixoo Dashboard."""
 
 import os
+import sys
 from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load .env file from project root
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 # Project root (parent of src/)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -40,26 +46,46 @@ def get_target_brightness(hour: int) -> int:
     return BRIGHTNESS_DAY
 
 # Bus departure settings (Entur JourneyPlanner v3 API)
-# Quay IDs for Ladeveien (NSR:StopPlace:42686)
-# Direction 1 (Sentrum): buses towards city center via Lade-sentrum-Kolstad
-# Direction 2 (Lade): buses towards Strindheim via Lade
-BUS_QUAY_DIRECTION1 = os.environ.get("BUS_QUAY_DIR1", "NSR:Quay:73154")
-BUS_QUAY_DIRECTION2 = os.environ.get("BUS_QUAY_DIR2", "NSR:Quay:73152")
+BUS_QUAY_DIRECTION1 = os.environ.get("BUS_QUAY_DIR1", "")
+BUS_QUAY_DIRECTION2 = os.environ.get("BUS_QUAY_DIR2", "")
 BUS_REFRESH_INTERVAL = 60  # seconds between bus API fetches
 BUS_NUM_DEPARTURES = 3  # number of departures to show per direction
-ET_CLIENT_NAME = os.environ.get("ET_CLIENT_NAME", "jdl-divoomhub")
+ET_CLIENT_NAME = os.environ.get("ET_CLIENT_NAME", "pixoo-dashboard")
 ENTUR_API_URL = "https://api.entur.io/journey-planner/v3/graphql"
 
 # Weather settings (MET Norway Locationforecast 2.0 API)
-# Default location: Trondheim, Norway
-WEATHER_LAT = float(os.environ.get("WEATHER_LAT", "63.4305"))
-WEATHER_LON = float(os.environ.get("WEATHER_LON", "10.3951"))
+WEATHER_LAT = float(os.environ.get("WEATHER_LAT", "0"))
+WEATHER_LON = float(os.environ.get("WEATHER_LON", "0"))
 WEATHER_REFRESH_INTERVAL = 600  # seconds between weather API fetches (10 min)
 WEATHER_API_URL = "https://api.met.no/weatherapi/locationforecast/2.0/compact"
-WEATHER_USER_AGENT = os.environ.get(
-    "WEATHER_USER_AGENT", "divoom-hub/0.1 github.com/jdl/divoom-hub"
-)
+WEATHER_USER_AGENT = os.environ.get("WEATHER_USER_AGENT", "pixoo-dashboard/1.0")
 
 # Discord message override settings (optional -- bot only starts if both are set)
 DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN")  # None if not configured
 DISCORD_CHANNEL_ID = os.environ.get("DISCORD_CHANNEL_ID")  # None if not configured
+
+# Birthday easter egg (optional -- comma-separated MM-DD dates)
+# Example: "01-01,06-15" for March 17 and December 16
+BIRTHDAY_DATES_RAW = os.environ.get("BIRTHDAY_DATES", "")
+BIRTHDAY_DATES: list[tuple[int, int]] = []
+for _d in BIRTHDAY_DATES_RAW.split(","):
+    _d = _d.strip()
+    if _d:
+        _parts = _d.split("-")
+        if len(_parts) == 2:
+            BIRTHDAY_DATES.append((int(_parts[0]), int(_parts[1])))
+
+
+def validate_config() -> None:
+    """Check that required config values are set. Exits with error if not."""
+    missing = []
+    if not BUS_QUAY_DIRECTION1:
+        missing.append("BUS_QUAY_DIR1")
+    if not BUS_QUAY_DIRECTION2:
+        missing.append("BUS_QUAY_DIR2")
+    if WEATHER_LAT == 0 and WEATHER_LON == 0:
+        missing.append("WEATHER_LAT / WEATHER_LON")
+    if missing:
+        print(f"Missing required config (set in .env): {', '.join(missing)}", file=sys.stderr)
+        print("Copy .env.example to .env and fill in your values.", file=sys.stderr)
+        sys.exit(1)
