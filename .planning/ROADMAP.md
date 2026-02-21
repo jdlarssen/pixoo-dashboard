@@ -114,7 +114,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 3. Weather | 3/3 | Complete | 2026-02-20 |
 | 4. Polish and Reliability | 5/5 | Complete | 2026-02-20 |
 | 5. Verification and Cleanup | 1/1 | Complete    | 2026-02-21 |
-| 6. Tech Debt Cleanup | 0/0 | Not planned | — |
+| 6. Tech Debt Cleanup | 0/2 | In progress | — |
 
 ### Phase 6: Tech Debt Cleanup
 **Goal**: Resolve all tech debt items identified in the v1.0 milestone audit — dead code, stale docs, deprecation warnings, and structural format gaps
@@ -124,7 +124,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
   2. Stale docstring in `main_loop()` referencing `fonts["large"]` — fix
   3. Pillow deprecation: `Image.getdata()` in test_weather_anim.py — replace before Pillow 14 (2027-10-15)
   4. SUMMARY frontmatter: add `requirements_completed` field to SUMMARY.md files
-**Plans**: 0 plans
+**Plans**: 2 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 6 to break down)
+- [ ] 06-01-PLAN.md — Dead code removal, stale docstring fix, and Pillow deprecation remediation
+- [ ] 06-02-PLAN.md — Add requirements_completed frontmatter to all 13 SUMMARY files
