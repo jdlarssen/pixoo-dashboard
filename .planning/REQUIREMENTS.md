@@ -50,29 +50,30 @@ None -- v1.1 is a focused polish milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DOC-01 | — | Pending |
-| DOC-02 | — | Pending |
-| DOC-03 | — | Pending |
-| DOC-04 | — | Pending |
-| DOC-05 | — | Pending |
-| DOC-06 | — | Pending |
-| DOC-07 | — | Pending |
-| DOC-08 | — | Pending |
-| DOC-09 | — | Pending |
-| DOC-10 | — | Pending |
-| DOC-11 | — | Pending |
-| DOC-12 | — | Pending |
-| DOC-13 | — | Pending |
-| DOC-14 | — | Pending |
-| FARGE-01 | — | Pending |
-| FARGE-02 | — | Pending |
-| FARGE-03 | — | Pending |
+| DOC-01 | Phase 8 | Pending |
+| DOC-02 | Phase 8 | Pending |
+| DOC-03 | Phase 8 | Pending |
+| DOC-04 | Phase 8 | Pending |
+| DOC-05 | Phase 8 | Pending |
+| DOC-06 | Phase 8 | Pending |
+| DOC-07 | Phase 8 | Pending |
+| DOC-08 | Phase 8 | Pending |
+| DOC-09 | Phase 8 | Pending |
+| DOC-10 | Phase 8 | Pending |
+| DOC-11 | Phase 8 | Pending |
+| DOC-12 | Phase 8 | Pending |
+| DOC-13 | Phase 8 | Pending |
+| DOC-14 | Phase 8 | Pending |
+| DOC-15 | Phase 8 | Pending |
+| FARGE-01 | Phase 7 | Pending |
+| FARGE-02 | Phase 7 | Pending |
+| FARGE-03 | Phase 7 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 18 total
-- Mapped to phases: 0
-- Unmapped: 18 (pending roadmap creation)
+- Mapped to phases: 18
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-21*
-*Last updated: 2026-02-21 after initial definition*
+*Last updated: 2026-02-21 after roadmap creation*
