@@ -9,21 +9,21 @@ Requirements for Documentation & Polish milestone. Each maps to roadmap phases.
 
 ### Dokumentasjon (README)
 
-- [ ] **DOC-01**: README has project overview in Norwegian with display photo placeholder
-- [ ] **DOC-02**: README has 64x64 zone layout diagram (ASCII art)
-- [ ] **DOC-03**: README has prerequisites section (Python 3.10+, Pixoo 64, LAN)
-- [ ] **DOC-04**: README has installation guide (clone, venv, pip install)
-- [ ] **DOC-05**: README has configuration guide (.env variables with required/optional flags)
-- [ ] **DOC-06**: README has usage section (running, --simulated, --save-frame)
-- [ ] **DOC-07**: README has launchd service setup (step-by-step)
-- [ ] **DOC-08**: README has "Bygget med Claude Code" badge and AI development transparency section
-- [ ] **DOC-09**: README has architecture overview (module map, data flow)
-- [ ] **DOC-10**: README has API documentation (Entur, MET Norway gotchas)
-- [ ] **DOC-11**: README has Discord message override section
-- [ ] **DOC-12**: README has weather animation documentation (3D depth system)
-- [ ] **DOC-13**: README documents Norwegian character support (BDF fonts, aeoeaa)
-- [ ] **DOC-14**: README documents error resilience (staleness dot, fallback, 300-push refresh)
-- [ ] **DOC-15**: README mentions birthday easter egg
+- [x] **DOC-01**: README has project overview in Norwegian with display photo placeholder
+- [x] **DOC-02**: README has 64x64 zone layout diagram (ASCII art)
+- [x] **DOC-03**: README has prerequisites section (Python 3.10+, Pixoo 64, LAN)
+- [x] **DOC-04**: README has installation guide (clone, venv, pip install)
+- [x] **DOC-05**: README has configuration guide (.env variables with required/optional flags)
+- [x] **DOC-06**: README has usage section (running, --simulated, --save-frame)
+- [x] **DOC-07**: README has launchd service setup (step-by-step)
+- [x] **DOC-08**: README has "Bygget med Claude Code" badge and AI development transparency section
+- [x] **DOC-09**: README has architecture overview (module map, data flow)
+- [x] **DOC-10**: README has API documentation (Entur, MET Norway gotchas)
+- [x] **DOC-11**: README has Discord message override section
+- [x] **DOC-12**: README has weather animation documentation (3D depth system)
+- [x] **DOC-13**: README documents Norwegian character support (BDF fonts, aeoeaa)
+- [x] **DOC-14**: README documents error resilience (staleness dot, fallback, 300-push refresh)
+- [x] **DOC-15**: README mentions birthday easter egg
 
 ### Fargefiks (Weather Colors)
 
@@ -50,21 +50,21 @@ None -- v1.1 is a focused polish milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DOC-01 | Phase 8 | Pending |
-| DOC-02 | Phase 8 | Pending |
-| DOC-03 | Phase 8 | Pending |
-| DOC-04 | Phase 8 | Pending |
-| DOC-05 | Phase 8 | Pending |
-| DOC-06 | Phase 8 | Pending |
-| DOC-07 | Phase 8 | Pending |
-| DOC-08 | Phase 8 | Pending |
-| DOC-09 | Phase 8 | Pending |
-| DOC-10 | Phase 8 | Pending |
-| DOC-11 | Phase 8 | Pending |
-| DOC-12 | Phase 8 | Pending |
-| DOC-13 | Phase 8 | Pending |
-| DOC-14 | Phase 8 | Pending |
-| DOC-15 | Phase 8 | Pending |
+| DOC-01 | Phase 8 | Complete |
+| DOC-02 | Phase 8 | Complete |
+| DOC-03 | Phase 8 | Complete |
+| DOC-04 | Phase 8 | Complete |
+| DOC-05 | Phase 8 | Complete |
+| DOC-06 | Phase 8 | Complete |
+| DOC-07 | Phase 8 | Complete |
+| DOC-08 | Phase 8 | Complete |
+| DOC-09 | Phase 8 | Complete |
+| DOC-10 | Phase 8 | Complete |
+| DOC-11 | Phase 8 | Complete |
+| DOC-12 | Phase 8 | Complete |
+| DOC-13 | Phase 8 | Complete |
+| DOC-14 | Phase 8 | Complete |
+| DOC-15 | Phase 8 | Complete |
 | FARGE-01 | Phase 7 | Complete |
 | FARGE-02 | Phase 7 | Complete |
 | FARGE-03 | Phase 7 | Complete |
@@ -76,4 +76,4 @@ None -- v1.1 is a focused polish milestone.
 
 ---
 *Requirements defined: 2026-02-21*
-*Last updated: 2026-02-21 after roadmap creation*
+*Last updated: 2026-02-21 after Phase 8 verification*

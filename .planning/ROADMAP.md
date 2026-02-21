@@ -7,7 +7,7 @@ v1.1 is a focused polish milestone: fix the weather animation color issue that m
 ## Milestones
 
 - ✅ **v1.0 MVP** - Phases 1-6 (shipped 2026-02-21)
-- 🚧 **v1.1 Documentation & Polish** - Phases 7-8 (in progress)
+- 🚧 **v1.1 Documentation & Polish** - Phases 7-8 (all phases complete, ready for milestone audit)
 
 ## Phases
 
@@ -26,8 +26,8 @@ Archived to `.planning/milestones/v1.0-ROADMAP.md`
 
 ### v1.1 Documentation & Polish
 
-- [ ] **Phase 7: Weather Color Fix** - Make rain/snow text and animation particles visually distinct on the physical LED display
-- [ ] **Phase 8: Norwegian README** - Comprehensive Norwegian-language README documenting the entire project
+- [x] **Phase 7: Weather Color Fix** - Make rain/snow text and animation particles visually distinct on the physical LED display
+- [x] **Phase 8: Norwegian README** - Comprehensive Norwegian-language README documenting the entire project
 
 ## Phase Details
 
@@ -42,8 +42,8 @@ Archived to `.planning/milestones/v1.0-ROADMAP.md`
 **Plans**: 2 plans
 
 Plans:
-- [ ] 07-01-PLAN.md -- Color palette tuning (text colors + particle RGB values for all 8 animation types)
-- [ ] 07-02-PLAN.md -- Color-identity regression tests (channel-dominance + contrast assertions)
+- [x] 07-01-PLAN.md -- Color palette tuning (text colors + particle RGB values for all 8 animation types)
+- [x] 07-02-PLAN.md -- Color-identity regression tests (channel-dominance + contrast assertions)
 
 ### Phase 8: Norwegian README
 **Goal**: A reader can understand, install, configure, run, and maintain Divoom Hub from the README alone -- entirely in Norwegian
@@ -58,8 +58,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 08-01-PLAN.md -- Core README (overview, badge, zone diagram, install, config, usage, launchd, AI transparency)
-- [ ] 08-02-PLAN.md -- Technical deep-dive (architecture, APIs, Discord, weather animations, fonts, error resilience, birthday)
+- [x] 08-01-PLAN.md -- Core README (overview, badge, zone diagram, install, config, usage, launchd, AI transparency)
+- [x] 08-02-PLAN.md -- Technical deep-dive (architecture, APIs, Discord, weather animations, fonts, error resilience, birthday)
 
 ## Progress
 
@@ -68,5 +68,5 @@ Phases execute in numeric order: 7 → 8
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 7. Weather Color Fix | v1.1 | 0/2 | Not started | - |
-| 8. Norwegian README | v1.1 | 0/? | Not started | - |
+| 7. Weather Color Fix | v1.1 | 2/2 | Complete | 2026-02-21 |
+| 8. Norwegian README | v1.1 | 2/2 | Complete | 2026-02-21 |
