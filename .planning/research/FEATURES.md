@@ -1,225 +1,142 @@
 # Feature Landscape
 
-**Domain:** Entryway information dashboard on Divoom Pixoo 64 (64x64 LED pixel display)
-**Researched:** 2026-02-20
-
-## Pixoo 64 Native vs Custom Rendering
-
-Understanding what the device does natively is critical before deciding what to build custom.
-
-### Native Capabilities (via Divoom app / built-in firmware)
-
-| Capability | How It Works | Limitations | Confidence |
-|-----------|--------------|-------------|------------|
-| Clock faces | Hundreds available via Divoom app; set via API `set_clock(id)` | Cannot combine with custom data overlays; it is the full 64x64 display | HIGH |
-| Weather display | Built-in via Divoom app; uses OpenWeatherMap; location auto-synced or manual | Fixed layout, cannot customize what data shows; uses Divoom's own weather source (not Yr) | HIGH |
-| Social stats counters | YouTube, Twitter, Twitch follower counts | Irrelevant for this project | HIGH |
-| Crypto/stock tickers | Built-in finance displays | Irrelevant for this project | HIGH |
-| Audio visualizer | EQ/spectrum display using built-in mic | Irrelevant for this project | HIGH |
-| Custom channels (3 slots) | Save images/animations to device memory; work offline | Static content only; no live data | HIGH |
-| Scrolling text | API `Draw/SendHttpText` with font, position, speed, direction | Text can only scroll left with most fonts; limited font options; cannot mix with pixel-buffer rendering | MEDIUM |
-| Brightness control | API `Channel/SetBrightness` (0-100) | Works well, no issues reported | HIGH |
-| Screen on/off | API `set_screen(on/off)` | Works well | HIGH |
-| GIF playback | Play from URL, local storage, or gallery | Up to ~40 frames before device crashes | HIGH |
-
-### What MUST Be Custom-Rendered
-
-For this project's requirements (time + date + bus departures + weather from Yr, all on one screen), **virtually everything must be custom-rendered** because:
-
-1. **Native clock faces occupy the entire 64x64 screen** -- you cannot overlay bus times or weather on top of a native clock face.
-2. **Native weather uses OpenWeatherMap**, not Yr (which is required for Norwegian weather data accuracy and API terms).
-3. **Native text scrolling (`SendHttpText`) cannot coexist with pixel-buffer rendering** (`SendHttpGif`) -- they are separate display modes. You use one or the other.
-4. **There is no native bus/transit display** -- this must be fetched from ATB's API and rendered.
-5. **The only way to show multiple data types on one screen** is to compose a full 64x64 pixel image and send it via `Draw/SendHttpGif`.
-
-**Verdict:** Use `Draw/SendHttpGif` (full-frame pixel buffer) for the dashboard. Render the entire 64x64 image server-side (using PIL/Pillow or similar), then push the base64-encoded RGB data to the device. This is the approach used by pixoo-weather, the Home Assistant integration's "components" mode, and every serious custom dashboard project.
-
-The only native features worth using are:
-- **Brightness control** -- use the API to auto-dim at night
-- **Screen on/off** -- turn off at bedtime, on in the morning
+**Domain:** Norwegian README documentation + LED weather color fix for Pixoo 64 dashboard
+**Researched:** 2026-02-21
+**Milestone:** v1.1 Documentation & Polish
 
 ## Table Stakes
 
-Features the user expects. Missing = the dashboard is useless as an entryway display.
+Features users expect. Missing = project feels incomplete.
 
-| Feature | Why Expected | Complexity | Rendering | Notes |
-|---------|--------------|------------|-----------|-------|
-| Current time (large, readable) | Core purpose -- glance at time before leaving | Low | Custom (full-frame) | Must be the dominant visual element; use a large pixel font (likely 5x7 or larger for digits). Time must update every minute at minimum. |
-| Today's date in Norwegian | Context for "what day is it?" before leaving | Low | Custom (full-frame) | Format: "tor 20. feb" -- short day name + date + short month. Requires a compact font (3x5 or 4x6). Norwegian locale strings are trivial to implement (12 months, 7 days). |
-| Next 2 bus departures (direction 1) | Core purpose -- "when do I need to leave?" | Medium | Custom (full-frame) | Show route number + minutes until departure. ATB API (EnTur/national API) provides real-time data. Must refresh every 60 seconds. Show "naa" or similar when bus is imminent. |
-| Next 2 bus departures (direction 2) | Same as above, opposite direction | Medium | Custom (full-frame) | Same format. Two directions means 4 departure lines total. This is 4 compact data rows. |
-| Current temperature | "Do I need a jacket?" | Low | Custom (full-frame) | Yr API. Display as e.g. "-3" or "12" with degree symbol. Large enough to read at a glance. |
-| Weather icon | Instant visual weather status | Medium | Custom (full-frame) | Must design pixel art icons for sun, cloud, rain, snow, etc. Yr provides weather symbol codes. A 10x10 to 16x16 pixel icon area is reasonable. |
-| Single-screen layout (no rotation) | User requirement -- all info visible at a glance | High | Custom (full-frame) | This is the hardest constraint. 64x64 pixels must fit: time, date, 4 bus departures, temperature, weather icon. Layout design is THE critical challenge. |
-| Auto-refresh (bus: 1min, weather: 10-15min) | Data must be current to be useful | Low | N/A (backend logic) | Bus data refreshes every 60s. Weather every 10-15 minutes (Yr rate limit friendly). Clock updates every 60s (or on the minute). |
+### README Documentation
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Prosjektbeskrivelse (overview) | First thing visitors read; explains what the display does and why | Low | 2-3 paragraphs covering: what it is (always-on entryway dashboard), what it shows (klokke, buss, vaer), and the core value (glance without pulling out your phone). A photo of the running display elevates this from good to great |
+| Installasjon (installation) | Users need to go from zero to running | Low | Clone, `python -m venv .venv`, `pip install .`, copy `.env.example` to `.env`. The existing `.env.example` has excellent inline docs already -- reference it rather than duplicating |
+| Oppsett / Konfigurasjon (configuration) | 7+ env vars that need explaining, some with non-obvious values | Low | Table of all `.env` variables with required/optional flags. Key guidance: how to find your bus stop quay IDs from stoppested.entur.org, how to find coordinates for weather, MET User-Agent requirements |
+| Bruk (usage) | How to start the dashboard | Low | `python src/main.py --ip X.X.X.X`, `--simulated` for testing without hardware, `--save-frame` for debugging. Document `TEST_WEATHER` env var for visual testing of weather animations |
+| Kjore som tjeneste (launchd service) | The plist exists but needs user-facing docs | Low | Step-by-step: edit paths in plist, `cp` to `~/Library/LaunchAgents/`, `launchctl load`, check status, view logs. Already documented in plist XML comments -- extract and format for README |
+| Skjermoppsett (display layout) | The 64x64 pixel budget is the project's core constraint | Low | ASCII art zone diagram: klokke 11px, dato 8px, skillelinje 1px, buss 19px, skillelinje 1px, vaer 24px = 64px. This makes the project tangible to readers |
+| Krav (requirements) | What you need before starting | Low | Python 3.10+, Pixoo 64 on same LAN, macOS for launchd (note: systemd alternative for Linux). List pip dependencies from pyproject.toml |
+
+### Weather Color Fix
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Rain text vs rain animation distinguishability | Reported as indistinguishable on physical hardware. `COLOR_WEATHER_RAIN (50, 180, 255)` clashes with rain drops `(40, 90, 200)` far and `(60, 140, 255)` near | Low | All three are blue-family hues. On LED at 2+ meters, perceptual distance is too small. This is the primary bug |
+| Verify all text-animation combinations | After fixing rain, confirm the other 7 animation types don't have similar issues | Low | Systematic check: temperature text vs each animation, hi/lo text vs each animation, rain indicator text vs each animation. Most are already fine based on code analysis |
 
 ## Differentiators
 
-Features that make this dashboard notably better than a basic setup. Not required for MVP, but high value.
+Features that set the project apart. Not expected, but valued.
+
+### README Documentation
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Rain expected indicator | "Should I grab an umbrella?" -- immediate visual cue | Low | Yr provides precipitation forecast. A single colored pixel/icon or "!" indicator near weather. Tiny addition, huge practical value. |
-| Today's high/low temperature | Context for dressing decisions beyond current temp | Low | Yr API provides daily min/max. Display as small text like "H5 L-2" near current temp. |
-| Auto-brightness (night dimming) | Avoid blinding LED glare in dark hallway at night | Low | Use `Channel/SetBrightness` API on a schedule. Trivially easy and highly practical for an always-on display. |
-| Custom push message | Temporary message overlay (e.g., "HUSK NØKLER" / "remember keys") | Medium | Would require an HTTP endpoint or MQTT listener on the server that temporarily overrides the dashboard. Useful but requires designing the override mechanism. |
-| Bus departure countdown coloring | Color-code departures: green (plenty of time), yellow (hurry), red (missed) | Low | Simple conditional: >10 min = green, 3-10 min = yellow, <3 min = red. Immediately readable without parsing numbers. |
-| Graceful error states | Show clear indicators when API is down instead of stale data | Medium | Display a small warning icon or "?" when bus/weather API fails. Stale data with no indicator is worse than showing "offline". |
-| Screen schedule (on/off times) | No point showing data at 2 AM; saves power and reduces LED wear | Low | Cron-like schedule using `set_screen()` API. e.g., on at 06:00, off at 23:00. |
-| Weekend/weekday mode | Different display on weekends (no bus times needed, show more weather) | Medium | Conditional layout based on day of week. Reclaims pixels on weekends for larger weather display. |
-| Smooth minute transitions | Avoid the "blink" when refreshing the display | Medium | Known Pixoo issue: buffer artifacts when pushing new frames. Can mitigate by sending frames at controlled intervals and avoiding rapid pushes (max 1 push/second). |
+| "Bygget med Claude Code" transparency section | Honest about AI-assisted development process. Explicitly requested in milestone | Low | Shield.io badge at top of README + short section explaining the development process. Link to Anthropic/Claude Code. This is not just a badge -- it tells the story of how the project was built |
+| Vaeranimasjoner (weather animation docs) | The 3D depth-layered animation system is the most impressive technical feature | Med | Describe bg/fg compositing, the 6 animation types (rain, snow, sun, fog, clouds, thunder), alpha tuning (65-180 range) for LED hardware. A screenshot or GIF would add significant value but is optional |
+| Arkitektur / Oversikt (architecture) | Clean module structure deserves documentation | Med | Module map: `src/display/` (renderer, layout, state, fonts, weather_anim, weather_icons), `src/providers/` (clock, bus, weather, discord_bot), `src/device/` (pixoo_client). Data flow: providers fetch -> DisplayState -> renderer composites -> pixoo_client pushes |
+| API-dokumentasjon (external APIs) | Two APIs with specific requirements that tripped up development | Med | Entur JourneyPlanner v3 GraphQL (quay IDs, ET-Client-Name header, refresh rate), MET Locationforecast 2.0 (User-Agent required, If-Modified-Since caching, rate limits). Document the gotchas |
+| Discord-meldinger (Discord integration) | Not obvious that a pixel display can receive push messages | Low | Brief section: create Discord bot, get token, set channel ID in .env, send `!msg hello` in the channel. Explain MessageBridge thread safety |
+| Bursdagspaaskeegg (birthday easter egg) | Fun personal touch | Low | Mention `BIRTHDAY_DATES` env var, describe golden crown + sparkles effect on configured dates |
+| Feilhaandtering (error resilience docs) | Engineering choices worth documenting for other builders | Low | Staleness indicators (orange dot), fallback to last-good data, 300-push connection refresh, graceful degradation |
+| Norsk tegnsett (Norwegian character support) | Solved a non-trivial problem: aeoaa on pixel displays | Low | Explain why custom rendering was needed (native Pixoo has no aeoaa), which BDF fonts (hzeller 4x6, 5x8), how they were validated |
+
+### Weather Color Fix
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Perceptually distinct color palette | Each weather state has a clear visual identity that never clashes with overlaid text | Med | Not just fixing one color -- opportunity to verify the entire palette is LED-safe. But scope should be limited to actual problems |
+| Maintain rain's blue identity in animation | Rain animation should still feel blue/watery | Low | Fix the TEXT color, not the animation. The rain drops are the artistic element; the "2.5mm" text is informational |
 
 ## Anti-Features
 
-Features to deliberately NOT build.
+Features to explicitly NOT build.
 
 | Anti-Feature | Why Avoid | What to Do Instead |
 |--------------|-----------|-------------------|
-| Native Divoom clock faces | Occupy the full screen; cannot overlay custom data; would lose bus/weather info | Render custom time display as part of the full-frame image |
-| Native Divoom weather | Uses OpenWeatherMap (not Yr); fixed layout; cannot combine with bus data | Fetch from Yr API and render custom |
-| Scrolling text for data display | `SendHttpText` cannot coexist with full-frame `SendHttpGif` rendering; scrolling text is distracting for always-on display; limited font options | Render static text as pixels in the frame buffer |
-| Animated transitions/effects | 64x64 is too small for animation to add value; animations increase complexity; max ~40 frames before device crashes; each push must be >1 second apart | Static frames, updated on refresh interval |
-| Multi-page rotation | User explicitly wants single-screen -- all info at a glance without waiting for rotation | Fit everything on one 64x64 layout |
-| Complex pixel art decoration | Every pixel matters for data; decorative borders/icons eat into the limited space | Minimal chrome, maximum information density |
-| Mobile app / web UI for config | Out of scope per project definition; adds massive complexity | Config file or environment variables |
-| Historical data / logging | Out of scope; adds storage requirements and complexity | Display only current/upcoming data |
-| Multi-device support | Only one Pixoo 64 | Hardcode single device IP |
-| Real-time second display | Updating every second wastes device bandwidth (max 1 push/sec); seconds are not useful for an entryway display | Update every 60 seconds, on the minute |
-
-## Layout Analysis: What Fits on 64x64
-
-This is the most critical design constraint. Based on research into pixel font sizes and existing Pixoo 64 projects:
-
-### Font Size Reality on 64x64
-
-| Font Size | Character Dimensions | Readability | Best For | Fits Per Row (64px) |
-|-----------|---------------------|-------------|----------|---------------------|
-| 3x5 (+ 1px gap) | 4px wide per char | Readable but small; some characters ambiguous (G/C, 0/O) | Secondary info: date, labels | ~16 characters |
-| 4x6 (+ 1px gap) | 5px wide per char | Good readability; most characters distinct | Bus times, temperatures | ~12 characters |
-| 5x7 (+ 1px gap) | 6px wide per char | Very readable; clear at a distance | Time display digits | ~10 characters |
-| 7x9+ | 8px wide per char | Excellent; visible across room | Large clock display | ~8 characters |
-
-### Proposed Layout Budget (64x64 pixels)
-
-```
-Row allocation (top to bottom):
-+----------------------------------+  y=0
-|  TIME (large)        WEATHER ICN |  ~16px tall (large digits + icon)
-|  13:45               [sun icon]  |
-+----------------------------------+  y=16
-|  tor 20. feb            -3°      |  ~8px tall (date + temp)
-+----------------------------------+  y=24
-|  H: 5°  L: -1°    [rain icon]   |  ~8px tall (high/low + rain indicator)
-+----------------------------------+  y=32
-|  --- BUS RETNING 1 ---           |  ~6px (section label, optional)
-|  6  3min   6  18min              |  ~8px (two departures)
-+----------------------------------+  y=46
-|  --- BUS RETNING 2 ---           |  ~6px (section label, optional)
-|  6  7min   6  22min              |  ~8px (two departures)
-+----------------------------------+  y=60
-|  [4px padding/status area]       |
-+----------------------------------+  y=64
-```
-
-This is approximate and will need iteration. Key constraints:
-- Time must be the largest element (10-16px tall digits)
-- Bus departures need route number + minutes, compact but readable
-- Weather icon needs at least 10x10 pixels to be recognizable
-- 1px gaps between sections prevent visual bleed on LEDs
-
-### What Existing Projects Teach Us
-
-| Project | Approach | Key Lesson |
-|---------|----------|------------|
-| pixoo-weather | PIL/Pillow image generation with 3x5 pixel font, sent as GIF | Small fonts work; GIF approach is standard; refresh every 1 min |
-| Node-RED pixoo-dash | 20 fields, 7 chars each, 4 blocks | Structured grid works but text-only is limiting |
-| Home Assistant integration | PIL-based compositing with multiple element types | Components model (text + images + shapes) is the most flexible |
-| HA community projects | Single-purpose displays (one notification at a time) | Dense multi-data layouts are hard but possible with careful design |
+| English README alongside Norwegian | Milestone explicitly calls for Norwegian README. Dual-language doubles maintenance for a personal project | Single Norwegian README in Bokmal. English speakers can use browser translation. One-line English summary at the very top is fine |
+| Nynorsk variant | The user writes Bokmal. Nynorsk is a separate written standard used by ~10% of Norwegians. Adding it doubles maintenance with no benefit for this personal project | Write consistently in Bokmal |
+| Auto-generated API reference (Sphinx/mkdocs) | 2,321 LOC codebase with good existing docstrings. Auto-doc tooling adds build complexity disproportionate to project size | Good docstrings in code (already present) + architecture section in README |
+| Interactive color picker / configurable colors | Over-engineering. The color problem needs 1-2 constant changes in layout.py, not a configuration system | Hardcode correct LED-safe colors. Document the color palette in README for anyone forking |
+| Per-weather-condition text color overrides | Adds complexity (8 weather conditions x N text elements) for minimal gain | Use text colors that contrast with ALL animation types, not per-type overrides |
+| Comprehensive Norwegian translation of code comments | Code comments and docstrings are in English by convention. Translating them adds no value and makes the code harder to maintain | Keep code in English, README in Norwegian |
 
 ## Feature Dependencies
 
 ```
-Core rendering pipeline (PIL/Pillow + SendHttpGif)
-  |
-  +-> Time display (requires: font rendering, minute-based refresh loop)
-  |     +-> Date display (requires: Norwegian locale strings)
-  |
-  +-> Bus departures (requires: ATB/EnTur API client, refresh scheduler)
-  |     +-> Departure countdown coloring (requires: bus departures working)
-  |
-  +-> Weather display (requires: Yr API client, weather icon sprites)
-  |     +-> Current temperature
-  |     +-> Weather icon
-  |     +-> High/low temperatures (requires: daily forecast parsing)
-  |     +-> Rain indicator (requires: precipitation forecast)
-  |
-  +-> Layout engine (requires: all data sources + font rendering)
-        +-> Single-screen compositor (combines all elements at coordinates)
+README (all sections can be written in parallel, but logical reading order matters):
+  Prosjektbeskrivelse -> Krav -> Installasjon -> Oppsett -> Bruk -> Tjeneste
+  Skjermoppsett (standalone, can be placed after Bruk)
+  Arkitektur (standalone, references module structure)
+  API-dokumentasjon (standalone, references Oppsett for env vars)
+  Discord-meldinger (requires Oppsett context)
+  Vaeranimasjoner (requires Arkitektur context)
+  Bursdagspaaskeegg (standalone mini-section)
+  Feilhaandtering (requires Arkitektur context)
+  "Bygget med Claude Code" (standalone, placed at end or as badge at top)
 
-Device connectivity (requires: Pixoo 64 on LAN, discovered IP)
-  +-> Brightness control
-  +-> Screen schedule
-  +-> Push frame to display
-
-Custom push message (requires: HTTP server or message listener + display override logic)
+Weather Color Fix:
+  Identify clashing colors in layout.py -> Choose replacement -> Update constant
+  -> Verify all 8 weather animation types still work -> Hardware test
+  (No dependency on README features -- can be done in parallel)
 ```
 
 ## MVP Recommendation
 
-**Phase 1: Core rendering pipeline + time/date**
-1. PIL/Pillow image generation at 64x64
-2. Custom pixel font rendering (3x5 and 5x7 minimum)
-3. Time display (large digits)
-4. Date display (Norwegian, compact)
-5. Push to Pixoo via `Draw/SendHttpGif`
-6. Minute-based refresh loop
+### README: Write in this order
 
-**Phase 2: Bus departures**
-1. ATB/EnTur API client
-2. Parse next 2 departures per direction
-3. Render in layout below time/date
-4. 60-second refresh cycle
+1. **Prosjektbeskrivelse** -- the hook. What it is, what it shows, why it exists. Include display photo if available
+2. **Skjermoppsett** -- the 64x64 zone layout diagram. Makes the project tangible immediately
+3. **Krav + Installasjon + Oppsett + Bruk** -- practical core. Clone to running in 5 minutes
+4. **Kjore som tjeneste** -- launchd for always-on operation
+5. **"Bygget med Claude Code"** -- transparency badge and section (explicitly requested in milestone)
+6. **Arkitektur** -- module map and data flow for anyone forking or understanding the code
+7. **Remaining differentiators** -- API docs, Discord, birthday, error handling, animations, Norwegian chars
 
-**Phase 3: Weather**
-1. Yr API client (with proper User-Agent)
-2. Current temperature display
-3. Weather icon sprites (pixel art, ~12x12)
-4. High/low temperatures
-5. Rain indicator
+**Defer:** None. This is a documentation milestone -- all sections should be written. The ordering above is priority for the reader experience, not a phasing suggestion.
 
-**Phase 4: Polish and differentiators**
-1. Auto-brightness / screen schedule
-2. Bus countdown coloring
-3. Graceful error states
-4. Custom push messages
+### Weather Color Fix: Specific recommendation
 
-**Defer:** Weekend mode, animated transitions, complex decorations. These add complexity without proportional value. The display should be rock-solid before adding conditional layouts.
+**The problem:** `COLOR_WEATHER_RAIN = (50, 180, 255)` (vivid blue) is rendered as rain indicator text ("2.5mm") in the weather zone. This text sits inside the rain animation, where drops are `(40, 90, 200, alpha=100)` (far/dim) and `(60, 140, 255, alpha=200)` (near/bright). All three are blue-family hues. On a 64x64 LED matrix viewed at 2+ meters, the perceptual distance between these colors is below the just-noticeable-difference threshold, making the text invisible during rain.
 
-## Rendering Approach Recommendation
+**Analysis of current color usage in weather zone:**
 
-**Use PIL/Pillow to generate the full 64x64 image server-side, then push as a single frame via `Draw/SendHttpGif`.** This is the proven approach used by every serious Pixoo 64 dashboard project. It gives complete control over:
-- Pixel-precise layout
-- Custom bitmap fonts at any size
-- Weather icon sprites
-- Color per-pixel
-- No dependency on Divoom's limited built-in text rendering
+| Element | Current Color | RGB | Against Rain Anim | Status |
+|---------|--------------|-----|-------------------|--------|
+| Temperature (positive) | `COLOR_WEATHER_TEMP` | `(255, 200, 50)` | Warm yellow vs blue drops | OK -- high contrast |
+| Temperature (negative) | `COLOR_WEATHER_TEMP_NEG` | `(80, 200, 255)` | Cyan vs blue drops | Borderline -- cyan is close to blue but distinct enough due to green channel. Monitor but no fix needed now |
+| High/Low text | `COLOR_WEATHER_HILO` | `(120, 180, 160)` | Teal vs blue drops | OK -- green channel separates it |
+| Rain indicator | `COLOR_WEATHER_RAIN` | `(50, 180, 255)` | Blue vs blue drops | BROKEN -- same hue family, alpha blending makes it worse |
+| Snow crystals (anim) | N/A | `(255, 255, 255, 180)` | White vs any text | OK -- snow is bright white, text colors are all distinct |
+| Sun rays (anim) | N/A | `(255, 230, 90)` | Yellow vs temp text | Borderline -- same yellow family, but sun animation alpha is low enough that text reads through |
 
-The alternative (using Divoom's `SendHttpText` for text + native features) is a dead end because text mode and pixel-buffer mode cannot coexist on the same display.
+**The fix:** Change `COLOR_WEATHER_RAIN` to a color that contrasts with blue rain drops. Recommended:
+
+| Option | RGB Value | Rationale | LED Readability |
+|--------|-----------|-----------|-----------------|
+| **Bright white** | `(255, 255, 255)` | Maximum luminance contrast against blue. Industry standard for info text on dark LED backgrounds. White reads through every animation type | BEST |
+| **Warm yellow** | `(255, 220, 100)` | Close to `COLOR_MESSAGE` yellow family. Yellow-on-blue is the #1 LED sign readability combination per signage research. Semantic risk: could confuse with temperature display | GOOD |
+| **Light cyan-white** | `(200, 240, 255)` | Stays in cool-water family while adding enough brightness to separate from pure blue drops. Subtlest change | ADEQUATE |
+
+**Recommendation:** Use `(255, 255, 255)` bright white because:
+1. Rain indicator text ("2.5mm") is purely informational -- it conveys a number, not a mood. Readability is paramount
+2. White has maximum luminance contrast against every animation type: blue rain, grey clouds, yellow sun, white snow (snow animation occupies different zone space), grey fog
+3. LED sign research consistently ranks white-on-dark as the most readable combination, with a brightness differential well above the 70% threshold for assured legibility
+4. The 4x6 "tiny" font used for rain text is already at the minimum readable size -- it cannot afford ANY contrast reduction
+5. Simple one-line change in `layout.py`: `COLOR_WEATHER_RAIN = (255, 255, 255)`
+
+**What NOT to change:** No changes needed for `COLOR_WEATHER_TEMP`, `COLOR_WEATHER_TEMP_NEG`, `COLOR_WEATHER_HILO`, or any animation colors. The bug is specifically the rain indicator text vs rain animation overlap.
 
 ## Sources
 
-- [SomethingWithComputers/pixoo](https://github.com/SomethingWithComputers/pixoo) - Primary Python library for Pixoo 64 (PICO-8 font, draw methods, push buffer) -- HIGH confidence
-- [Grayda/pixoo_api NOTES.md](https://github.com/Grayda/pixoo_api/blob/main/NOTES.md) - Comprehensive reverse-engineered API command list -- HIGH confidence
-- [pixoo-weather](https://github.com/jankornfeld/pixoo-weather) - Weather display project using PIL + 3x5 font + GIF approach -- MEDIUM confidence
-- [pixoo-homeassistant](https://github.com/gickowtf/pixoo-homeassistant) - Home Assistant integration with components/compositing model -- HIGH confidence
-- [Node-RED pixoo-dash](https://flows.nodered.org/node/@nickiv/node-red-pixoo-dash) - Structured text grid approach (20 fields, 7 chars) -- MEDIUM confidence
-- [Divoom Pixoo 64 product page](https://divoom.com/products/pixoo-64) - Native feature overview -- HIGH confidence
-- [Divoom Pixoo 64 MakeUseOf review](https://www.makeuseof.com/divoom-pixoo-64-review/) - Native channels and customization details -- MEDIUM confidence
-- [HA Community: Pixoo 64 projects](https://community.home-assistant.io/t/divoom-pixoo-64/420660) - Real-world dashboard experiences and limitations -- MEDIUM confidence
-- [HA Blueprint: Send Text 4 Lines](https://community.home-assistant.io/t/divoom-pixoo64-send-text-4-lines/554428) - Text layout coordinates (font 8, y-spacing of 15px) -- MEDIUM confidence
-- [Pixoo 64 Tools DeepWiki](https://deepwiki.com/itsmikethetech/Pixoo-64-Tools) - Rendering pipeline details (PIL + scaling + push) -- MEDIUM confidence
-- [MoonBench tiny pixel fonts](https://moonbench.xyz/projects/tiny-pixel-art-fonts/) - Font readability analysis (3x3 min, 3x5 good, 5x5 ideal) -- HIGH confidence
-- [Pixel-Font-Gen for Pixoo](https://github.com/gickowtf/Pixel-Font-Gen) - Custom font generation tool for Pixoo 64 -- LOW confidence (limited docs)
-- [pixoo PyPI](https://pypi.org/project/pixoo/) - Python library details, PICO-8 font, buffer model -- HIGH confidence
-- [Kickstarter Pixoo 64 FAQ](https://www.kickstarter.com/projects/divoom/pixoo-64-the-pixel-art-smart-clock-for-the-cyber-world/faqs) - Native channel details, custom channel limits (3 slots, 100+ items) -- MEDIUM confidence
-- [Divoom official API docs](http://doc.divoom-gz.com/web/#/12?page_id=196) - Official API reference (ShowDoc platform, requires JS rendering) -- LOW confidence (page did not load content)
+- [LED Sign Color Combos for Visibility](https://www.ledsignsupply.com/designing-eye-catching-content-for-outdoor-led-signs/) -- Yellow/white on dark as top LED readability combinations (MEDIUM confidence)
+- [Signage and Color Contrast](https://www.designworkplan.com/read/signage-and-color-contrast) -- 70% brightness differential threshold for assured legibility, Arthur & Passini 1992 method (MEDIUM confidence)
+- [Best Color Combinations for Signs 2025](https://www.indigosigns.com/news/best-color-combinations-sign-2025-update) -- High-contrast pairing recommendations for LED displays (MEDIUM confidence)
+- [About READMEs - GitHub Docs](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes) -- README auto-rendering, naming, placement conventions (HIGH confidence)
+- [Standard README](https://github.com/RichardLitt/standard-readme) -- Section structure and ordering conventions for GitHub READMEs (HIGH confidence)
+- [iterate/olorm](https://github.com/iterate/olorm) -- Real Norwegian-language README using "Installasjon" terminology (MEDIUM confidence)
+- [Color Difference - Wikipedia](https://en.wikipedia.org/wiki/Color_difference) -- Perceptual color distance theory, JND thresholds, CIE color spaces (HIGH confidence)
+- Codebase analysis: `src/display/weather_anim.py` lines 79, 90 (rain drop colors), `src/display/layout.py` line 61 (`COLOR_WEATHER_RAIN`), `src/display/renderer.py` lines 196-202 (rain text rendering) -- actual color values causing the clash (HIGH confidence)
