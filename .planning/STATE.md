@@ -29,7 +29,7 @@ Full log in PROJECT.md Key Decisions table.
 
 ### Pending Todos
 
-None.
+1. Replace ASCII approximations with Norwegian characters in README (docs)
 
 ### Blockers/Concerns
 
