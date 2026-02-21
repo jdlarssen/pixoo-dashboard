@@ -23,3 +23,24 @@
 
 ---
 
+
+## v1.1 Documentation & Polish (Shipped: 2026-02-21)
+
+**Phases:** 2 | **Plans:** 4 | **Tasks:** 8 | **LOC:** 3,974 Python (src + tests)
+**Timeline:** 2 days (2026-02-20 -> 2026-02-21) | **Git range:** a68bcef..d076829
+**Requirements:** 18/18 complete (FARGE-01-03 + DOC-01-15)
+
+**Delivered:** Weather color fix for LED display readability + comprehensive 414-line Norwegian README documenting the entire project from installation to architecture.
+
+**Key accomplishments:**
+1. Vivid weather color palette tuned for physical LED display -- rain particles distinctly blue, snow white, all 8 animation types readable at 2+ meters
+2. Color-identity regression tests preventing future color clashes (channel-dominance + contrast assertions)
+3. Comprehensive 414-line Norwegian README covering all 15 documentation requirements (overview, install, config, usage, launchd, AI transparency, architecture, APIs, Discord, animations, fonts, error resilience, birthday)
+4. shields.io "Bygget med Claude Code" badge and AI development transparency section
+
+**Known Tech Debt:** None.
+
+**Archives:** `milestones/v1.1-ROADMAP.md` | `milestones/v1.1-REQUIREMENTS.md`
+
+---
+

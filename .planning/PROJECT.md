@@ -95,4 +95,4 @@ Weather color issue fixed in v1.1 Phase 7. Norwegian README (414 lines) added in
 - **v1.1 Documentation & Polish** — Shipped 2026-02-21. Weather color fix (Phase 7) + comprehensive Norwegian README (Phase 8, 414 lines, 15 DOC requirements).
 
 ---
-*Last updated: 2026-02-21 after v1.1 Phase 8 completion*
+*Last updated: 2026-02-21 after v1.1 milestone*
