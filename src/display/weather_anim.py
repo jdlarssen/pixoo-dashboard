@@ -76,7 +76,7 @@ class RainAnimation(WeatherAnimation):
         for drop in self.far_drops:
             x, y = drop[0], drop[1]
             if 0 <= x < self.width and 0 <= y < self.height:
-                bg_draw.line([(x, y), (x, min(y + 1, self.height - 1))], fill=(40, 90, 200, 100))
+                bg_draw.line([(x, y), (x, min(y + 1, self.height - 1))], fill=(30, 80, 220, 100))
             drop[1] += 1
             drop[0] += random.choice([-1, 0, 0, 0])
             if drop[1] >= self.height:
@@ -87,7 +87,7 @@ class RainAnimation(WeatherAnimation):
         for drop in self.near_drops:
             x, y = drop[0], drop[1]
             if 0 <= x < self.width and 0 <= y < self.height:
-                fg_draw.line([(x, y), (x, min(y + 2, self.height - 1))], fill=(60, 140, 255, 200))
+                fg_draw.line([(x, y), (x, min(y + 2, self.height - 1))], fill=(50, 120, 255, 200))
             drop[1] += random.randint(2, 3)
             drop[0] += random.choice([-1, 0, 0, 0])
             if drop[1] >= self.height:
@@ -155,7 +155,7 @@ class SnowAnimation(WeatherAnimation):
         for flake in self.far_flakes:
             x, y = flake[0], flake[1]
             if 0 <= x < self.width and 0 <= y < self.height:
-                bg_draw.point((x, y), fill=(200, 210, 230, 90))
+                bg_draw.point((x, y), fill=(220, 230, 255, 90))
             flake[1] += random.choice([0, 0, 1])
             flake[0] += random.choice([-1, 0, 0, 1])
             flake[0] = max(0, min(flake[0], self.width - 1))
@@ -205,8 +205,8 @@ class CloudAnimation(WeatherAnimation):
         # Far clouds -- behind text, dimmer
         for cloud in self.far_clouds:
             x, y, w, h = int(cloud["x"]), cloud["y"], cloud["w"], cloud["h"]
-            bg_draw.ellipse([x, y, x + w, y + h], fill=(140, 150, 160, 60))
-            bg_draw.ellipse([x + w // 3, y - 1, x + w + w // 3, y + h - 1], fill=(140, 150, 160, 45))
+            bg_draw.ellipse([x, y, x + w, y + h], fill=(150, 160, 180, 60))
+            bg_draw.ellipse([x + w // 3, y - 1, x + w + w // 3, y + h - 1], fill=(150, 160, 180, 45))
             cloud["x"] += cloud["speed"]
             if cloud["x"] > self.width:
                 cloud["x"] = float(-cloud["w"])
@@ -214,8 +214,8 @@ class CloudAnimation(WeatherAnimation):
         # Near clouds -- in front of text, brighter
         for cloud in self.near_clouds:
             x, y, w, h = int(cloud["x"]), cloud["y"], cloud["w"], cloud["h"]
-            fg_draw.ellipse([x, y, x + w, y + h], fill=(180, 190, 200, 90))
-            fg_draw.ellipse([x + w // 3, y - 1, x + w + w // 3, y + h - 1], fill=(180, 190, 200, 70))
+            fg_draw.ellipse([x, y, x + w, y + h], fill=(190, 200, 220, 90))
+            fg_draw.ellipse([x + w // 3, y - 1, x + w + w // 3, y + h - 1], fill=(190, 200, 220, 70))
             cloud["x"] += cloud["speed"]
             if cloud["x"] > self.width:
                 cloud["x"] = float(-cloud["w"])
@@ -284,10 +284,10 @@ class SunAnimation(WeatherAnimation):
         fg_draw = ImageDraw.Draw(fg)
 
         for ray in self.far_rays:
-            self._draw_ray(bg_draw, ray, (220, 180, 60))
+            self._draw_ray(bg_draw, ray, (240, 200, 40))
 
         for ray in self.near_rays:
-            self._draw_ray(fg_draw, ray, (255, 230, 90))
+            self._draw_ray(fg_draw, ray, (255, 240, 60))
 
         return bg, fg
 
@@ -407,7 +407,7 @@ class FogAnimation(WeatherAnimation):
     def _draw_blob(self, draw: ImageDraw.Draw, blob: dict, bright: bool) -> None:
         x = int(blob["x"])
         y, w, h, alpha = blob["y"], blob["w"], blob["h"], blob["alpha"]
-        base = (200, 210, 220) if bright else (160, 170, 180)
+        base = (210, 220, 235) if bright else (180, 190, 200)
         draw.ellipse([x, y, x + w, y + h], fill=(*base, alpha))
         draw.ellipse([x + w // 4, y - 1, x + w - w // 4, y + h - 2], fill=(*base, max(alpha - 25, 30)))
 
