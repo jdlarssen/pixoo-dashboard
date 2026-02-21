@@ -55,10 +55,10 @@ COLOR_STALE_INDICATOR = (255, 100, 0)    # Orange dot for stale data
 COLOR_MESSAGE = (255, 220, 100)            # Warm yellow for message text -- stands out
 
 # Weather zone colors -- vivid palette
-COLOR_WEATHER_TEMP = (255, 200, 50)        # Bold warm yellow -- stands out against all animations
+COLOR_WEATHER_TEMP = (255, 220, 50)        # Warm yellow -- slightly warmer for LED vibrancy
 COLOR_WEATHER_TEMP_NEG = (80, 200, 255)    # Vivid cyan-blue for negative temperatures
-COLOR_WEATHER_HILO = (120, 180, 160)       # Soft teal for high/low text (not grey)
-COLOR_WEATHER_RAIN = (50, 180, 255)        # Vivid blue for rain indicator text
+COLOR_WEATHER_HILO = (120, 200, 160)       # Teal-green for high/low text -- more vivid on LED
+COLOR_WEATHER_RAIN = (255, 255, 255)       # White for max contrast against all animation particles
 
 # Birthday easter egg colors (March 17, December 16)
 COLOR_BIRTHDAY_GOLD = (255, 200, 50)       # Golden festive color for clock text
