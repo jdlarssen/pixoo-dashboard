@@ -179,7 +179,8 @@ def render_weather_zone(
     )
 
     # High/low below current temp -- tiny font, soft teal
-    if state.weather_high is not None and state.weather_low is not None:
+    # Suppressed when Discord message is active (message occupies this area)
+    if state.message_text is None and state.weather_high is not None and state.weather_low is not None:
         hilo_text = f"{state.weather_high}/{state.weather_low}"
         draw.text(
             (TEXT_X, zone_y + 10),
@@ -219,7 +220,7 @@ def _render_message(
     """Render a persistent message in the bottom portion of the weather zone.
 
     Uses the tiny (4x6) font. Truncates to fit within 64px display width.
-    Renders up to 2 lines starting at zone_y + 12 (below weather data).
+    Renders up to 2 lines starting at zone_y + 10 (replaces high/low row).
 
     Args:
         draw: PIL ImageDraw instance.
@@ -234,8 +235,9 @@ def _render_message(
     lines = _wrap_text(text, font, max_width)
 
     # Render up to 2 lines in the bottom portion of the weather zone
+    # Starts at zone_y + 10 (replaces high/low row, which is suppressed during messages)
     line_height = 7  # 6px font + 1px gap
-    start_y = zone_y + 12  # Below temperature/hilo row
+    start_y = zone_y + 10  # Replaces hilo row (hilo suppressed when message active)
     for i, line in enumerate(lines[:2]):
         draw.text(
             (TEXT_X, start_y + i * line_height),
