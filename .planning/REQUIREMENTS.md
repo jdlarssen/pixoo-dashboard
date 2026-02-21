@@ -91,22 +91,22 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DISP-01 | Phase 1 | Complete |
 | DISP-02 | Phase 1 | Complete |
 | DISP-03 | Phase 1 | Complete |
-| DISP-04 | Phase 4 | Pending |
+| DISP-04 | Phase 5 | Pending |
 | CLCK-01 | Phase 1 | Complete |
 | CLCK-02 | Phase 1 | Complete |
 | BUS-01 | Phase 2 | Complete |
 | BUS-02 | Phase 2 | Complete |
 | BUS-03 | Phase 2 | Complete |
-| BUS-04 | Phase 4 | Pending |
+| BUS-04 | Phase 5 | Pending |
 | BUS-05 | Phase 2 | Complete |
 | WTHR-01 | Phase 3 | Complete |
 | WTHR-02 | Phase 3 | Complete |
 | WTHR-03 | Phase 3 | Complete |
 | WTHR-04 | Phase 3 | Complete |
 | RLBL-01 | Phase 1 | Complete |
-| RLBL-02 | Phase 4 | Pending |
-| RLBL-03 | Phase 4 | Pending |
-| MSG-01 | Phase 4 | Pending |
+| RLBL-02 | Phase 5 | Pending |
+| RLBL-03 | Phase 5 | Pending |
+| MSG-01 | Phase 5 | Pending |
 
 **Coverage:**
 - v1 requirements: 19 total
@@ -115,4 +115,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-20*
-*Last updated: 2026-02-20 after roadmap creation*
+*Last updated: 2026-02-21 after gap closure phase creation*

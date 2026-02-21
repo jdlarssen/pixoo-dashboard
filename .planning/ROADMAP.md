@@ -16,6 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Bus Departures** - Live Entur transit data for Ladeveien in both directions
 - [x] **Phase 3: Weather** - Yr/MET weather data with pixel art icons
 - [x] **Phase 4: Polish and Reliability** - Urgency coloring, brightness, error handling, service wrapper, and push messages
+- [ ] **Phase 5: Verification and Cleanup** - Phase 4 verification artifact, missing test, dead code removal, checkbox updates
 
 ## Phase Details
 
@@ -83,6 +84,22 @@ Plans:
 - [x] 04-02-PLAN.md -- Auto-brightness scheduling and visual color overhaul
 - [x] 04-03-PLAN.md -- Discord message override integration
 - [x] 04-04-PLAN.md -- Launchd service wrapper and birthday easter egg
+- [x] 04-05-SUMMARY.md -- Post-UAT: 3D depth animation system and weather layout refinements (ad-hoc)
+
+### Phase 5: Verification and Cleanup
+**Goal**: Close the 5 partial-status audit gaps by creating the missing Phase 4 VERIFICATION.md, adding missing test coverage, and cleaning up tech debt
+**Depends on**: Phase 4
+**Requirements**: DISP-04, BUS-04, RLBL-02, RLBL-03, MSG-01
+**Gap Closure:** Closes gaps from v1.0 milestone audit
+**Success Criteria** (what must be TRUE):
+  1. Phase 4 VERIFICATION.md exists with evidence for all 5 requirements (DISP-04, BUS-04, RLBL-02, RLBL-03, MSG-01)
+  2. Staleness indicator dot rendering has test coverage (RLBL-02 tech debt)
+  3. Dead `fonts["large"]` entry removed from build_font_map()
+  4. REQUIREMENTS.md checkboxes updated to [x] for all verified Phase 4 requirements
+**Plans**: 0 plans
+
+Plans:
+- (none yet)
 
 ## Progress
 
@@ -94,4 +111,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 1. Foundation | 2/2 | Complete    | 2026-02-20 |
 | 2. Bus Departures | 2/2 | Complete | 2026-02-20 |
 | 3. Weather | 3/3 | Complete | 2026-02-20 |
-| 4. Polish and Reliability | 4/4 | Complete | 2026-02-20 |
+| 4. Polish and Reliability | 5/5 | Complete | 2026-02-20 |
+| 5. Verification and Cleanup | 0/0 | Not Started | — |
