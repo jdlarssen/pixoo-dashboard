@@ -96,10 +96,10 @@ Plans:
   2. Staleness indicator dot rendering has test coverage (RLBL-02 tech debt)
   3. Dead `fonts["large"]` entry removed from build_font_map()
   4. REQUIREMENTS.md checkboxes updated to [x] for all verified Phase 4 requirements
-**Plans**: 0 plans
+**Plans**: 1 plan
 
 Plans:
-- (none yet)
+- [ ] 05-01-PLAN.md — Phase 4 verification artifact, staleness dot tests, dead code removal, and checkbox updates
 
 ## Progress
 
