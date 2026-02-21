@@ -206,12 +206,33 @@ def _draw_partcloud_day(size: int) -> Image.Image:
 
 
 def _draw_partcloud_night(size: int) -> Image.Image:
-    """Small moon peeking behind a cloud."""
+    """Small moon peeking behind a cloud.
+
+    Uses a hand-crafted pixel bitmap for the mini crescent (same technique
+    as ``_draw_moon``).  Ellipse math produces unrecognizable blobs at this
+    scale.
+    """
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    # Moon in top-left
-    draw.ellipse([0, 0, 4, 4], fill=(200, 210, 220, 200))
-    draw.ellipse([1, -1, 5, 3], fill=(0, 0, 0, 0))  # crescent cut
+    # fmt: off
+    # Mini crescent moon in top-left (hand-crafted pixel art)
+    #   . . # #
+    #   . # # .
+    #   # # . .
+    #   # # . .
+    #   . # # .
+    moon_pixels = [
+                (2, 0), (3, 0),
+        (1, 1), (2, 1),
+        (0, 2), (1, 2),
+        (0, 3), (1, 3),
+        (1, 4), (2, 4),
+    ]
+    # fmt: on
+    moon_color = (255, 220, 100, 255)  # warm golden yellow (matches _draw_moon)
+    for x, y in moon_pixels:
+        if x < size and y < size:
+            img.putpixel((x, y), moon_color)
     # Cloud in front
     draw.ellipse([2, 3, 7, 8], fill=(200, 200, 210, 230))
     draw.ellipse([4, 2, 9, 7], fill=(200, 200, 210, 230))
