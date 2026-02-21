@@ -67,6 +67,7 @@ COLOR_BIRTHDAY_ACCENT = (255, 100, 150)    # Pink accent for date text
 
 # Text positioning
 TEXT_X = 2  # 2px left padding for all text
+MESSAGE_X = 22  # Discord message starts at middle column of weather zone (positions 8,9)
 
 
 def urgency_color(minutes: int) -> tuple[int, int, int]:
