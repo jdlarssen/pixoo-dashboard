@@ -5,7 +5,7 @@ description = "Pixoo 64 smart display hub: clock, bus times, and weather at a gl
 requires-python = ">=3.10"
 dependencies = [
     "pixoo",
-    "Pillow",
+    "Pillow>=12.1.0",
     "discord.py>=2.0",
 ]
 
