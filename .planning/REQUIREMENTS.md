@@ -12,7 +12,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **DISP-01**: Full-frame custom rendering via PIL/Pillow pushed to Pixoo 64
 - [x] **DISP-02**: Pixel font rendering with Norwegian character support (æøå)
 - [x] **DISP-03**: Single-screen layout — all info zones on 64x64, readable at a glance
-- [ ] **DISP-04**: Auto-brightness based on time of day
+- [x] **DISP-04**: Auto-brightness based on time of day
 
 ### Clock
 
@@ -24,7 +24,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **BUS-01**: Show next 2 departures from Ladeveien — direction 1
 - [x] **BUS-02**: Show next 2 departures from Ladeveien — direction 2
 - [x] **BUS-03**: Countdown format ("5 min" instead of "14:35")
-- [ ] **BUS-04**: Color coding by urgency (green/yellow/red)
+- [x] **BUS-04**: Color coding by urgency (green/yellow/red)
 - [x] **BUS-05**: 60-second refresh cycle
 
 ### Weather
@@ -37,12 +37,12 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Reliability
 
 - [x] **RLBL-01**: Connection refresh cycle (prevent 300-push lockup)
-- [ ] **RLBL-02**: Graceful error states (show last known data when API fails)
-- [ ] **RLBL-03**: Auto-restart via service wrapper (systemd/launchd)
+- [x] **RLBL-02**: Graceful error states (show last known data when API fails)
+- [x] **RLBL-03**: Auto-restart via service wrapper (systemd/launchd)
 
 ### Messages
 
-- [ ] **MSG-01**: Push text message to temporarily override display
+- [x] **MSG-01**: Push text message to temporarily override display
 
 ## v2 Requirements
 
@@ -91,22 +91,22 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DISP-01 | Phase 1 | Complete |
 | DISP-02 | Phase 1 | Complete |
 | DISP-03 | Phase 1 | Complete |
-| DISP-04 | Phase 5 | Pending |
+| DISP-04 | Phase 4 | Complete |
 | CLCK-01 | Phase 1 | Complete |
 | CLCK-02 | Phase 1 | Complete |
 | BUS-01 | Phase 2 | Complete |
 | BUS-02 | Phase 2 | Complete |
 | BUS-03 | Phase 2 | Complete |
-| BUS-04 | Phase 5 | Pending |
+| BUS-04 | Phase 4 | Complete |
 | BUS-05 | Phase 2 | Complete |
 | WTHR-01 | Phase 3 | Complete |
 | WTHR-02 | Phase 3 | Complete |
 | WTHR-03 | Phase 3 | Complete |
 | WTHR-04 | Phase 3 | Complete |
 | RLBL-01 | Phase 1 | Complete |
-| RLBL-02 | Phase 5 | Pending |
-| RLBL-03 | Phase 5 | Pending |
-| MSG-01 | Phase 5 | Pending |
+| RLBL-02 | Phase 4 | Complete |
+| RLBL-03 | Phase 4 | Complete |
+| MSG-01 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 19 total
