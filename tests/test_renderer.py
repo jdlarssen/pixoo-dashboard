@@ -448,3 +448,92 @@ class TestStalenessIndicator:
         assert pixel == COLOR_STALE_INDICATOR, (
             f"Expected orange dot {COLOR_STALE_INDICATOR} at (62, {WEATHER_ZONE.y + 1}), got {pixel}"
         )
+
+
+class TestMessageRendering:
+    """Tests for Discord message rendering, including emoji/Unicode safety."""
+
+    def test_ascii_message_renders_without_crash(self):
+        """Plain ASCII message should render pixels in the weather zone."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            weather_temp=8,
+            weather_symbol="partlycloudy_day",
+            weather_high=12,
+            weather_low=3,
+            weather_precip_mm=0.0,
+            weather_is_day=True,
+            message_text="Hello!",
+        )
+        frame = render_frame(state, FONTS)
+        assert isinstance(frame, Image.Image)
+        assert frame.size == (64, 64)
+
+    def test_emoji_message_does_not_crash(self):
+        """Message with emoji must NOT crash the renderer (was UnicodeEncodeError)."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            weather_temp=8,
+            weather_symbol="partlycloudy_day",
+            weather_high=12,
+            weather_low=3,
+            weather_precip_mm=0.0,
+            weather_is_day=True,
+            message_text="Klaebo vant! \U0001f604",
+        )
+        frame = render_frame(state, FONTS)
+        assert isinstance(frame, Image.Image)
+        assert frame.size == (64, 64)
+
+    def test_all_emoji_message_renders_empty(self):
+        """Message that is ALL emoji should render without crash (empty after strip)."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            weather_temp=8,
+            weather_symbol="partlycloudy_day",
+            weather_high=12,
+            weather_low=3,
+            weather_precip_mm=0.0,
+            weather_is_day=True,
+            message_text="\U0001f604\U0001f389\U0001f525",
+        )
+        frame = render_frame(state, FONTS)
+        assert isinstance(frame, Image.Image)
+        assert frame.size == (64, 64)
+
+    def test_mixed_emoji_and_text_renders(self):
+        """Mixed emoji + text should render the text portion without crash."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            weather_temp=8,
+            weather_symbol="partlycloudy_day",
+            weather_high=12,
+            weather_low=3,
+            weather_precip_mm=0.0,
+            weather_is_day=True,
+            message_text="\U0001f3c6 Gull! \U0001f1f3\U0001f1f4",
+        )
+        frame = render_frame(state, FONTS)
+        assert isinstance(frame, Image.Image)
+        assert frame.size == (64, 64)
+
+    def test_norwegian_chars_in_message(self):
+        """Norwegian characters (within Latin-1) should render fine."""
+        state = DisplayState(
+            time_str="14:32",
+            date_str="lor 21. mar",
+            weather_temp=8,
+            weather_symbol="partlycloudy_day",
+            weather_high=12,
+            weather_low=3,
+            weather_precip_mm=0.0,
+            weather_is_day=True,
+            message_text="Kl\u00e6bo v\u00e6rt b\u00e5de gull",
+        )
+        frame = render_frame(state, FONTS)
+        assert isinstance(frame, Image.Image)
+        assert frame.size == (64, 64)
