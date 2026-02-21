@@ -37,7 +37,7 @@ patterns-established:
   - "LED visibility gate: all animation alpha values must stay above 50 per test enforcement"
   - "Rate limiter alignment: animation sleep must exceed rate limit minimum to avoid silent frame drops"
 
-requirements-completed: [WTHR-02]
+requirements-completed: []
 
 # Metrics
 duration: 4min

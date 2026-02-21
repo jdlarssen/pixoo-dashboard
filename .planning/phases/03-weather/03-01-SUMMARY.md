@@ -43,7 +43,7 @@ patterns-established:
   - "Weather provider safe wrapper: fetch_weather_safe() mirrors bus fetch_departures_safe()"
   - "Timeseries scan: iterate entries for today's date string prefix to find high/low temps"
 
-requirements-completed: [WTHR-01, WTHR-03, WTHR-04]
+requirements-completed: [WTHR-01, WTHR-03]
 
 # Metrics
 duration: 3min

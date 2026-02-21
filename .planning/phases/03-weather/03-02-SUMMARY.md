@@ -48,7 +48,7 @@ patterns-established:
   - "Animation overlay: RGBA frame composited onto weather zone before text rendering"
   - "Dual-speed main loop: fast tick for animation, independent slow fetch timers"
 
-requirements-completed: [WTHR-02]
+requirements-completed: [WTHR-01, WTHR-02, WTHR-03, WTHR-04]
 
 # Metrics
 duration: 5min
