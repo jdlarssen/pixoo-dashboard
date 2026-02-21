@@ -55,11 +55,11 @@ Plans:
   3. The README includes the "Bygget med Claude Code" badge near the top and an AI development transparency section explaining how Claude Code was used to build the project
   4. Technical sections (architecture, APIs, weather animations, Discord, Norwegian characters, error resilience, birthday easter egg) provide enough depth for someone to understand the system and contribute or fork
   5. No personal data (real GPS coordinates, real Discord tokens, real bus stop IDs from .env) appears in the README -- only safe placeholder values
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 08-01: TBD
-- [ ] 08-02: TBD
+- [ ] 08-01-PLAN.md -- Core README (overview, badge, zone diagram, install, config, usage, launchd, AI transparency)
+- [ ] 08-02-PLAN.md -- Technical deep-dive (architecture, APIs, Discord, weather animations, fonts, error resilience, birthday)
 
 ## Progress
 
