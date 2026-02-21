@@ -31,6 +31,7 @@ Full log in PROJECT.md Key Decisions table.
 
 1. Replace ASCII approximations with Norwegian characters in README (docs)
 2. Fix Discord message overlapping high/low temperature display (display)
+3. Emoji in Discord message crashes dashboard (display)
 
 ### Blockers/Concerns
 
