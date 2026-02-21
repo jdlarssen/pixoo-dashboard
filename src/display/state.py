@@ -81,8 +81,9 @@ class DisplayState:
                 "weather_is_day": weather_data.is_day,
             }
 
-        # Birthday easter egg: March 17 or December 16
-        is_birthday = (dt.month == 3 and dt.day == 17) or (dt.month == 12 and dt.day == 16)
+        # Birthday easter egg: configurable dates from BIRTHDAY_DATES env var
+        from src.config import BIRTHDAY_DATES
+        is_birthday = any(dt.month == m and dt.day == d for m, d in BIRTHDAY_DATES)
 
         return cls(
             time_str=format_time(dt),
