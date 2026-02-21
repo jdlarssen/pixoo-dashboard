@@ -34,7 +34,11 @@ Glance at the display and instantly know: what time it is, when the next buses l
 
 ### Active
 
-(None — define with next milestone)
+<!-- Current milestone: v1.1 Documentation & Polish -->
+
+- [ ] Comprehensive Norwegian README with full project documentation
+- [ ] "Built with Claude Code" transparency — badge and development process section
+- [ ] Fix weather animation/rain text color indistinguishability
 
 ### Out of Scope
 
@@ -82,5 +86,14 @@ Weather animations: rain, snow, sun, fog, thunder with 3D depth layering (bg/fg 
 | 3D depth animation system | bg/fg tuple composited around text for depth effect | ✓ Good — rain/snow particles pass through text naturally |
 | Alpha values 65-150 for LED visibility | Original 15-50 invisible on physical hardware | ✓ Good — confirmed visible after compositing fix |
 
+## Current Milestone: v1.1 Documentation & Polish
+
+**Goal:** Make the project accessible with a comprehensive Norwegian README and fix the remaining display color issue.
+
+**Target features:**
+- Full Norwegian README (overview, setup, architecture, API docs, launchd service, Discord)
+- Claude Code transparency (badge + AI-assisted development section)
+- Weather animation color fix (rain/snow particles vs text)
+
 ---
-*Last updated: 2026-02-21 after v1.0 milestone*
+*Last updated: 2026-02-21 after v1.1 milestone start*
