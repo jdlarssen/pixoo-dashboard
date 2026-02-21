@@ -85,7 +85,7 @@ def main_loop(
 
     Args:
         client: Pixoo device client for pushing frames.
-        fonts: Font dictionary with keys "large", "small", "tiny".
+        fonts: Font dictionary with keys "small", "tiny".
         save_frame: If True, save each rendered frame to debug_frame.png.
         message_bridge: Optional MessageBridge from Discord bot for message override.
     """
