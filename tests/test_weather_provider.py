@@ -22,7 +22,8 @@ from src.display.state import DisplayState
 
 def _make_entry(time_str: str, temp: float, symbol: str = "cloudy",
                 precip: float = 0.0, high6h: float | None = None,
-                low6h: float | None = None) -> dict:
+                low6h: float | None = None,
+                wind_speed: float = 3.0, wind_direction: float = 180.0) -> dict:
     """Build a single MET API timeseries entry for testing."""
     entry: dict = {
         "time": time_str,
@@ -30,6 +31,8 @@ def _make_entry(time_str: str, temp: float, symbol: str = "cloudy",
             "instant": {
                 "details": {
                     "air_temperature": temp,
+                    "wind_speed": wind_speed,
+                    "wind_from_direction": wind_direction,
                 }
             },
             "next_1_hours": {
@@ -304,3 +307,34 @@ class TestDisplayStateWeather:
         assert state.weather_high == -1  # round(-1.2) = -1
         assert state.weather_low == -6   # round(-5.8) = -6
         assert state.weather_is_day is False
+
+
+# ---------------------------------------------------------------------------
+# Tests: Wind data extraction
+# ---------------------------------------------------------------------------
+
+class TestWindData:
+    def test_parse_current_includes_wind(self):
+        ts = [_make_entry(f"{_today_str()}T12:00:00Z", 5.0, "rain_day", 2.0,
+                          wind_speed=8.5, wind_direction=270.0)]
+        result = _parse_current(ts)
+        assert result["wind_speed"] == 8.5
+        assert result["wind_from_direction"] == 270.0
+
+    def test_weather_data_has_wind_fields(self):
+        wd = WeatherData(
+            temperature=5.0, symbol_code="rain_day", high_temp=8.0,
+            low_temp=1.0, precipitation_mm=2.0, is_day=True,
+            wind_speed=8.5, wind_from_direction=270.0,
+        )
+        assert wd.wind_speed == 8.5
+        assert wd.wind_from_direction == 270.0
+
+    def test_wind_defaults_to_zero(self):
+        """Wind fields should default to 0 when not provided."""
+        wd = WeatherData(
+            temperature=5.0, symbol_code="rain", high_temp=8.0,
+            low_temp=1.0, precipitation_mm=0.0, is_day=True,
+        )
+        assert wd.wind_speed == 0.0
+        assert wd.wind_from_direction == 0.0
