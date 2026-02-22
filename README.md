@@ -63,6 +63,7 @@ Avhengigheter (installeres automatisk):
 |-------|---------|--------|
 | pixoo | -- | Kommunikasjon med Pixoo 64 |
 | Pillow | >= 12.1.0 | Bildebehandling og fontrendering |
+| astral | >= 3.2 | Astronomisk soloppgang/solnedgang for auto-lysstyrke |
 | discord.py | >= 2.0 | Valgfri Discord-meldingsoverstyring |
 | python-dotenv | >= 1.0 | Lasting av .env-konfigurasjon |
 
@@ -239,6 +240,7 @@ src/
     ├── bus.py            # Entur JourneyPlanner v3 (GraphQL)
     ├── clock.py          # Norsk tid- og datoformatering
     ├── discord_bot.py    # Discord-meldingsoverstyring (daemon-tråd)
+    ├── sun.py            # Astronomisk soloppgang/solnedgang (astral)
     └── weather.py        # MET Norway Locationforecast 2.0
 ```
 
@@ -347,6 +349,14 @@ Hvert bilde rendres ved å legge bakgrunnslaget under teksten og forgrunnslaget 
 
 </details>
 
+### Lagdelte animasjoner og vindeffekt
+
+Animasjonssystemet støtter sammensatte effekter når værforholdene tilsier det:
+
+- **Intensitetsskalering:** Snø- og regnanimasjoner tilpasser antall partikler etter nedbørsmengde (lett < 1mm, moderat 1--3mm, kraftig > 3mm, ekstrem > 5mm)
+- **Vindeffekt:** Når det blåser legges en horisontal drift på partiklene basert på faktisk vindretning og vindstyrke fra MET API
+- **Kombo-regler:** Kraftig regn (> 3mm) legger automatisk tåke oppå regnet. Torden og regn med sterk vind (> 5 m/s) får vinddrift. Snø med vind > 3 m/s driver sidelengs.
+
 Animasjonene kjører med ~3 FPS (0.35s mellom hvert bilde). Alpha-verdier er tunet for LED-maskinvarens synlighet (65--180-området).
 
 ---
@@ -386,10 +396,13 @@ Dashbordet er designet for å kjøre døgnkontinuerlig uten tilsyn. Flere lag me
 - `pixoo`-bibliotekets `refresh_connection_automatically` forhindrer at tilkoblingen låser seg etter ~300 push-operasjoner
 - Rate limiting: minimum 0.3 sekunder mellom hvert bilde (forhindrer tapte frames ved timing-jitter)
 - Lysstyrke begrenset til 90% (`MAX_BRIGHTNESS`) -- full lysstyrke kan krasje enheten
+- Nettverksfeil (timeout, tilkoblingsbrudd) fanges opp og logges -- dashbordet fortsetter å kjøre og prøver igjen neste iterasjon
 
-**Auto-lysstyrke:**
-- Dag (06:00--21:00): 100% (begrenset til 90% av klienten)
-- Natt (21:00--06:00): 20% -- lesbart uten å lyse opp rommet
+**Auto-lysstyrke (astronomisk):**
+- Bruker `astral`-biblioteket for å beregne faktisk soloppgang, solnedgang og sivil skumring basert på bredde-/lengdegrad
+- Dag (etter morgenskumring): 100% (begrenset til 90% av klienten)
+- Natt (etter kveldsskumring): 20% -- lesbart uten å lyse opp rommet
+- Følger sesongene automatisk: i desember dimmes det allerede kl. 15--16, i juni holder det seg lyst til kl. 22--23
 
 ---
 
