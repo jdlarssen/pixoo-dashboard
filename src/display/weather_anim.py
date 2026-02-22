@@ -4,14 +4,15 @@ Each animation produces two RGBA layers:
 - bg_layer: rendered BEHIND text (far/dim particles for depth)
 - fg_layer: rendered IN FRONT of text (near/bright particles for 3D effect)
 
-Alpha values tuned for LED hardware visibility (65-180 range).
+Alpha values tuned for LED hardware visibility (90-230 range).
+LED pixels below ~RGB(15,15,15) produce no visible light, so alpha values
+must be high enough that the composited result exceeds this threshold.
 
 Color palette: vivid, LED-friendly colors per weather type.
 Rain=blue, snow=bright white, sun=warm yellow, fog=soft white, clouds=grey-white.
-Night clear=twinkling white/blue stars.
+Night clear=twinkling white/blue stars with organic per-star randomness.
 """
 
-import math
 import random
 
 from PIL import Image, ImageDraw
@@ -78,7 +79,7 @@ class RainAnimation(WeatherAnimation):
         for drop in self.far_drops:
             x, y = drop[0], drop[1]
             if 0 <= x < self.width and 0 <= y < self.height:
-                bg_draw.line([(x, y), (x, min(y + 1, self.height - 1))], fill=(30, 80, 220, 100))
+                bg_draw.line([(x, y), (x, min(y + 1, self.height - 1))], fill=(30, 80, 220, 140))
             drop[1] += 1
             drop[0] += random.choice([-1, 0, 0, 0])
             if drop[1] >= self.height:
@@ -89,7 +90,7 @@ class RainAnimation(WeatherAnimation):
         for drop in self.near_drops:
             x, y = drop[0], drop[1]
             if 0 <= x < self.width and 0 <= y < self.height:
-                fg_draw.line([(x, y), (x, min(y + 2, self.height - 1))], fill=(50, 120, 255, 200))
+                fg_draw.line([(x, y), (x, min(y + 2, self.height - 1))], fill=(50, 120, 255, 230))
             drop[1] += random.randint(2, 3)
             drop[0] += random.choice([-1, 0, 0, 0])
             if drop[1] >= self.height:
@@ -108,7 +109,7 @@ class RainAnimation(WeatherAnimation):
 class SnowAnimation(WeatherAnimation):
     """Snow crystals at two depths.
 
-    Far flakes (behind): smaller single pixel, dimmer, slow drift.
+    Far flakes (behind): 2px horizontal dot pair, moderate brightness, slow drift.
     Near flakes (in front): + shaped crystal, bright white, gentle fall.
     """
 
@@ -153,11 +154,13 @@ class SnowAnimation(WeatherAnimation):
         bg_draw = ImageDraw.Draw(bg)
         fg_draw = ImageDraw.Draw(fg)
 
-        # Far flakes -- behind text, single pixel, dim
+        # Far flakes -- behind text, 2px horizontal pair, moderate
         for flake in self.far_flakes:
             x, y = flake[0], flake[1]
             if 0 <= x < self.width and 0 <= y < self.height:
-                bg_draw.point((x, y), fill=(220, 230, 255, 90))
+                bg_draw.point((x, y), fill=(220, 230, 255, 130))
+                if x + 1 < self.width:
+                    bg_draw.point((x + 1, y), fill=(220, 230, 255, 100))
             flake[1] += random.choice([0, 0, 1])
             flake[0] += random.choice([-1, 0, 0, 1])
             flake[0] = max(0, min(flake[0], self.width - 1))
@@ -168,7 +171,7 @@ class SnowAnimation(WeatherAnimation):
         # Near flakes -- in front of text, + crystal, bright
         for flake in self.near_flakes:
             x, y = flake[0], flake[1]
-            self._draw_crystal(fg_draw, x, y, 180)
+            self._draw_crystal(fg_draw, x, y, 210)
             flake[1] += random.randint(0, 1)
             flake[0] += random.choice([-1, 0, 0, 1])
             flake[0] = max(1, min(flake[0], self.width - 2))
@@ -204,11 +207,11 @@ class CloudAnimation(WeatherAnimation):
         bg_draw = ImageDraw.Draw(bg)
         fg_draw = ImageDraw.Draw(fg)
 
-        # Far clouds -- behind text, dimmer
+        # Far clouds -- behind text, moderate
         for cloud in self.far_clouds:
             x, y, w, h = int(cloud["x"]), cloud["y"], cloud["w"], cloud["h"]
-            bg_draw.ellipse([x, y, x + w, y + h], fill=(150, 160, 180, 60))
-            bg_draw.ellipse([x + w // 3, y - 1, x + w + w // 3, y + h - 1], fill=(150, 160, 180, 45))
+            bg_draw.ellipse([x, y, x + w, y + h], fill=(150, 160, 180, 90))
+            bg_draw.ellipse([x + w // 3, y - 1, x + w + w // 3, y + h - 1], fill=(150, 160, 180, 70))
             cloud["x"] += cloud["speed"]
             if cloud["x"] > self.width:
                 cloud["x"] = float(-cloud["w"])
@@ -216,8 +219,8 @@ class CloudAnimation(WeatherAnimation):
         # Near clouds -- in front of text, brighter
         for cloud in self.near_clouds:
             x, y, w, h = int(cloud["x"]), cloud["y"], cloud["w"], cloud["h"]
-            fg_draw.ellipse([x, y, x + w, y + h], fill=(190, 200, 220, 90))
-            fg_draw.ellipse([x + w // 3, y - 1, x + w + w // 3, y + h - 1], fill=(190, 200, 220, 70))
+            fg_draw.ellipse([x, y, x + w, y + h], fill=(190, 200, 220, 130))
+            fg_draw.ellipse([x + w // 3, y - 1, x + w + w // 3, y + h - 1], fill=(190, 200, 220, 100))
             cloud["x"] += cloud["speed"]
             if cloud["x"] > self.width:
                 cloud["x"] = float(-cloud["w"])
@@ -251,7 +254,7 @@ class SunAnimation(WeatherAnimation):
                 float(random.randint(0, self.height - 1)),
                 random.uniform(0.5, 0.9),   # slower
                 random.randint(2, 4),        # shorter
-                random.randint(70, 110),     # dimmer
+                random.randint(100, 140),    # moderate
             ])
 
     def _spawn_near(self, count: int) -> None:
@@ -261,7 +264,7 @@ class SunAnimation(WeatherAnimation):
                 float(random.randint(0, self.height - 1)),
                 random.uniform(1.0, 1.8),    # faster
                 random.randint(4, 7),         # longer
-                random.randint(130, 180),     # brighter
+                random.randint(160, 220),     # bright
             ])
 
     def _draw_ray(self, draw: ImageDraw.Draw, ray: list[float], color: tuple) -> None:
@@ -392,7 +395,7 @@ class FogAnimation(WeatherAnimation):
                 "w": random.randint(6, 10),
                 "h": random.randint(3, 4),
                 "speed": random.uniform(0.05, 0.12),
-                "alpha": random.randint(40, 65),
+                "alpha": random.randint(65, 90),
             })
 
     def _spawn_near(self, count: int) -> None:
@@ -403,7 +406,7 @@ class FogAnimation(WeatherAnimation):
                 "w": random.randint(10, 16),
                 "h": random.randint(4, 6),
                 "speed": random.uniform(0.12, 0.25),
-                "alpha": random.randint(70, 110),
+                "alpha": random.randint(100, 140),
             })
 
     def _draw_blob(self, draw: ImageDraw.Draw, blob: dict, bright: bool) -> None:
@@ -445,37 +448,132 @@ class FogAnimation(WeatherAnimation):
 class ClearNightAnimation(WeatherAnimation):
     """Twinkling stars for clear nighttime skies at two depths.
 
-    Far stars (behind text): dim, slow twinkle, cool white.
-    Near stars (in front of text): brighter, warm white, gentle twinkle.
-    Stars randomly fade in and out to create a twinkling effect.
+    Each star has its own independent twinkle cycle using a state machine:
+    - DARK: star is invisible, waiting a random duration before next blink
+    - BRIGHTEN: star fades in over a random number of ticks
+    - PEAK: star holds at max brightness for a random duration
+    - DIM: star fades out over a random number of ticks
+
+    Each star's durations for each phase are independently randomized,
+    producing an organic, non-uniform twinkling pattern like a real night sky.
+
+    Far stars (behind text): cool white, dimmer peaks, longer dark intervals.
+    Near stars (in front of text): warm white, brighter peaks, + shape at peak.
     """
+
+    # Star state constants
+    _DARK = 0
+    _BRIGHTEN = 1
+    _PEAK = 2
+    _DIM = 3
 
     def __init__(self, width: int = 64, height: int = 24) -> None:
         super().__init__(width, height)
         self.far_stars: list[dict] = []
         self.near_stars: list[dict] = []
-        self._spawn_far(12)
-        self._spawn_near(5)
+        self._spawn_far(14)
+        self._spawn_near(6)
+
+    def _new_star(self, *, is_near: bool) -> dict:
+        """Create a single star with random position and twinkle parameters."""
+        if is_near:
+            peak_alpha = random.randint(160, 240)
+            dark_ticks = random.randint(4, 20)
+            brighten_ticks = random.randint(2, 6)
+            peak_ticks = random.randint(3, 10)
+            dim_ticks = random.randint(2, 8)
+        else:
+            peak_alpha = random.randint(80, 150)
+            dark_ticks = random.randint(6, 30)
+            brighten_ticks = random.randint(3, 10)
+            peak_ticks = random.randint(2, 8)
+            dim_ticks = random.randint(3, 12)
+
+        # Start each star at a random point in its cycle to avoid sync
+        state = random.choice([self._DARK, self._BRIGHTEN, self._PEAK, self._DIM])
+        if state == self._DARK:
+            timer = random.randint(0, dark_ticks)
+        elif state == self._BRIGHTEN:
+            timer = random.randint(0, brighten_ticks)
+        elif state == self._PEAK:
+            timer = random.randint(0, peak_ticks)
+        else:
+            timer = random.randint(0, dim_ticks)
+
+        return {
+            "x": random.randint(0, self.width - 1),
+            "y": random.randint(0, self.height - 1),
+            "peak_alpha": peak_alpha,
+            "state": state,
+            "timer": timer,
+            "dark_ticks": dark_ticks,
+            "brighten_ticks": brighten_ticks,
+            "peak_ticks": peak_ticks,
+            "dim_ticks": dim_ticks,
+        }
+
+    def _randomize_durations(self, star: dict, *, is_near: bool) -> None:
+        """Re-randomize phase durations for the next cycle."""
+        if is_near:
+            star["dark_ticks"] = random.randint(4, 20)
+            star["brighten_ticks"] = random.randint(2, 6)
+            star["peak_ticks"] = random.randint(3, 10)
+            star["dim_ticks"] = random.randint(2, 8)
+            star["peak_alpha"] = random.randint(160, 240)
+        else:
+            star["dark_ticks"] = random.randint(6, 30)
+            star["brighten_ticks"] = random.randint(3, 10)
+            star["peak_ticks"] = random.randint(2, 8)
+            star["dim_ticks"] = random.randint(3, 12)
+            star["peak_alpha"] = random.randint(80, 150)
 
     def _spawn_far(self, count: int) -> None:
         for _ in range(count):
-            self.far_stars.append({
-                "x": random.randint(0, self.width - 1),
-                "y": random.randint(0, self.height - 1),
-                "alpha": random.randint(40, 90),
-                "phase": random.uniform(0, 6.28),   # random start phase
-                "speed": random.uniform(0.08, 0.2),  # twinkle speed
-            })
+            self.far_stars.append(self._new_star(is_near=False))
 
     def _spawn_near(self, count: int) -> None:
         for _ in range(count):
-            self.near_stars.append({
-                "x": random.randint(0, self.width - 1),
-                "y": random.randint(0, self.height - 1),
-                "alpha": random.randint(120, 180),
-                "phase": random.uniform(0, 6.28),
-                "speed": random.uniform(0.1, 0.25),
-            })
+            self.near_stars.append(self._new_star(is_near=True))
+
+    def _tick_star(self, star: dict, *, is_near: bool) -> int:
+        """Advance star state machine by one tick, return current alpha (0-255)."""
+        state = star["state"]
+        timer = star["timer"]
+
+        if state == self._DARK:
+            alpha = 0
+            star["timer"] -= 1
+            if star["timer"] <= 0:
+                star["state"] = self._BRIGHTEN
+                star["timer"] = star["brighten_ticks"]
+        elif state == self._BRIGHTEN:
+            # Linear fade in: progress from 0.0 to 1.0
+            total = star["brighten_ticks"]
+            elapsed = total - timer
+            progress = elapsed / max(total, 1)
+            alpha = int(star["peak_alpha"] * progress)
+            star["timer"] -= 1
+            if star["timer"] <= 0:
+                star["state"] = self._PEAK
+                star["timer"] = star["peak_ticks"]
+        elif state == self._PEAK:
+            alpha = star["peak_alpha"]
+            star["timer"] -= 1
+            if star["timer"] <= 0:
+                star["state"] = self._DIM
+                star["timer"] = star["dim_ticks"]
+        else:  # DIM
+            # Linear fade out: progress from 1.0 to 0.0
+            total = star["dim_ticks"]
+            progress = timer / max(total, 1)
+            alpha = int(star["peak_alpha"] * progress)
+            star["timer"] -= 1
+            if star["timer"] <= 0:
+                star["state"] = self._DARK
+                self._randomize_durations(star, is_near=is_near)
+                star["timer"] = star["dark_ticks"]
+
+        return max(0, min(alpha, 255))
 
     def tick(self) -> tuple[Image.Image, Image.Image]:
         bg = self._empty()
@@ -485,44 +583,39 @@ class ClearNightAnimation(WeatherAnimation):
 
         # Far stars -- behind text, cool white, single pixel
         for star in self.far_stars:
-            star["phase"] += star["speed"]
-            # Sinusoidal twinkle: alpha oscillates around base value
-            twinkle = math.sin(star["phase"])
-            alpha = int(star["alpha"] + twinkle * 30)
-            alpha = max(15, min(alpha, 120))
-            x, y = star["x"], star["y"]
-            if 0 <= x < self.width and 0 <= y < self.height:
-                bg_draw.point((x, y), fill=(180, 200, 255, alpha))
+            alpha = self._tick_star(star, is_near=False)
+            if alpha > 0:
+                x, y = star["x"], star["y"]
+                if 0 <= x < self.width and 0 <= y < self.height:
+                    bg_draw.point((x, y), fill=(180, 200, 255, alpha))
 
-        # Near stars -- in front of text, warm white, + shape for brighter ones
+        # Near stars -- in front of text, warm white, + shape at peak
         for star in self.near_stars:
-            star["phase"] += star["speed"]
-            twinkle = math.sin(star["phase"])
-            alpha = int(star["alpha"] + twinkle * 40)
-            alpha = max(60, min(alpha, 220))
-            x, y = star["x"], star["y"]
-            color = (255, 250, 230, alpha)
-            if 0 <= x < self.width and 0 <= y < self.height:
-                fg_draw.point((x, y), fill=color)
-                # Cross arms for brighter moments
-                if alpha > 150:
-                    dim_color = (255, 250, 230, alpha // 2)
-                    if 0 <= x - 1 < self.width:
-                        fg_draw.point((x - 1, y), fill=dim_color)
-                    if 0 <= x + 1 < self.width:
-                        fg_draw.point((x + 1, y), fill=dim_color)
-                    if 0 <= y - 1 < self.height:
-                        fg_draw.point((x, y - 1), fill=dim_color)
-                    if 0 <= y + 1 < self.height:
-                        fg_draw.point((x, y + 1), fill=dim_color)
+            alpha = self._tick_star(star, is_near=True)
+            if alpha > 0:
+                x, y = star["x"], star["y"]
+                color = (255, 250, 230, alpha)
+                if 0 <= x < self.width and 0 <= y < self.height:
+                    fg_draw.point((x, y), fill=color)
+                    # Cross arms when bright enough
+                    if alpha > 150:
+                        dim_color = (255, 250, 230, alpha // 2)
+                        if 0 <= x - 1 < self.width:
+                            fg_draw.point((x - 1, y), fill=dim_color)
+                        if 0 <= x + 1 < self.width:
+                            fg_draw.point((x + 1, y), fill=dim_color)
+                        if 0 <= y - 1 < self.height:
+                            fg_draw.point((x, y - 1), fill=dim_color)
+                        if 0 <= y + 1 < self.height:
+                            fg_draw.point((x, y + 1), fill=dim_color)
 
         return bg, fg
 
     def reset(self) -> None:
         self.far_stars.clear()
         self.near_stars.clear()
-        self._spawn_far(12)
-        self._spawn_near(5)
+        self._spawn_far(14)
+        self._spawn_near(6)
 
 
 # Factory: weather group name -> animation class (daytime)

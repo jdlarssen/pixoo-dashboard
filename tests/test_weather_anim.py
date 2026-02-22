@@ -94,25 +94,25 @@ class TestAnimationVisibility:
         anim = RainAnimation()
         layers = anim.tick()
         max_a = self._max_alpha_in_layers(layers)
-        assert max_a >= 100, f"Rain max alpha {max_a} too low for LED visibility"
+        assert max_a >= 140, f"Rain max alpha {max_a} too low for LED visibility"
 
     def test_snow_alpha_above_minimum(self):
         anim = SnowAnimation()
         layers = anim.tick()
         max_a = self._max_alpha_in_layers(layers)
-        assert max_a >= 90, f"Snow max alpha {max_a} too low for LED visibility"
+        assert max_a >= 130, f"Snow max alpha {max_a} too low for LED visibility"
 
     def test_cloud_alpha_above_minimum(self):
         anim = CloudAnimation()
         layers = anim.tick()
         max_a = self._max_alpha_in_layers(layers)
-        assert max_a >= 60, f"Cloud max alpha {max_a} too low for LED visibility"
+        assert max_a >= 90, f"Cloud max alpha {max_a} too low for LED visibility"
 
     def test_sun_alpha_above_minimum(self):
         anim = SunAnimation()
         layers = anim.tick()
         max_a = self._max_alpha_in_layers(layers)
-        assert max_a >= 40, f"Sun max alpha {max_a} too low for LED visibility"
+        assert max_a >= 100, f"Sun max alpha {max_a} too low for LED visibility"
 
     def test_thunder_flash_alpha(self):
         anim = ThunderAnimation()
@@ -126,7 +126,7 @@ class TestAnimationVisibility:
         anim = FogAnimation()
         layers = anim.tick()
         max_a = self._max_alpha_in_layers(layers)
-        assert max_a >= 60, f"Fog max alpha {max_a} too low for LED visibility"
+        assert max_a >= 90, f"Fog max alpha {max_a} too low for LED visibility"
 
     def test_rain_has_multi_pixel_particles(self):
         """Rain drops should be larger than single pixels."""
@@ -378,3 +378,133 @@ class TestNightAnimations:
                 f"Star pixel ({r}, {g}, {b}) spread {spread} too high -- "
                 f"should be white-ish"
             )
+
+
+class TestStarRandomness:
+    """Verify ClearNightAnimation produces organic, non-uniform twinkle patterns.
+
+    Stars should NOT all blink in lockstep. Each star should have independent
+    timing so the overall effect feels like a real night sky.
+    """
+
+    def test_stars_have_varied_peak_alphas(self):
+        """Different stars should have different peak brightness levels."""
+        anim = ClearNightAnimation()
+        peak_alphas = set()
+        for star in anim.far_stars + anim.near_stars:
+            peak_alphas.add(star["peak_alpha"])
+        # With 20 stars, random peak_alpha should produce at least 5 distinct values
+        assert len(peak_alphas) >= 5, (
+            f"Only {len(peak_alphas)} distinct peak alphas across {len(anim.far_stars) + len(anim.near_stars)} stars -- "
+            f"not enough variation"
+        )
+
+    def test_stars_have_varied_dark_durations(self):
+        """Stars should have different dark (off) interval durations."""
+        anim = ClearNightAnimation()
+        dark_durations = set()
+        for star in anim.far_stars + anim.near_stars:
+            dark_durations.add(star["dark_ticks"])
+        # Should have at least 4 distinct dark durations
+        assert len(dark_durations) >= 4, (
+            f"Only {len(dark_durations)} distinct dark durations -- stars will blink too uniformly"
+        )
+
+    def test_stars_not_all_in_same_state(self):
+        """At initialization, stars should be in different states (not all synchronized)."""
+        anim = ClearNightAnimation()
+        states = set()
+        for star in anim.far_stars + anim.near_stars:
+            states.add(star["state"])
+        # Should have at least 2 different states at init (ideally all 4)
+        assert len(states) >= 2, (
+            f"All stars start in same state ({states}) -- will look synchronized"
+        )
+
+    def test_some_stars_dark_at_any_given_tick(self):
+        """At any given tick, some stars should be dark (alpha=0) while others are visible.
+
+        This is the key organic property: not all stars visible simultaneously.
+        Over 30 ticks, there should be at least one tick where some stars are dark.
+        """
+        anim = ClearNightAnimation()
+        found_mixed_frame = False
+        for _ in range(30):
+            bg, fg = anim.tick()
+            # Count visible pixels in both layers
+            visible_count = 0
+            for layer in (bg, fg):
+                alpha_band = layer.split()[3]
+                for a in alpha_band.get_flattened_data():
+                    if a > 0:
+                        visible_count += 1
+            # Total star count: 14 far + 6 near = 20 stars
+            # If some are dark, visible_count < total star pixels at full brightness
+            # With 20 stars, if all were visible, we'd see 20+ pixels (near stars have cross arms)
+            # If some are dark, we see fewer
+            total_stars = len(anim.far_stars) + len(anim.near_stars)
+            if visible_count < total_stars:
+                found_mixed_frame = True
+                break
+        assert found_mixed_frame, (
+            "All stars appear visible every frame -- no dark intervals detected. "
+            "Stars should independently go dark for organic twinkle effect."
+        )
+
+    def test_star_alpha_varies_over_time(self):
+        """A single star's effective alpha should change over multiple ticks.
+
+        This verifies the state machine is actually transitioning between
+        phases rather than staying stuck.
+        """
+        anim = ClearNightAnimation()
+        # Track alpha values for one specific near star across 50 ticks
+        # We do this by reading the pixel at the star's position from the fg layer
+        test_star = anim.near_stars[0]
+        x, y = test_star["x"], test_star["y"]
+        alphas_seen = set()
+        for _ in range(50):
+            bg, fg = anim.tick()
+            pixel = fg.getpixel((x, y))
+            alphas_seen.add(pixel[3])
+        # Star should have been at multiple different alpha levels
+        assert len(alphas_seen) >= 3, (
+            f"Star at ({x},{y}) only produced {len(alphas_seen)} distinct alpha values "
+            f"over 50 ticks: {sorted(alphas_seen)} -- twinkle not working"
+        )
+
+    def test_star_durations_re_randomize_after_cycle(self):
+        """After completing a full dark->brighten->peak->dim cycle, durations should change.
+
+        This ensures each blink cycle is different from the last.
+        """
+        anim = ClearNightAnimation()
+        star = anim.far_stars[0]
+        # Force star into a known state: start of DARK phase
+        star["state"] = ClearNightAnimation._DARK
+        star["timer"] = 1  # will transition to BRIGHTEN on next tick
+        initial_brighten = star["brighten_ticks"]
+        initial_peak = star["peak_ticks"]
+        initial_dim = star["dim_ticks"]
+
+        # Tick through: DARK(1) -> BRIGHTEN -> PEAK -> DIM -> DARK (re-randomized)
+        max_ticks = 200  # safety limit
+        for _ in range(max_ticks):
+            anim._tick_star(star, is_near=False)
+            # Check if we've re-entered DARK (meaning one full cycle completed)
+            if star["state"] == ClearNightAnimation._DARK and star["timer"] == star["dark_ticks"]:
+                break
+
+        # After a full cycle, durations should have been re-randomized
+        # At least one duration should be different (probabilistically near-certain)
+        changed = (
+            star["brighten_ticks"] != initial_brighten
+            or star["peak_ticks"] != initial_peak
+            or star["dim_ticks"] != initial_dim
+        )
+        # This could theoretically fail if random produces same values, but probability
+        # is extremely low given the ranges involved
+        assert changed, (
+            "Star durations not re-randomized after full cycle -- "
+            "each blink should be unique"
+        )
