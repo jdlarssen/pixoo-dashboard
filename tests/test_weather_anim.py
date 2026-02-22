@@ -18,6 +18,7 @@ from src.display.layout import COLOR_WEATHER_RAIN
 from src.display.weather_anim import (
     ClearNightAnimation,
     CloudAnimation,
+    CompositeAnimation,
     FogAnimation,
     RainAnimation,
     SnowAnimation,
@@ -655,3 +656,38 @@ class TestSnowIntensity:
         anim.reset()
         assert len(anim.far_flakes) == 16
         assert len(anim.near_flakes) == 10
+
+
+class TestCompositeAnimation:
+    def test_single_animation_passthrough(self):
+        rain = RainAnimation(precipitation_mm=2.0)
+        comp = CompositeAnimation([rain])
+        bg, fg = comp.tick()
+        assert bg.size == (64, 24) and bg.mode == "RGBA"
+        assert fg.size == (64, 24) and fg.mode == "RGBA"
+
+    def test_two_animations_produce_visible_output(self):
+        rain = RainAnimation(precipitation_mm=3.0)
+        fog = FogAnimation()
+        comp = CompositeAnimation([rain, fog])
+        for _ in range(5):
+            bg, fg = comp.tick()
+        bg_pixels = sum(1 for a in bg.split()[3].get_flattened_data() if a > 0)
+        fg_pixels = sum(1 for a in fg.split()[3].get_flattened_data() if a > 0)
+        assert bg_pixels > 0
+        assert fg_pixels > 0
+
+    def test_reset_resets_all_children(self):
+        rain = RainAnimation(precipitation_mm=2.0)
+        snow = SnowAnimation(precipitation_mm=2.0)
+        comp = CompositeAnimation([rain, snow])
+        for _ in range(10):
+            comp.tick()
+        comp.reset()
+        assert len(rain.far_drops) == 14
+        assert len(snow.far_flakes) == 10
+
+    def test_empty_animations_returns_empty_layers(self):
+        comp = CompositeAnimation([])
+        bg, fg = comp.tick()
+        assert max(bg.split()[3].get_flattened_data()) == 0
