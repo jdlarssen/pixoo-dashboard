@@ -2,6 +2,7 @@
 
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -23,25 +24,27 @@ FONT_TINY = "4x6"     # for zone labels
 # Device safety
 MAX_BRIGHTNESS = 90  # cap at 90% -- full brightness can crash device
 
-# Brightness schedule (time-of-day auto-dimming)
+# Brightness schedule (astronomical auto-dimming)
 BRIGHTNESS_NIGHT = 20     # 20% -- within user's 15-25% range, readable without lighting room
 BRIGHTNESS_DAY = 100      # 100% -- PixooClient caps at MAX_BRIGHTNESS (90%)
-BRIGHTNESS_DIM_START = 21  # hour when night mode starts (21:00)
-BRIGHTNESS_DIM_END = 6     # hour when day mode starts (06:00)
 
 
-def get_target_brightness(hour: int) -> int:
-    """Return target brightness based on hour of day.
+def get_target_brightness(dt: datetime, lat: float, lon: float) -> int:
+    """Return target brightness based on astronomical darkness.
 
-    Night mode (21:00-06:00): dim. Day mode (06:00-21:00): full.
+    Uses civil twilight (sun 6 deg below horizon) from the astral library
+    instead of hardcoded hours.
 
     Args:
-        hour: Current hour (0-23).
+        dt: Current timezone-aware datetime.
+        lat: Latitude in decimal degrees.
+        lon: Longitude in decimal degrees.
 
     Returns:
         Target brightness percentage (0-100).
     """
-    if hour >= BRIGHTNESS_DIM_START or hour < BRIGHTNESS_DIM_END:
+    from src.providers.sun import is_dark
+    if is_dark(dt, lat, lon):
         return BRIGHTNESS_NIGHT
     return BRIGHTNESS_DAY
 

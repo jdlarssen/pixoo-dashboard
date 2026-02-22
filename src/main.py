@@ -13,7 +13,7 @@ import logging
 import os
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Ensure project root is on sys.path so `src.*` imports work when run directly
@@ -41,6 +41,7 @@ from src.display.weather_anim import WeatherAnimation, get_animation
 from src.display.weather_icons import symbol_to_group
 from src.providers.bus import fetch_bus_data
 from src.providers.discord_bot import MessageBridge, start_discord_bot
+from src.providers.sun import is_dark
 from src.providers.weather import WeatherData, fetch_weather_safe
 from src.device.pixoo_client import PixooClient
 from src.display.fonts import load_fonts
@@ -143,6 +144,7 @@ def main_loop(
 
     while True:
         now_mono = time.monotonic()
+        now_utc = datetime.now(timezone.utc)
 
         # Independent 60-second bus data refresh
         if now_mono - last_bus_fetch >= BUS_REFRESH_INTERVAL:
@@ -167,7 +169,7 @@ def main_loop(
                 last_good_weather = weather_data
                 last_good_weather_time = now_mono
                 new_group = symbol_to_group(weather_data.symbol_code)
-                is_night = not weather_data.is_day
+                is_night = is_dark(now_utc, WEATHER_LAT, WEATHER_LON)
                 precip = weather_data.precipitation_mm
                 if new_group != last_weather_group or is_night != last_weather_night:
                     weather_anim = get_animation(new_group, is_night=is_night, precipitation_mm=precip)
@@ -190,7 +192,7 @@ def main_loop(
                 )
                 # Swap animation if weather group, day/night, or rain intensity changed
                 new_group = symbol_to_group(weather_data.symbol_code)
-                is_night = not weather_data.is_day
+                is_night = is_dark(now_utc, WEATHER_LAT, WEATHER_LON)
                 precip = weather_data.precipitation_mm
                 precip_changed = _precip_category(precip) != _precip_category(last_precip_mm)
                 if new_group != last_weather_group or is_night != last_weather_night or precip_changed:
@@ -219,8 +221,8 @@ def main_loop(
 
         now = datetime.now()
 
-        # Auto-brightness: adjust based on time of day (only when target changes)
-        target_brightness = get_target_brightness(now.hour)
+        # Auto-brightness: adjust based on astronomical darkness (only when target changes)
+        target_brightness = get_target_brightness(now_utc, WEATHER_LAT, WEATHER_LON)
         if target_brightness != last_brightness:
             client.set_brightness(target_brightness)
             last_brightness = target_brightness
