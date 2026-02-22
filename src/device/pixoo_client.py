@@ -4,6 +4,7 @@ import logging
 import time
 
 from PIL import Image
+from requests.exceptions import RequestException
 
 from src.config import DISPLAY_SIZE, MAX_BRIGHTNESS
 
@@ -18,6 +19,7 @@ class PixooClient:
     - Rate-limited frame pushing (minimum 0.3s between pushes, ~3 FPS max)
     - Brightness control capped at MAX_BRIGHTNESS (90%)
     - Simulator mode for development without hardware
+    - Resilient error handling: network errors are logged, not raised
     """
 
     def __init__(self, ip: str, size: int = DISPLAY_SIZE, simulated: bool = False):
@@ -54,6 +56,9 @@ class PixooClient:
         Pixoo 64 handles ~3 FPS over HTTP reliably. If called too soon after
         the last push, the call is skipped with a warning.
 
+        Network errors (timeouts, connection failures) are caught and logged
+        so the main loop can continue and retry on the next iteration.
+
         Args:
             image: A PIL RGB Image (should be 64x64 for Pixoo 64).
         """
@@ -66,12 +71,18 @@ class PixooClient:
             )
             return
 
-        self._pixoo.draw_image(image)
-        self._pixoo.push()
+        try:
+            self._pixoo.draw_image(image)
+            self._pixoo.push()
+        except (RequestException, OSError) as exc:
+            logger.warning("Device communication error during push_frame: %s", exc)
+            return
         self._last_push_time = time.monotonic()
 
     def set_brightness(self, level: int) -> None:
         """Set device brightness, capped at MAX_BRIGHTNESS.
+
+        Network errors are caught and logged so the main loop can continue.
 
         Args:
             level: Brightness level (0-100). Will be capped at MAX_BRIGHTNESS (90).
@@ -81,7 +92,10 @@ class PixooClient:
             logger.info(
                 "Brightness %d exceeds max (%d), capping at %d", level, MAX_BRIGHTNESS, capped
             )
-        self._pixoo.set_brightness(capped)
+        try:
+            self._pixoo.set_brightness(capped)
+        except (RequestException, OSError) as exc:
+            logger.warning("Device communication error during set_brightness: %s", exc)
 
     def test_connection(self) -> bool:
         """Push a solid dark blue test frame to verify device connectivity.
