@@ -30,6 +30,8 @@ class WeatherData:
     low_temp: float          # today's forecast low
     precipitation_mm: float  # next 1h precipitation amount in mm
     is_day: bool             # derived from symbol_code suffix
+    wind_speed: float = 0.0           # wind speed in m/s
+    wind_from_direction: float = 0.0  # meteorological wind direction in degrees
 
 
 def _parse_is_day(symbol_code: str) -> bool:
@@ -67,6 +69,8 @@ def _parse_current(timeseries: list[dict]) -> dict:
         "symbol_code": symbol_code,
         "precipitation_mm": next_1h.get("details", {}).get("precipitation_amount", 0.0),
         "is_day": _parse_is_day(symbol_code),
+        "wind_speed": instant.get("wind_speed", 0.0),
+        "wind_from_direction": instant.get("wind_from_direction", 0.0),
     }
 
 
@@ -151,6 +155,8 @@ def fetch_weather(lat: float, lon: float) -> WeatherData:
         low_temp=low,
         precipitation_mm=current["precipitation_mm"],
         is_day=current["is_day"],
+        wind_speed=current["wind_speed"],
+        wind_from_direction=current["wind_from_direction"],
     )
 
 
