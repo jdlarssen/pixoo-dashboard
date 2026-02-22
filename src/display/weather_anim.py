@@ -682,6 +682,33 @@ class ClearNightAnimation(WeatherAnimation):
         self._spawn_near(6)
 
 
+class CompositeAnimation(WeatherAnimation):
+    """Layers multiple weather animations by alpha-compositing their frames.
+
+    Each child animation's bg layers are composited together, and fg layers
+    are composited together, preserving the depth-layer rendering pipeline.
+    """
+
+    def __init__(self, animations: list[WeatherAnimation]) -> None:
+        width = animations[0].width if animations else 64
+        height = animations[0].height if animations else 24
+        super().__init__(width, height)
+        self.animations = animations
+
+    def tick(self) -> tuple[Image.Image, Image.Image]:
+        bg = self._empty()
+        fg = self._empty()
+        for anim in self.animations:
+            child_bg, child_fg = anim.tick()
+            bg = Image.alpha_composite(bg, child_bg)
+            fg = Image.alpha_composite(fg, child_fg)
+        return bg, fg
+
+    def reset(self) -> None:
+        for anim in self.animations:
+            anim.reset()
+
+
 # Factory: weather group name -> animation class (daytime)
 _ANIMATION_MAP: dict[str, type[WeatherAnimation]] = {
     "clear": SunAnimation,
