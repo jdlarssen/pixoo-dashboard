@@ -29,7 +29,8 @@ Full log in PROJECT.md Key Decisions table.
 
 ### Pending Todos
 
-None.
+1. Rain animation intensity should reflect precipitation amount (display)
+2. Sun rays animation unrecognizable without sun in weather zone (display)
 
 ### Blockers/Concerns
 
