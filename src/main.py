@@ -99,9 +99,10 @@ def main_loop(
     Checks time every iteration. Pushes a frame when the display state
     changes or when the weather animation ticks a new frame.
 
-    When weather animation is active, the loop runs at ~3 FPS (0.35s sleep)
-    to produce smooth animation while staying above the device's 0.3s rate
-    limit (prevents frame drops from timing jitter). Otherwise it sleeps 1 second.
+    When weather animation is active, the loop runs at ~1 FPS (1.0s sleep).
+    The Pixoo 64 device can only reliably handle ~1 HTTP push per second;
+    faster rates overwhelm its embedded HTTP server, causing connection
+    resets and eventual device freezes. Without animation, also sleeps 1s.
 
     Args:
         client: Pixoo device client for pushing frames.
@@ -287,9 +288,10 @@ def main_loop(
                 logger.info("Pushed frame: %s %s", current_state.time_str, current_state.date_str)
             needs_push = False
 
-        # Sleep: 0.35s when animation is active (~3 FPS), 1s otherwise
-        sleep_time = 0.35 if weather_anim is not None else 1.0
-        time.sleep(sleep_time)
+        # Sleep 1s always.  The Pixoo 64 can handle ~1 push/second max.
+        # Animation particles advance one step per tick, producing gentle
+        # motion at 1 FPS that the LED display renders smoothly.
+        time.sleep(1.0)
 
 
 def main() -> None:

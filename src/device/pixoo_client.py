@@ -1,8 +1,19 @@
-"""Pixoo 64 device communication wrapper with connection refresh and rate limiting."""
+"""Pixoo 64 device communication wrapper with connection refresh and rate limiting.
 
+The Pixoo 64 device has a documented limitation: its embedded HTTP server
+cannot reliably handle more than ~1 request per second. Exceeding this rate
+causes the device to drop connections and eventually freeze.
+
+This wrapper enforces safe timing, adds timeouts to all device HTTP calls
+(the upstream pixoo library uses none), and implements error cooldown to
+prevent cascading failures when the device is in a degraded state.
+"""
+
+import functools
 import logging
 import time
 
+import requests as _requests_module
 from PIL import Image
 from requests.exceptions import RequestException
 
@@ -10,13 +21,46 @@ from src.config import DISPLAY_SIZE, MAX_BRIGHTNESS
 
 logger = logging.getLogger(__name__)
 
+# Device HTTP timeout -- the pixoo library's requests.post() calls have no
+# timeout, so a hung device blocks the main loop indefinitely.  We monkey-patch
+# the module-level requests.post used by the pixoo library to inject one.
+_DEVICE_TIMEOUT = 5  # seconds
+
+# Minimum interval between frame pushes (seconds).  The Pixoo 64 documentation
+# says "do not call push() more than once per second".  We enforce 1.0s.
+_MIN_PUSH_INTERVAL = 1.0
+
+# After a device communication error, pause before retrying to let the
+# device's embedded HTTP server recover.
+_ERROR_COOLDOWN = 3.0  # seconds
+
+
+def _patch_requests_post(original_post):
+    """Wrap requests.post to inject a default timeout when calling the device.
+
+    The pixoo library calls ``requests.post(url, payload)`` with no timeout,
+    meaning a hung device blocks the caller indefinitely. This wrapper adds
+    a timeout to any POST that targets a local device IP (``http://192.*``).
+    Non-device calls (e.g., to external APIs) are left untouched.
+    """
+    @functools.wraps(original_post)
+    def _post_with_timeout(*args, **kwargs):
+        url = args[0] if args else kwargs.get("url", "")
+        # Only inject timeout for device calls (local HTTP), not external APIs
+        if "timeout" not in kwargs and isinstance(url, str) and url.startswith("http://192."):
+            kwargs["timeout"] = _DEVICE_TIMEOUT
+        return original_post(*args, **kwargs)
+    return _post_with_timeout
+
 
 class PixooClient:
     """Wrapper around the pixoo library's Pixoo class.
 
     Provides:
-    - Connection refresh to prevent the ~300-push lockup (enabled by default in pixoo lib)
-    - Rate-limited frame pushing (minimum 0.3s between pushes, ~3 FPS max)
+    - Safe rate limiting (minimum 1.0s between pushes, matching device capacity)
+    - Timeout injection for all device HTTP calls (5s default)
+    - Error cooldown to prevent cascading failures on degraded device
+    - Connection refresh to prevent the ~300-push lockup (pixoo lib feature)
     - Brightness control capped at MAX_BRIGHTNESS (90%)
     - Simulator mode for development without hardware
     - Resilient error handling: network errors are logged, not raised
@@ -30,6 +74,13 @@ class PixooClient:
             size: Display size in pixels (64 for Pixoo 64).
             simulated: If True, use the pixoo library's Tkinter simulator.
         """
+        # Monkey-patch requests.post BEFORE importing pixoo so that all
+        # device HTTP calls from the pixoo library get a timeout.
+        import pixoo.objects.pixoo as _pixoo_module
+        if not getattr(_requests_module.post, "_patched_with_timeout", False):
+            _requests_module.post = _patch_requests_post(_requests_module.post)
+            _requests_module.post._patched_with_timeout = True  # type: ignore[attr-defined]
+
         from pixoo import Pixoo
 
         kwargs = {
@@ -48,13 +99,17 @@ class PixooClient:
         self._pixoo = Pixoo(**kwargs)
         self._size = size
         self._last_push_time: float = 0.0
+        self._error_until: float = 0.0  # monotonic time when cooldown expires
 
     def push_frame(self, image: Image.Image) -> None:
         """Push a PIL Image frame to the device.
 
-        Enforces a minimum 0.3-second (300ms) interval between pushes. The
-        Pixoo 64 handles ~3 FPS over HTTP reliably. If called too soon after
-        the last push, the call is skipped with a warning.
+        Enforces a minimum 1.0-second interval between pushes. The Pixoo 64
+        can only reliably handle ~1 push per second over HTTP. Calls arriving
+        too soon are silently skipped (no warning spam at animation tick rate).
+
+        After a communication error, a cooldown period prevents rapid retries
+        that would further overwhelm the device.
 
         Network errors (timeouts, connection failures) are caught and logged
         so the main loop can continue and retry on the next iteration.
@@ -63,12 +118,14 @@ class PixooClient:
             image: A PIL RGB Image (should be 64x64 for Pixoo 64).
         """
         now = time.monotonic()
-        elapsed = now - self._last_push_time
 
-        if self._last_push_time > 0 and elapsed < 0.3:
-            logger.warning(
-                "Push skipped: only %.2fs since last push (minimum 0.3s interval)", elapsed
-            )
+        # Respect error cooldown
+        if now < self._error_until:
+            return
+
+        # Rate limit: enforce minimum interval
+        elapsed = now - self._last_push_time
+        if self._last_push_time > 0 and elapsed < _MIN_PUSH_INTERVAL:
             return
 
         try:
@@ -76,6 +133,8 @@ class PixooClient:
             self._pixoo.push()
         except (RequestException, OSError) as exc:
             logger.warning("Device communication error during push_frame: %s", exc)
+            self._error_until = time.monotonic() + _ERROR_COOLDOWN
+            logger.info("Device cooldown: pausing pushes for %.0fs", _ERROR_COOLDOWN)
             return
         self._last_push_time = time.monotonic()
 

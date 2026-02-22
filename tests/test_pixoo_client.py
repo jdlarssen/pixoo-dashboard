@@ -22,6 +22,7 @@ def client():
         c._pixoo = MagicMock()
         c._size = 64
         c._last_push_time = 0.0
+        c._error_until = 0.0
         return c
 
 
@@ -88,10 +89,14 @@ class TestPushFrameErrorHandling:
         assert client._last_push_time == 0.0
 
     def test_push_frame_recovers_after_error(self, client, test_image):
-        """After a network error, the next push should succeed normally."""
+        """After a network error and cooldown, the next push should succeed."""
         # First call fails
         client._pixoo.push.side_effect = ReadTimeout("Read timed out")
         client.push_frame(test_image)
+
+        # Clear cooldown so second call is allowed immediately
+        client._error_until = 0.0
+        client._last_push_time = 0.0
 
         # Second call succeeds
         client._pixoo.push.side_effect = None
@@ -102,6 +107,32 @@ class TestPushFrameErrorHandling:
         client._pixoo.draw_image.assert_called_once_with(test_image)
         client._pixoo.push.assert_called_once()
         assert client._last_push_time > 0.0
+
+    def test_push_frame_skipped_during_cooldown(self, client, test_image):
+        """During error cooldown, push_frame should skip without calling device."""
+        import time
+
+        # Set cooldown far in the future
+        client._error_until = time.monotonic() + 60
+
+        client.push_frame(test_image)
+
+        # Should not have called device at all
+        client._pixoo.draw_image.assert_not_called()
+        client._pixoo.push.assert_not_called()
+
+    def test_push_frame_rate_limited(self, client, test_image):
+        """Calls within the minimum push interval should be silently skipped."""
+        import time
+
+        # Simulate a recent push
+        client._last_push_time = time.monotonic()
+
+        client.push_frame(test_image)
+
+        # Should not have called device due to rate limiting
+        client._pixoo.draw_image.assert_not_called()
+        client._pixoo.push.assert_not_called()
 
 
 class TestSetBrightnessErrorHandling:
