@@ -62,6 +62,15 @@ def _precip_category(mm: float) -> str:
     return "heavy"
 
 
+def _wind_category(speed: float) -> str:
+    """Classify wind speed for animation switching."""
+    if speed < 3.0:
+        return "calm"
+    elif speed <= 5.0:
+        return "moderate"
+    return "strong"
+
+
 def build_font_map(font_dir: str) -> dict:
     """Load fonts and map them to logical names used by the renderer.
 
@@ -104,13 +113,13 @@ def main_loop(
     # Set TEST_WEATHER env var to: clear, rain, snow, fog (cycles on restart)
     test_weather_mode = os.environ.get("TEST_WEATHER")
     test_weather_map = {
-        "clear": WeatherData(temperature=30, symbol_code="clearsky_day", high_temp=32, low_temp=22, precipitation_mm=0.0, is_day=True),
-        "rain": WeatherData(temperature=30, symbol_code="rain_day", high_temp=32, low_temp=22, precipitation_mm=5.0, is_day=True),
-        "snow": WeatherData(temperature=30, symbol_code="snow_day", high_temp=32, low_temp=22, precipitation_mm=2.0, is_day=True),
+        "clear": WeatherData(temperature=30, symbol_code="clearsky_day", high_temp=32, low_temp=22, precipitation_mm=0.0, is_day=True, wind_speed=2.0, wind_from_direction=180.0),
+        "rain": WeatherData(temperature=30, symbol_code="rain_day", high_temp=32, low_temp=22, precipitation_mm=5.0, is_day=True, wind_speed=8.0, wind_from_direction=270.0),
+        "snow": WeatherData(temperature=30, symbol_code="snow_day", high_temp=32, low_temp=22, precipitation_mm=2.0, is_day=True, wind_speed=5.0, wind_from_direction=200.0),
         "fog": WeatherData(temperature=30, symbol_code="fog", high_temp=32, low_temp=22, precipitation_mm=0.0, is_day=True),
         "cloudy": WeatherData(temperature=30, symbol_code="cloudy", high_temp=32, low_temp=22, precipitation_mm=0.0, is_day=True),
         "sun": WeatherData(temperature=30, symbol_code="clearsky_day", high_temp=32, low_temp=22, precipitation_mm=0.0, is_day=True),
-        "thunder": WeatherData(temperature=30, symbol_code="rainandthunder_day", high_temp=32, low_temp=22, precipitation_mm=8.0, is_day=True),
+        "thunder": WeatherData(temperature=30, symbol_code="rainandthunder_day", high_temp=32, low_temp=22, precipitation_mm=8.0, is_day=True, wind_speed=12.0, wind_from_direction=250.0),
     }
     if test_weather_mode:
         logger.info("TEST MODE: weather=%s, temp=30°C, daytime", test_weather_mode)
@@ -125,6 +134,7 @@ def main_loop(
     last_weather_group: str | None = None
     last_weather_night: bool | None = None
     last_precip_mm: float = 0.0
+    last_wind_speed: float = 0.0
     needs_push = False
 
     # Staleness tracking -- preserve last-good data through API failures
@@ -172,11 +182,16 @@ def main_loop(
                 is_night = is_dark(now_utc, WEATHER_LAT, WEATHER_LON)
                 precip = weather_data.precipitation_mm
                 if new_group != last_weather_group or is_night != last_weather_night:
-                    weather_anim = get_animation(new_group, is_night=is_night, precipitation_mm=precip)
+                    weather_anim = get_animation(
+                        new_group, is_night=is_night, precipitation_mm=precip,
+                        wind_speed=weather_data.wind_speed,
+                        wind_direction=weather_data.wind_from_direction,
+                    )
                     last_weather_group = new_group
                     last_weather_night = is_night
                     last_precip_mm = precip
-                    logger.info("TEST: weather animation: %s (night=%s, precip=%.1fmm)", new_group, is_night, precip)
+                    last_wind_speed = weather_data.wind_speed
+                    logger.info("TEST: weather animation: %s (night=%s, precip=%.1fmm, wind=%.1fm/s)", new_group, is_night, precip, weather_data.wind_speed)
         elif now_mono - last_weather_fetch >= WEATHER_REFRESH_INTERVAL:
             fresh_weather = fetch_weather_safe(WEATHER_LAT, WEATHER_LON)
             last_weather_fetch = now_mono
@@ -195,12 +210,18 @@ def main_loop(
                 is_night = is_dark(now_utc, WEATHER_LAT, WEATHER_LON)
                 precip = weather_data.precipitation_mm
                 precip_changed = _precip_category(precip) != _precip_category(last_precip_mm)
-                if new_group != last_weather_group or is_night != last_weather_night or precip_changed:
-                    weather_anim = get_animation(new_group, is_night=is_night, precipitation_mm=precip)
+                wind_changed = _wind_category(weather_data.wind_speed) != _wind_category(last_wind_speed)
+                if new_group != last_weather_group or is_night != last_weather_night or precip_changed or wind_changed:
+                    weather_anim = get_animation(
+                        new_group, is_night=is_night, precipitation_mm=precip,
+                        wind_speed=weather_data.wind_speed,
+                        wind_direction=weather_data.wind_from_direction,
+                    )
                     last_weather_group = new_group
                     last_weather_night = is_night
                     last_precip_mm = precip
-                    logger.info("Weather animation: %s (night=%s, precip=%.1fmm)", new_group, is_night, precip)
+                    last_wind_speed = weather_data.wind_speed
+                    logger.info("Weather animation: %s (night=%s, precip=%.1fmm, wind=%.1fm/s)", new_group, is_night, precip, weather_data.wind_speed)
             else:
                 # API failed -- keep using last-good data
                 weather_data = last_good_weather
