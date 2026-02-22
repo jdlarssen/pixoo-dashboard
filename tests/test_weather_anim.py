@@ -24,6 +24,7 @@ from src.display.weather_anim import (
     SnowAnimation,
     SunAnimation,
     ThunderAnimation,
+    WindEffect,
     get_animation,
 )
 
@@ -691,3 +692,44 @@ class TestCompositeAnimation:
         comp = CompositeAnimation([])
         bg, fg = comp.tick()
         assert max(bg.split()[3].get_flattened_data()) == 0
+
+
+class TestWindEffect:
+    def test_wind_shifts_rain_drops(self):
+        rain = RainAnimation(precipitation_mm=2.0)
+        wind = WindEffect(rain, wind_speed=10.0, wind_direction=270.0)
+        initial_x = [d[0] for d in rain.far_drops]
+        for _ in range(5):
+            wind.tick()
+        current_x = [d[0] for d in rain.far_drops]
+        assert initial_x != current_x
+
+    def test_no_wind_no_extra_drift(self):
+        rain = RainAnimation(precipitation_mm=2.0)
+        wind = WindEffect(rain, wind_speed=0.0, wind_direction=270.0)
+        bg, fg = wind.tick()
+        assert bg.size == (64, 24) and bg.mode == "RGBA"
+
+    def test_wind_returns_two_layers(self):
+        rain = RainAnimation(precipitation_mm=2.0)
+        wind = WindEffect(rain, wind_speed=8.0, wind_direction=180.0)
+        bg, fg = wind.tick()
+        assert bg.size == (64, 24) and bg.mode == "RGBA"
+        assert fg.size == (64, 24) and fg.mode == "RGBA"
+
+    def test_wind_direction_affects_drift_sign(self):
+        rain1 = RainAnimation(precipitation_mm=2.0)
+        wind_west = WindEffect(rain1, wind_speed=10.0, wind_direction=270.0)
+        assert wind_west._drift_per_tick > 0
+
+        rain2 = RainAnimation(precipitation_mm=2.0)
+        wind_east = WindEffect(rain2, wind_speed=10.0, wind_direction=90.0)
+        assert wind_east._drift_per_tick < 0
+
+    def test_reset_delegates(self):
+        rain = RainAnimation(precipitation_mm=5.0)
+        wind = WindEffect(rain, wind_speed=8.0, wind_direction=270.0)
+        for _ in range(10):
+            wind.tick()
+        wind.reset()
+        assert len(rain.far_drops) == 22

@@ -13,6 +13,7 @@ Rain=blue, snow=bright white, sun=warm yellow, fog=soft white, clouds=grey-white
 Night clear=twinkling white/blue stars with organic per-star randomness.
 """
 
+import math
 import random
 
 from PIL import Image, ImageDraw
@@ -707,6 +708,44 @@ class CompositeAnimation(WeatherAnimation):
     def reset(self) -> None:
         for anim in self.animations:
             anim.reset()
+
+
+class WindEffect(WeatherAnimation):
+    """Wraps a particle-based animation and adds wind-driven horizontal drift.
+
+    Wind direction is meteorological: 270 = from west (blows east).
+    Drift magnitude scales with wind_speed (m/s). At 10 m/s, drift is
+    ~2 pixels per tick. Affects all particle lists found on the inner
+    animation (far_drops, near_drops, far_flakes, near_flakes).
+    """
+
+    def __init__(
+        self,
+        inner: WeatherAnimation,
+        wind_speed: float = 0.0,
+        wind_direction: float = 0.0,
+    ) -> None:
+        super().__init__(inner.width, inner.height)
+        self.inner = inner
+        self.wind_speed = wind_speed
+        wind_rad = math.radians(wind_direction)
+        self._drift_per_tick = -math.sin(wind_rad) * (wind_speed / 5.0)
+
+    def tick(self) -> tuple[Image.Image, Image.Image]:
+        drift = self._drift_per_tick
+        for attr in ("far_drops", "near_drops", "far_flakes", "near_flakes"):
+            particles = getattr(self.inner, attr, None)
+            if particles:
+                for p in particles:
+                    p[0] += drift
+                    if p[0] >= self.width:
+                        p[0] -= self.width
+                    elif p[0] < 0:
+                        p[0] += self.width
+        return self.inner.tick()
+
+    def reset(self) -> None:
+        self.inner.reset()
 
 
 # Factory: weather group name -> animation class (daytime)
