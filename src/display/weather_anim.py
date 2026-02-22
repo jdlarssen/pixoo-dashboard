@@ -767,35 +767,65 @@ _NIGHT_ANIMATION_MAP: dict[str, type[WeatherAnimation]] = {
 }
 
 
+# Wind thresholds (m/s)
+_WIND_THRESHOLD_RAIN = 5.0
+_WIND_THRESHOLD_SNOW = 3.0
+
+# Precipitation threshold for fog overlay on heavy rain
+_FOG_OVERLAY_PRECIP = 3.0
+
+
 def get_animation(
     weather_group: str,
     *,
     is_night: bool = False,
     precipitation_mm: float = 0.0,
+    wind_speed: float = 0.0,
+    wind_direction: float = 0.0,
 ) -> WeatherAnimation:
-    """Get an animation instance for the given weather group and time of day.
+    """Get an animation instance for the given weather conditions.
 
-    At night, "clear" and "partcloud" use twinkling stars instead of sunrays.
-    Other weather groups (rain, snow, etc.) are the same day and night.
-
-    Rain and thunder animations scale particle density based on precipitation_mm.
+    Builds composite animations for intense conditions:
+    - Rain/snow with strong wind: wrapped in WindEffect
+    - Heavy rain (>3mm): layered with fog overlay
+    - Thunder: internal rain + lightning, optionally with wind
 
     Args:
-        weather_group: One of the icon group names from weather_icons.py
-                       (clear, partcloud, cloudy, rain, sleet, snow, thunder, fog).
-        is_night: True if it's nighttime (from MET symbol_code suffix).
-        precipitation_mm: Precipitation amount in mm/h for rain intensity scaling.
+        weather_group: Weather group name (clear, rain, snow, etc.).
+        is_night: True if it's nighttime.
+        precipitation_mm: Precipitation amount in mm/h.
+        wind_speed: Wind speed in m/s.
+        wind_direction: Meteorological wind direction in degrees.
 
     Returns:
-        A WeatherAnimation instance that produces overlay frames.
+        A WeatherAnimation (possibly CompositeAnimation or WindEffect).
     """
+    # Night overrides for clear/partcloud
     if is_night:
         cls = _NIGHT_ANIMATION_MAP.get(weather_group)
         if cls is not None:
             return cls()
+
     cls = _ANIMATION_MAP.get(weather_group, CloudAnimation)
+
+    # Build the base animation
     if cls is RainAnimation:
-        return RainAnimation(precipitation_mm=precipitation_mm)
-    if cls is ThunderAnimation:
-        return ThunderAnimation(precipitation_mm=precipitation_mm)
-    return cls()
+        base = RainAnimation(precipitation_mm=precipitation_mm)
+        # Heavy rain gets fog overlay
+        if precipitation_mm > _FOG_OVERLAY_PRECIP:
+            base = CompositeAnimation([base, FogAnimation()])
+    elif cls is ThunderAnimation:
+        base = ThunderAnimation(precipitation_mm=precipitation_mm)
+    elif cls is SnowAnimation:
+        base = SnowAnimation(precipitation_mm=precipitation_mm)
+    else:
+        base = cls()
+
+    # Apply wind effect to particle-based animations
+    wind_applicable = cls in (RainAnimation, SnowAnimation, ThunderAnimation)
+    if wind_applicable and wind_speed > 0:
+        threshold = _WIND_THRESHOLD_SNOW if cls is SnowAnimation else _WIND_THRESHOLD_RAIN
+        if wind_speed > threshold:
+            base = WindEffect(base, wind_speed=wind_speed, wind_direction=wind_direction)
+
+    return base

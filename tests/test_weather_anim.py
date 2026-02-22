@@ -564,10 +564,15 @@ class TestRainIntensity:
         assert len(anim.near_drops) == 18
 
     def test_get_animation_passes_precipitation(self):
-        """get_animation should pass precipitation_mm to RainAnimation."""
+        """get_animation should pass precipitation_mm to RainAnimation.
+
+        Heavy rain (>3mm) returns a CompositeAnimation with RainAnimation inside.
+        """
         anim = get_animation("rain", precipitation_mm=5.0)
-        assert isinstance(anim, RainAnimation)
-        assert len(anim.far_drops) == 22
+        assert isinstance(anim, CompositeAnimation)
+        rain = anim.animations[0]
+        assert isinstance(rain, RainAnimation)
+        assert len(rain.far_drops) == 22
 
     def test_thunder_passes_precipitation_to_rain(self):
         """ThunderAnimation should pass precipitation_mm to its internal rain."""
@@ -733,3 +738,53 @@ class TestWindEffect:
             wind.tick()
         wind.reset()
         assert len(rain.far_drops) == 22
+
+
+class TestAnimationCombos:
+    def test_rain_with_strong_wind_returns_wind_effect(self):
+        anim = get_animation("rain", precipitation_mm=3.0, wind_speed=8.0, wind_direction=270.0)
+        assert isinstance(anim, WindEffect)
+        assert isinstance(anim.inner, RainAnimation)
+
+    def test_rain_with_light_wind_no_wind_effect(self):
+        anim = get_animation("rain", precipitation_mm=3.0, wind_speed=3.0)
+        assert isinstance(anim, RainAnimation)
+
+    def test_snow_with_wind_returns_wind_effect(self):
+        anim = get_animation("snow", precipitation_mm=2.0, wind_speed=5.0, wind_direction=180.0)
+        assert isinstance(anim, WindEffect)
+        assert isinstance(anim.inner, SnowAnimation)
+
+    def test_snow_passes_precipitation(self):
+        anim = get_animation("snow", precipitation_mm=4.0)
+        assert isinstance(anim, SnowAnimation)
+        assert len(anim.far_flakes) == 16
+
+    def test_heavy_rain_with_fog_returns_composite(self):
+        anim = get_animation("rain", precipitation_mm=5.0)
+        assert isinstance(anim, CompositeAnimation)
+        types = [type(a).__name__ for a in anim.animations]
+        assert "RainAnimation" in types
+        assert "FogAnimation" in types
+
+    def test_heavy_rain_fog_with_wind_wraps_composite(self):
+        anim = get_animation("rain", precipitation_mm=6.0, wind_speed=8.0, wind_direction=270.0)
+        assert isinstance(anim, WindEffect)
+        assert isinstance(anim.inner, CompositeAnimation)
+
+    def test_thunder_with_wind(self):
+        anim = get_animation("thunder", precipitation_mm=5.0, wind_speed=8.0, wind_direction=270.0)
+        assert isinstance(anim, WindEffect)
+        assert isinstance(anim.inner, ThunderAnimation)
+
+    def test_clear_day_unaffected_by_wind(self):
+        anim = get_animation("clear", wind_speed=15.0)
+        assert isinstance(anim, SunAnimation)
+
+    def test_fog_unaffected_by_wind(self):
+        anim = get_animation("fog", wind_speed=10.0)
+        assert isinstance(anim, FogAnimation)
+
+    def test_backward_compat_no_wind_params(self):
+        anim = get_animation("rain", precipitation_mm=2.0)
+        assert isinstance(anim, RainAnimation)
