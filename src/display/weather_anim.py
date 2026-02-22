@@ -69,8 +69,10 @@ class RainAnimation(WeatherAnimation):
             return 8, 4
         elif precipitation_mm <= 3.0:
             return 14, 8
-        else:
+        elif precipitation_mm <= 5.0:
             return 22, 14
+        else:
+            return 30, 18
 
     def _spawn_far(self, count: int) -> None:
         for _ in range(count):
@@ -127,18 +129,35 @@ class RainAnimation(WeatherAnimation):
 
 
 class SnowAnimation(WeatherAnimation):
-    """Snow crystals at two depths.
+    """Snow crystals at two depths with intensity scaling.
 
     Far flakes (behind): 2px horizontal dot pair, moderate brightness, slow drift.
     Near flakes (in front): + shaped crystal, bright white, gentle fall.
+
+    Particle count scales with precipitation_mm:
+    - Light (< 1mm): sparse flurry (6 far, 3 near)
+    - Moderate (1-3mm): normal snow (10 far, 6 near)
+    - Heavy (> 3mm): dense snowfall (16 far, 10 near)
     """
 
-    def __init__(self, width: int = 64, height: int = 24) -> None:
+    def __init__(self, width: int = 64, height: int = 24, precipitation_mm: float = 2.0) -> None:
         super().__init__(width, height)
+        self.precipitation_mm = precipitation_mm
+        self._far_count, self._near_count = self._particle_counts(precipitation_mm)
         self.far_flakes: list[list[int]] = []
         self.near_flakes: list[list[int]] = []
-        self._spawn_far(10)
-        self._spawn_near(6)
+        self._spawn_far(self._far_count)
+        self._spawn_near(self._near_count)
+
+    @staticmethod
+    def _particle_counts(precipitation_mm: float) -> tuple[int, int]:
+        """Return (far_count, near_count) based on precipitation intensity."""
+        if precipitation_mm < 1.0:
+            return 6, 3
+        elif precipitation_mm <= 3.0:
+            return 10, 6
+        else:
+            return 16, 10
 
     def _spawn_far(self, count: int) -> None:
         for _ in range(count):
@@ -204,8 +223,8 @@ class SnowAnimation(WeatherAnimation):
     def reset(self) -> None:
         self.far_flakes.clear()
         self.near_flakes.clear()
-        self._spawn_far(10)
-        self._spawn_near(6)
+        self._spawn_far(self._far_count)
+        self._spawn_near(self._near_count)
 
 
 class CloudAnimation(WeatherAnimation):

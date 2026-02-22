@@ -555,6 +555,12 @@ class TestRainIntensity:
         assert len(anim.far_drops) == 22
         assert len(anim.near_drops) == 14
 
+    def test_extreme_rain_even_more_particles(self):
+        """Extreme rain (>5mm) should have maximum density."""
+        anim = RainAnimation(precipitation_mm=8.0)
+        assert len(anim.far_drops) == 30
+        assert len(anim.near_drops) == 18
+
     def test_get_animation_passes_precipitation(self):
         """get_animation should pass precipitation_mm to RainAnimation."""
         anim = get_animation("rain", precipitation_mm=5.0)
@@ -617,3 +623,35 @@ class TestSunBody:
         anim = SunAnimation()
         colors = _sample_particle_rgb(anim, num_ticks=3)
         assert len(colors) > 10, f"Only {len(colors)} particles -- rays should still be active"
+
+
+class TestSnowIntensity:
+    """Verify snow particle count scales with precipitation amount."""
+
+    def test_light_snow_fewer_particles(self):
+        anim = SnowAnimation(precipitation_mm=0.3)
+        assert len(anim.far_flakes) == 6
+        assert len(anim.near_flakes) == 3
+
+    def test_moderate_snow_default_particles(self):
+        anim = SnowAnimation(precipitation_mm=2.0)
+        assert len(anim.far_flakes) == 10
+        assert len(anim.near_flakes) == 6
+
+    def test_heavy_snow_more_particles(self):
+        anim = SnowAnimation(precipitation_mm=4.0)
+        assert len(anim.far_flakes) == 16
+        assert len(anim.near_flakes) == 10
+
+    def test_default_is_moderate(self):
+        """No precipitation arg defaults to moderate (backward compat)."""
+        anim = SnowAnimation()
+        assert len(anim.far_flakes) == 10
+        assert len(anim.near_flakes) == 6
+
+    def test_reset_preserves_intensity(self):
+        anim = SnowAnimation(precipitation_mm=4.0)
+        assert len(anim.far_flakes) == 16
+        anim.reset()
+        assert len(anim.far_flakes) == 16
+        assert len(anim.near_flakes) == 10
