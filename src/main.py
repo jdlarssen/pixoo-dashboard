@@ -52,6 +52,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _precip_category(mm: float) -> str:
+    """Classify precipitation into light/moderate/heavy for animation switching."""
+    if mm < 1.0:
+        return "light"
+    elif mm <= 3.0:
+        return "moderate"
+    return "heavy"
+
+
 def build_font_map(font_dir: str) -> dict:
     """Load fonts and map them to logical names used by the renderer.
 
@@ -114,6 +123,7 @@ def main_loop(
     weather_anim: WeatherAnimation | None = None
     last_weather_group: str | None = None
     last_weather_night: bool | None = None
+    last_precip_mm: float = 0.0
     needs_push = False
 
     # Staleness tracking -- preserve last-good data through API failures
@@ -158,11 +168,13 @@ def main_loop(
                 last_good_weather_time = now_mono
                 new_group = symbol_to_group(weather_data.symbol_code)
                 is_night = not weather_data.is_day
+                precip = weather_data.precipitation_mm
                 if new_group != last_weather_group or is_night != last_weather_night:
-                    weather_anim = get_animation(new_group, is_night=is_night)
+                    weather_anim = get_animation(new_group, is_night=is_night, precipitation_mm=precip)
                     last_weather_group = new_group
                     last_weather_night = is_night
-                    logger.info("TEST: weather animation: %s (night=%s)", new_group, is_night)
+                    last_precip_mm = precip
+                    logger.info("TEST: weather animation: %s (night=%s, precip=%.1fmm)", new_group, is_night, precip)
         elif now_mono - last_weather_fetch >= WEATHER_REFRESH_INTERVAL:
             fresh_weather = fetch_weather_safe(WEATHER_LAT, WEATHER_LON)
             last_weather_fetch = now_mono
@@ -176,14 +188,17 @@ def main_loop(
                     weather_data.symbol_code,
                     weather_data.precipitation_mm,
                 )
-                # Swap animation if weather group or day/night changed
+                # Swap animation if weather group, day/night, or rain intensity changed
                 new_group = symbol_to_group(weather_data.symbol_code)
                 is_night = not weather_data.is_day
-                if new_group != last_weather_group or is_night != last_weather_night:
-                    weather_anim = get_animation(new_group, is_night=is_night)
+                precip = weather_data.precipitation_mm
+                precip_changed = _precip_category(precip) != _precip_category(last_precip_mm)
+                if new_group != last_weather_group or is_night != last_weather_night or precip_changed:
+                    weather_anim = get_animation(new_group, is_night=is_night, precipitation_mm=precip)
                     last_weather_group = new_group
                     last_weather_night = is_night
-                    logger.info("Weather animation: %s (night=%s)", new_group, is_night)
+                    last_precip_mm = precip
+                    logger.info("Weather animation: %s (night=%s, precip=%.1fmm)", new_group, is_night, precip)
             else:
                 # API failed -- keep using last-good data
                 weather_data = last_good_weather

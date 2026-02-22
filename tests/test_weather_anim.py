@@ -508,3 +508,112 @@ class TestStarRandomness:
             "Star durations not re-randomized after full cycle -- "
             "each blink should be unique"
         )
+
+
+class TestRainIntensity:
+    """Verify rain particle count scales with precipitation amount."""
+
+    def test_light_rain_fewer_particles(self):
+        """Light rain (<1mm) should have fewer drops than default."""
+        anim = RainAnimation(precipitation_mm=0.3)
+        assert len(anim.far_drops) == 8
+        assert len(anim.near_drops) == 4
+
+    def test_moderate_rain_default_particles(self):
+        """Moderate rain (1-3mm) should use the standard drop count."""
+        anim = RainAnimation(precipitation_mm=2.0)
+        assert len(anim.far_drops) == 14
+        assert len(anim.near_drops) == 8
+
+    def test_heavy_rain_more_particles(self):
+        """Heavy rain (>3mm) should have dense drop count."""
+        anim = RainAnimation(precipitation_mm=5.0)
+        assert len(anim.far_drops) == 22
+        assert len(anim.near_drops) == 14
+
+    def test_zero_precip_uses_light(self):
+        """Zero precipitation defaults to light rain particle count."""
+        anim = RainAnimation(precipitation_mm=0.0)
+        assert len(anim.far_drops) == 8
+        assert len(anim.near_drops) == 4
+
+    def test_boundary_moderate(self):
+        """Exactly 1mm should be moderate."""
+        anim = RainAnimation(precipitation_mm=1.0)
+        assert len(anim.far_drops) == 14
+
+    def test_boundary_heavy(self):
+        """Just above 3mm should be heavy."""
+        anim = RainAnimation(precipitation_mm=3.1)
+        assert len(anim.far_drops) == 22
+
+    def test_reset_preserves_intensity(self):
+        """Reset should respawn with the same intensity-based count."""
+        anim = RainAnimation(precipitation_mm=5.0)
+        assert len(anim.far_drops) == 22
+        anim.reset()
+        assert len(anim.far_drops) == 22
+        assert len(anim.near_drops) == 14
+
+    def test_get_animation_passes_precipitation(self):
+        """get_animation should pass precipitation_mm to RainAnimation."""
+        anim = get_animation("rain", precipitation_mm=5.0)
+        assert isinstance(anim, RainAnimation)
+        assert len(anim.far_drops) == 22
+
+    def test_thunder_passes_precipitation_to_rain(self):
+        """ThunderAnimation should pass precipitation_mm to its internal rain."""
+        anim = get_animation("thunder", precipitation_mm=0.5)
+        assert isinstance(anim, ThunderAnimation)
+        assert len(anim._rain.far_drops) == 8
+
+    def test_heavy_rain_visible_coverage(self):
+        """Heavy rain should produce more visible pixels than light rain."""
+        light = RainAnimation(precipitation_mm=0.3)
+        heavy = RainAnimation(precipitation_mm=6.0)
+        light_pixels = 0
+        heavy_pixels = 0
+        for _ in range(3):
+            bg, fg = light.tick()
+            for layer in (bg, fg):
+                alpha_band = layer.split()[3]
+                light_pixels += sum(1 for a in alpha_band.get_flattened_data() if a > 0)
+            bg, fg = heavy.tick()
+            for layer in (bg, fg):
+                alpha_band = layer.split()[3]
+                heavy_pixels += sum(1 for a in alpha_band.get_flattened_data() if a > 0)
+        assert heavy_pixels > light_pixels, (
+            f"Heavy rain ({heavy_pixels} pixels) should have more coverage than light ({light_pixels})"
+        )
+
+
+class TestSunBody:
+    """Verify sun body is visible in SunAnimation for visual context."""
+
+    def test_sun_body_produces_warm_pixels_at_position(self):
+        """Sun body should produce warm yellow pixels near its position."""
+        anim = SunAnimation()
+        bg, fg = anim.tick()
+        # Sun body is drawn in bg layer at (_SUN_X, _SUN_Y)
+        sx, sy = SunAnimation._SUN_X, SunAnimation._SUN_Y
+        pixel = bg.getpixel((sx, sy))
+        r, g, b, a = pixel
+        assert a >= 150, f"Sun body center alpha {a} too low"
+        assert r > b + 50, f"Sun body not warm yellow: R={r} B={b}"
+
+    def test_sun_body_has_glow(self):
+        """Sun body should have a softer glow around the core."""
+        anim = SunAnimation()
+        bg, fg = anim.tick()
+        sx, sy = SunAnimation._SUN_X, SunAnimation._SUN_Y
+        r = SunAnimation._SUN_RADIUS
+        # Check a pixel just outside the main body (in the glow)
+        glow_pixel = bg.getpixel((sx - r - 1, sy))
+        _, _, _, a = glow_pixel
+        assert a > 0, "No glow detected around sun body"
+
+    def test_sun_animation_still_has_rays(self):
+        """Sun animation should still produce ray particles alongside the body."""
+        anim = SunAnimation()
+        colors = _sample_particle_rgb(anim, num_ticks=3)
+        assert len(colors) > 10, f"Only {len(colors)} particles -- rays should still be active"

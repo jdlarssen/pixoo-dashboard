@@ -42,18 +42,35 @@ class WeatherAnimation:
 
 
 class RainAnimation(WeatherAnimation):
-    """Falling blue raindrops at two depths.
+    """Falling blue raindrops at two depths with intensity scaling.
 
     Far drops (behind text): dimmer, shorter, slower.
     Near drops (in front of text): brighter, longer, faster.
+
+    Particle count scales with precipitation_mm:
+    - Light (< 1mm): sparse drizzle (8 far, 4 near)
+    - Moderate (1-3mm): normal rain (14 far, 8 near)
+    - Heavy (> 3mm): dense downpour (22 far, 14 near)
     """
 
-    def __init__(self, width: int = 64, height: int = 24) -> None:
+    def __init__(self, width: int = 64, height: int = 24, precipitation_mm: float = 2.0) -> None:
         super().__init__(width, height)
+        self.precipitation_mm = precipitation_mm
+        self._far_count, self._near_count = self._particle_counts(precipitation_mm)
         self.far_drops: list[list[int]] = []
         self.near_drops: list[list[int]] = []
-        self._spawn_far(14)
-        self._spawn_near(8)
+        self._spawn_far(self._far_count)
+        self._spawn_near(self._near_count)
+
+    @staticmethod
+    def _particle_counts(precipitation_mm: float) -> tuple[int, int]:
+        """Return (far_count, near_count) based on precipitation intensity."""
+        if precipitation_mm < 1.0:
+            return 8, 4
+        elif precipitation_mm <= 3.0:
+            return 14, 8
+        else:
+            return 22, 14
 
     def _spawn_far(self, count: int) -> None:
         for _ in range(count):
@@ -87,11 +104,14 @@ class RainAnimation(WeatherAnimation):
                 drop[0] = random.randint(0, self.width - 1)
 
         # Near drops -- in front of text, brighter, 3px streak, faster
+        # Heavy rain (>3mm) falls faster with longer streaks
+        heavy = self.precipitation_mm > 3.0
         for drop in self.near_drops:
             x, y = drop[0], drop[1]
+            streak = 3 if heavy else 2
             if 0 <= x < self.width and 0 <= y < self.height:
-                fg_draw.line([(x, y), (x, min(y + 2, self.height - 1))], fill=(50, 120, 255, 230))
-            drop[1] += random.randint(2, 3)
+                fg_draw.line([(x, y), (x, min(y + streak, self.height - 1))], fill=(50, 120, 255, 230))
+            drop[1] += random.randint(2, 4) if heavy else random.randint(2, 3)
             drop[0] += random.choice([-1, 0, 0, 0])
             if drop[1] >= self.height:
                 drop[1] = 0
@@ -102,8 +122,8 @@ class RainAnimation(WeatherAnimation):
     def reset(self) -> None:
         self.far_drops.clear()
         self.near_drops.clear()
-        self._spawn_far(14)
-        self._spawn_near(8)
+        self._spawn_far(self._far_count)
+        self._spawn_near(self._near_count)
 
 
 class SnowAnimation(WeatherAnimation):
@@ -234,11 +254,19 @@ class CloudAnimation(WeatherAnimation):
 
 
 class SunAnimation(WeatherAnimation):
-    """Sunrays beaming downward at two depths.
+    """Sun body with rays beaming downward at two depths.
+
+    A small sun circle is drawn in the top-right of the weather zone,
+    giving visual context so the rays are recognizable as sunshine.
 
     Far rays (behind): dimmer, thinner, slower.
     Near rays (in front): brighter, longer, faster -- beaming over text.
     """
+
+    # Sun body position (top-right of weather zone, clear of left-side text)
+    _SUN_X = 48
+    _SUN_Y = 4
+    _SUN_RADIUS = 3
 
     def __init__(self, width: int = 64, height: int = 24) -> None:
         super().__init__(width, height)
@@ -282,11 +310,28 @@ class SunAnimation(WeatherAnimation):
             ray[0] = float(random.randint(0, self.width - 1))
             ray[1] = 0.0
 
+    def _draw_sun_body(self, draw: ImageDraw.Draw) -> None:
+        """Draw a warm sun circle with a soft glow in the weather zone."""
+        sx, sy, r = self._SUN_X, self._SUN_Y, self._SUN_RADIUS
+        # Outer glow (larger, dimmer)
+        draw.ellipse(
+            [sx - r - 1, sy - r - 1, sx + r + 1, sy + r + 1],
+            fill=(255, 200, 40, 80),
+        )
+        # Sun body (bright warm yellow)
+        draw.ellipse(
+            [sx - r, sy - r, sx + r, sy + r],
+            fill=(255, 220, 60, 200),
+        )
+
     def tick(self) -> tuple[Image.Image, Image.Image]:
         bg = self._empty()
         fg = self._empty()
         bg_draw = ImageDraw.Draw(bg)
         fg_draw = ImageDraw.Draw(fg)
+
+        # Sun body behind text for context
+        self._draw_sun_body(bg_draw)
 
         for ray in self.far_rays:
             self._draw_ray(bg_draw, ray, (240, 200, 40))
@@ -312,9 +357,9 @@ class ThunderAnimation(WeatherAnimation):
     - Frame 3: dim fade
     """
 
-    def __init__(self, width: int = 64, height: int = 24) -> None:
+    def __init__(self, width: int = 64, height: int = 24, precipitation_mm: float = 5.0) -> None:
         super().__init__(width, height)
-        self._rain = RainAnimation(width, height)
+        self._rain = RainAnimation(width, height, precipitation_mm=precipitation_mm)
         self._tick_count = 0
         self._flash_remaining = 0
         self._bolt_x = 0
@@ -637,16 +682,24 @@ _NIGHT_ANIMATION_MAP: dict[str, type[WeatherAnimation]] = {
 }
 
 
-def get_animation(weather_group: str, *, is_night: bool = False) -> WeatherAnimation:
+def get_animation(
+    weather_group: str,
+    *,
+    is_night: bool = False,
+    precipitation_mm: float = 0.0,
+) -> WeatherAnimation:
     """Get an animation instance for the given weather group and time of day.
 
     At night, "clear" and "partcloud" use twinkling stars instead of sunrays.
     Other weather groups (rain, snow, etc.) are the same day and night.
 
+    Rain and thunder animations scale particle density based on precipitation_mm.
+
     Args:
         weather_group: One of the icon group names from weather_icons.py
                        (clear, partcloud, cloudy, rain, sleet, snow, thunder, fog).
         is_night: True if it's nighttime (from MET symbol_code suffix).
+        precipitation_mm: Precipitation amount in mm/h for rain intensity scaling.
 
     Returns:
         A WeatherAnimation instance that produces overlay frames.
@@ -656,4 +709,8 @@ def get_animation(weather_group: str, *, is_night: bool = False) -> WeatherAnima
         if cls is not None:
             return cls()
     cls = _ANIMATION_MAP.get(weather_group, CloudAnimation)
+    if cls is RainAnimation:
+        return RainAnimation(precipitation_mm=precipitation_mm)
+    if cls is ThunderAnimation:
+        return ThunderAnimation(precipitation_mm=precipitation_mm)
     return cls()
