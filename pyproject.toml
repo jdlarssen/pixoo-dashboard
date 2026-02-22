@@ -8,6 +8,7 @@ dependencies = [
     "Pillow>=12.1.0",
     "discord.py>=2.0",
     "python-dotenv>=1.0",
+    "astral>=3.2",
 ]
 
 [project.optional-dependencies]
