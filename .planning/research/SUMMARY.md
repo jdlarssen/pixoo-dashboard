@@ -1,178 +1,181 @@
 # Project Research Summary
 
-**Project:** Divoom Hub v1.1 — Documentation & Polish
-**Domain:** LED dashboard documentation and display color accessibility
-**Researched:** 2026-02-21
+**Project:** Divoom Hub v1.2 — Sun Ray Overhaul
+**Domain:** LED pixel display animation (Pixoo 64 weather dashboard)
+**Researched:** 2026-02-23
 **Confidence:** HIGH
 
 ## Executive Summary
 
-Divoom Hub v1.1 is a tightly scoped polish milestone with exactly two deliverables: a Norwegian-language README and a weather animation color fix. Research across all four areas converges on the same conclusion — this is low-risk, well-understood work that requires no new dependencies, no architectural changes, and no new tooling. The existing Python/Pillow/pixoo stack is complete as-is. The entire code surface is five lines across two files (`layout.py`, `weather_anim.py`) plus a new `README.md`. Complexity is documentation quality and hardware color validation, not engineering.
+The v1.2 Sun Ray Overhaul is a tightly scoped refactor of a single animation class (`SunAnimation` in `weather_anim.py`) to replace random sky-wide diagonal rays with radial emission from a visible half-sun body. The core problem is well-diagnosed: the existing animation looks like "yellow diagonal rain" because rays spawn at random positions with no spatial connection to the sun. The fix is conceptually straightforward — move the sun to the top edge of the weather zone, make it a semicircle clipped at y=0, and emit rays outward from its center using polar coordinates with distance-based alpha fade. No new dependencies are needed; Python's `math` stdlib and Pillow 12.1.1 already provide every required primitive.
 
-The recommended build order is color fix first, README second. The color fix should inform the README's description of the animation system, and it requires physical Pixoo 64 hardware testing as the acceptance gate — not just unit tests. The core color problem is that rain indicator text (`COLOR_WEATHER_RAIN`) and rain animation particles share the same blue hue family, making the text invisible during rain. The fix requires coordinating particle and text colors as a unit: rain particles should be vivid blue, snow particles should be bright cool-white, and rain text should shift to bright white `(255, 255, 255)` — which provides maximum luminance contrast against every animation type and is the industry-standard choice for informational text on LED displays.
+The recommended approach is test-first in three sequential phases: establish the half-sun body geometry first (it sets the origin for all rays), then replace the ray system with polar-to-cartesian emission, then tune parameters through hardware testing. The two-layer `(bg, fg)` RGBA compositing contract that drives the rendering pipeline is completely unchanged — only `SunAnimation`'s internals are rewritten. The total scope is approximately 90 lines of production code change and 40 lines of test updates across exactly 2 files.
 
-The Norwegian README has one clear risk: privacy. The project's `.env` file contains the user's home GPS coordinates, specific bus stop IDs, and Discord tokens. Example values in the README must use safe placeholders, not the real values. A pre-commit secrets grep is mandatory. Beyond that, the README work is straightforward: Norwegian Bokmal, shields.io badge for Claude Code attribution, standard GitHub README structure, no documentation generators, no dual-language maintenance burden.
+The key risks are concentrated in the ray implementation phase, not the architecture. Alpha fade math that looks correct in PNG test output can fail on LED hardware because LEDs have a hard minimum brightness floor (~RGB 15,15,15). The proposed linear fade formula will make far rays invisible before they reach `MAX_DIST`, creating ghost rays and an apparent "halo boundary." An off-by-one rounding choice (`int()` vs `round()`) in polar-to-pixel conversion introduces a systematic directional bias across all 14 rays. Both risks are one-line fixes once understood — the danger is implementing them incorrectly and not catching them until physical hardware testing.
 
 ## Key Findings
 
 ### Recommended Stack
 
-No stack changes are needed for v1.1. The existing dependencies (Python 3.12+, Pillow >=12.1.0, pixoo, discord.py, python-dotenv) handle everything. The Norwegian README requires no tooling — GitHub renders UTF-8 Markdown natively, including ae/oe/aa. The Claude Code attribution badge is a static shields.io image link with no runtime dependency.
+The existing stack is exactly right and needs zero changes. Pillow 12.1.1 provides `pieslice()` for the semicircle body and `point()`/`line()` for rays with RGBA fills. Python's `math` stdlib provides `cos`, `sin`, and `radians` — all already imported in `weather_anim.py`. Performance is a non-issue: 14 rays at 15px length draw in 0.02ms per tick against a 1000ms frame budget (0.002% utilization).
 
-**Core technologies (unchanged from v1.0):**
-- Python 3.12+: runtime — keep as-is, no version constraint changes needed
-- Pillow >=12.1.0 (12.1.1 available): image rendering and RGBA compositing — version constraint already correct
-- pixoo (unpinned): Pixoo 64 LAN communication — keep as-is
-- discord.py >=2.0: message override bot — keep as-is
-- pytest + ruff: test suite (96 tests) and linting — keep as-is
+**Core technologies:**
+- **Python 3.14 + `math` stdlib**: Polar-to-cartesian conversion — already imported, no changes needed
+- **Pillow 12.1.1**: `pieslice()` for half-sun body, `line()` for rays, RGBA alpha compositing — already installed, verified against this version
+- **`random` stdlib**: Ray angle and speed randomization on spawn/respawn — already imported
+
+**Critical version note:** `pieslice()` with RGBA fill has been available since Pillow 2.0+. The current `Pillow>=12.1.0` constraint in `pyproject.toml` is correct and requires no change.
 
 ### Expected Features
 
+The feature set is driven by one user requirement: sun rays must be recognizable as sunshine, not random streaks. All table stakes features have clear implementation paths.
+
 **Must have (table stakes):**
-- Prosjektbeskrivelse (project overview) — first thing readers see; photo of running display strongly recommended
-- Installasjon + Oppsett (install and config) — clone to running in 5 minutes; reference `.env.example` for config table
-- Bruk (usage) — document `--simulated`, `--save-frame`, and `TEST_WEATHER` env var
-- Kjore som tjeneste (launchd service) — step-by-step from plist to `launchctl`
-- Rain particle vs rain text distinguishability fix — primary reported hardware bug; blocks v1.1 completion
-- Verification of all 8 animation types after color change — systematic check, not just rain
+- **Half-sun body at zone top edge** — without a visible sun, rays look like abstract lines; semicircle at (48, 0) r=7 via Pillow auto-clipping
+- **Rays originate from sun center** — radial emission from (48, 0) using polar coordinates; this is the single fix for the core bug
+- **Distance-based alpha fade** — linear falloff `alpha = base_alpha * (1 - dist/max_dist)`; makes beams look like light rather than particles
+- **Ray respawn at sun origin** — continuous animation; rays recycled to sun center on exit or fade-out
+- **Two-depth-layer system preserved** — far rays (9) on bg behind text, near rays (5) on fg in front; existing `(bg, fg)` contract unchanged
+- **Yellow color palette maintained** — far (240,200,40), near (255,240,60), body (255,220,60); matches dashboard visual language
+- **Tests pass for new geometry** — TestSunBody coordinate assertions updated for new position and radius
 
 **Should have (differentiators):**
-- "Bygget med Claude Code" badge and transparency section — explicitly requested in milestone; badge at top, methodology note in Utvikling section
-- Skjermoppsett (zone layout diagram) — ASCII art of 64px budget makes the project tangible
-- Arkitektur (module map + data flow) — providers -> DisplayState -> renderer -> pixoo; valuable for anyone forking
-- API documentation (Entur + MET Norway) — gotchas like ET-Client-Name header, If-Modified-Since caching, rate limits
-- Vaeranimasjoner (animation system description) — 3D depth layering, bg/fg compositing, 6 animation types
-- Discord-meldinger, birthday easter egg, error resilience, Norwegian character support sections
+- **Staggered initial ray distances** — animation starts mid-flow, not as a burst; use `random.uniform(0, MAX_DIST * 0.7)` on init
+- **Variable ray length per ray** — organic quality; 2-4px far, 4-7px near; already specified in spawn parameters
+- **Angle range avoids pure horizontal** — 0.15pi to 0.85pi prevents near-horizontal rays that flicker and exit quickly
+- **Ray origin clustering test** — regression gate: asserts rays cluster near sun position on first tick
 
-**Defer (not in v1.1 scope):**
-- English-language README alongside Norwegian — doubles maintenance, no benefit for a personal project
-- Nynorsk variant — irrelevant for this project and user
-- Auto-generated API reference (Sphinx/MkDocs) — over-engineering for 2,321 LOC project
-- Configurable color palette — 1-2 constant changes is the right scope, not a configuration system
-- Per-weather-condition text color overrides — adds complexity without gain
+**Defer (post-v1.2):**
+- Dynamic ray count based on weather intensity (no intensity parameter exists for clear sky)
+- Sunrise/sunset color transitions (belongs in a new animation class, not this one)
+- Sun body position varying with time (zone too small for meaningful motion)
+- Wind effect on sun rays (polar coordinate rays cannot meaningfully receive cartesian wind offsets)
 
 ### Architecture Approach
 
-v1.1 changes are entirely additive and non-breaking. The color fix touches the rendering layer only — fill color values in `weather_anim.py` and one constant in `layout.py`. The compositing pipeline itself (`_composite_layer()` in `renderer.py`) must not be touched; it was debugged and fixed in v1.0 and must remain isolated from color work. The README is a new file at the project root with zero code integration — it reads from the codebase but nothing reads it. Thunder animation inherits from `RainAnimation`, so rain particle color changes propagate to thunder automatically without a separate change.
+The change is entirely contained within `SunAnimation`. The external interface — `tick()` returning `(bg_layer, fg_layer)` as RGBA 64x24 images — is unchanged. The renderer, main loop, factory function, and all other animation classes are untouched. The key internal changes are: (1) ray data structure changes from `list[float]` with positional indexing to `dict` with named keys (matching the pattern already used by `ClearNightAnimation` stars), (2) ray state changes from cartesian `(x, y, speed)` to polar `(angle, dist, speed)`, and (3) sun body changes from a full 3px-radius circle at (48,4) to a clipped 7px-radius semicircle at (48,0).
 
-**Components affected by v1.1:**
-1. `src/display/weather_anim.py` — rain and snow particle fill colors (~4 lines in `tick()` methods)
-2. `src/display/layout.py` — `COLOR_WEATHER_RAIN` constant (1 line)
-3. `README.md` (new) — documentation file drawing on all existing modules as content sources
-
-**Components that must NOT change:**
-1. `renderer.py` `_composite_layer()` — working compositing logic, do not touch alongside color changes
-2. `config.py`, `state.py`, providers — no scope for v1.1
+**Major components:**
+1. **`SunAnimation._draw_sun_body()`** — Changed: full ellipse at (48,4) r=3 replaced with ellipse at (48,0) r=7; Pillow auto-clips the top half producing a clean semicircle; glow ring preserved at r+2
+2. **`SunAnimation._draw_ray()`** — Changed: cartesian diagonal advance replaced with polar outward travel; alpha computed from `dist / max_dist` ratio; `round()` not `int()` for pixel coordinates
+3. **`SunAnimation._spawn_far()` / `_spawn_near()`** — Changed: random position across zone replaced with angle+distance at sun origin; initial stagger limited to 70% of MAX_DIST
+4. **`tests/test_weather_anim.py::TestSunBody`** — Changed: pixel coordinate assertions updated for new geometry; new clustering assertion added
 
 ### Critical Pitfalls
 
-1. **Color fix creates new text/particle color collision** — If rain particles become vivid blue but rain text stays blue too, the original indistinguishability bug recurs in a different color. Choose particle and text colors as a coordinated palette: rain particles vivid blue, rain text bright white `(255, 255, 255)` for maximum contrast against every animation type. White has no conflict with blue rain, grey clouds, yellow sun, grey fog, or white snow (snow occupies different zone space).
+1. **Far ray invisible fade tail** — Linear alpha fade drops below LED visibility threshold (~RGB 15,15,15) before reaching MAX_DIST. Use `MAX_DIST = 22` instead of 28, or a non-linear fade curve `(1 - dist/MAX_DIST) ** 0.6`, or a minimum alpha floor of 20. Validate on physical hardware — monitor rendering hides this problem.
 
-2. **Color changes look correct on screen but fail on LED hardware** — PIL PNG previews on a monitor cannot validate LED rendering. LEDs have minimum brightness thresholds, non-linear brightness curves, and a different color gamut than LCD screens. Physical Pixoo 64 hardware testing is the only valid acceptance gate for color work. Do not sign off on color changes without viewing them on the actual device at 2+ meters.
+2. **`int()` truncation creates directional bias** — `int()` truncates toward zero, systematically shifting all ray pixel positions left/up by up to 1 pixel when rays originate from a fixed point and fan outward. Use `round()` for all polar-to-pixel conversions. The existing codebase uses `int()` and the random-spawn design masked this bias. On the new radial system, the bias is amplified because all rays share the same origin.
 
-3. **Alpha values must stay within empirically validated ranges** — The alpha ranges in `weather_anim.py` (bg_layer 40-100, fg_layer 90-200) were tuned specifically for LED visibility during v1.0 debugging. Change RGB channels only; do not adjust alpha values alongside color changes. Changing both simultaneously makes it impossible to isolate regressions.
+3. **Pillow `ImageDraw` overwrites, does not alpha-blend** — Drawing 14 overlapping rays at the sun origin does NOT produce cumulative glow; each `draw.line()` overwrites previous pixels. Draw the sun body first (establishes bright center), then draw rays on top. Accept that the last ray drawn at any pixel wins; the sun body glow covers the origin overlap zone.
 
-4. **README exposes personal location data** — The user's real GPS coordinates, bus stop IDs (NSR:Quay:73154, NSR:Quay:73152), and Discord tokens must never appear in the README. Use explicit placeholders (`192.168.1.XXX`, `NSR:Quay:XXXXX`, Oslo city center `59.9139, 10.7522`). Grep the README against `.env` values before committing.
+4. **Asymmetric ray fan from right-side sun position** — Sun at x=48 gives rightward rays only 16px of travel vs 48px for leftward rays. Narrow angle range to 0.15pi–0.85pi to avoid near-horizontal rightward rays that exit in 2-3 pixels and create flickering.
 
-5. **Missing color regression tests** — Existing `test_weather_anim.py` tests check alpha thresholds only, not colors. After the fix, add color-identity assertions: rain particles must be blue-channel-dominant, snow particles must have roughly equal high RGB values (white-ish). Without these, a future change can silently revert the fix.
+5. **Staggered spawn invisible zone** — Rays initialized at `random.uniform(0, MAX_DIST)` may start in the invisible tail of the fade curve, appearing sparse for the first 2-3 ticks. Cap stagger at 70% of MAX_DIST and raise the alpha draw threshold from 5 to 20 (matching the LED visibility floor).
 
 ## Implications for Roadmap
 
-Two clean, independent phases with a clear ordering rationale. All research points to this structure.
+Based on research, the natural phase structure follows the dependency chain: the sun body establishes the origin point, the ray system depends on that origin, and tuning can only happen once the system works.
 
-### Phase 1: Weather Color Fix
+### Phase 1: Sun Body Geometry
 
-**Rationale:** Fix the code first, then document the fixed state. The README should describe how the animation system looks in its correct form. Hardware testing is the bottleneck; complete it while focused on code, before switching context to writing.
+**Rationale:** The half-sun at (48, 0) is the visual anchor for the entire overhaul. All ray spawn logic references `_SUN_X`, `_SUN_Y`, `_SUN_RADIUS`. Establishing these constants and the `_draw_sun_body()` implementation first removes ambiguity for Phase 2. This is also the smallest, most isolated change — good to get right before the more complex ray system.
 
-**Delivers:** Distinguishable rain, snow, and text colors on the physical Pixoo 64 display; color-identity test assertions that prevent future regression.
+**Delivers:** Visible half-sun semicircle at top-right of weather zone; two-layer glow (outer r+2 dim, inner r bright); sun body test assertions updated and passing.
 
-**Addresses:** Rain particle vs rain text indistinguishability (primary reported bug); snow vs rain visual distinction; systematic verification of all 8 animation types.
+**Addresses:** "Half-sun body at top edge" table stake; glow differentiator; Pitfall 5 (semicircle clipping fragility — add comment explaining the auto-clip dependency and test guard asserting no pixels above y=2).
 
-**Avoids:**
-- Pitfall 1: Coordinate particle and text colors as a unit, not independently — rain particles blue, rain text white
-- Pitfall 2: Physical hardware testing as acceptance gate — PNG previews are insufficient
-- Pitfall 3: Keep alpha ranges unchanged; change RGB channels only
-- Pitfall 5: Add color-identity tests in the same commit as the color fix
+**Avoids:** Drawing the sun body as a full circle (Pitfall 5), or placing it at y=4 where the full circle is visible (the original bug).
 
-**Files changed:**
-- `src/display/weather_anim.py` — RainAnimation and SnowAnimation fill colors (~4 lines)
-- `src/display/layout.py` — `COLOR_WEATHER_RAIN` constant (1 line)
-- `tests/test_weather_anim.py` — color-identity assertions (new)
+**Files:** `src/display/weather_anim.py` (constants + `_draw_sun_body`), `tests/test_weather_anim.py` (TestSunBody assertions).
 
-**Research flag:** Standard patterns — no research needed. Color constants are fully audited, recommended values are clear, compositing architecture is well understood.
+### Phase 2: Radial Ray System
 
-### Phase 2: Norwegian README
+**Rationale:** The core bug fix. Depends on Phase 1 for the sun center position. This is the highest-complexity phase and where all identified critical pitfalls concentrate. Must address `round()` vs `int()`, alpha fade curve, angle range, and stagger range together — they interact.
 
-**Rationale:** Documentation of the fixed codebase. No code risk. The README reads from all existing source files as content, but modifies nothing. Can be iterated freely without risk of breaking functionality.
+**Delivers:** Rays emitting radially from the sun body; distance-based alpha fade; continuous respawn at sun origin; staggered initial distances; far/near depth layers preserved; all tests passing including new clustering assertion.
 
-**Delivers:** Complete Norwegian-language README.md at the project root with Claude Code attribution badge and transparency section.
+**Uses:** `math.cos()`, `math.sin()`, `math.radians()` from stdlib; Pillow `draw.line()` with RGBA fills; dict-based ray state structure matching `ClearNightAnimation` pattern.
 
-**Addresses:** All table-stakes documentation sections (overview, install, config, usage, launchd service) plus differentiator sections (architecture, APIs, Discord, animations, birthday easter egg, error resilience, Norwegian character support).
+**Implements:** Polar-to-cartesian particle system; distance-based alpha fade; respawn-at-origin loop; two-depth-layer assignment.
 
-**Avoids:**
-- Pitfall 4: Privacy — use placeholder values throughout, grep README against `.env` before committing
-- Norwegian language pitfall: Keep English technical terms in English (API, LED, pip, Python, README, fork, commit); write descriptive text in idiomatic Bokmal
-- Claude Code attribution pitfall: Frame as development methodology note, not a disclaimer; badge near top, detailed note in Utvikling section
+**Avoids:** Pitfall 1 (invisible fade tail — use reduced MAX_DIST or non-linear curve), Pitfall 2 (`int()` bias — use `round()`), Pitfall 3 (Pillow overwrite — draw order: body first, rays second), Pitfall 4 (asymmetric fan — angle range 0.15pi–0.85pi), Pitfall 6 (stagger invisible zone — cap stagger at 70% MAX_DIST).
 
-**Files changed:**
-- `README.md` (new file at project root)
+**Files:** `src/display/weather_anim.py` (full `SunAnimation` rewrite), `tests/test_weather_anim.py` (ray-related assertions).
 
-**Research flag:** Standard patterns — no research needed. README structure, Norwegian Bokmal conventions, shields.io badge format, and anti-features (dual-language, Sphinx) are all clearly defined by research.
+### Phase 3: Hardware Validation and Tuning
+
+**Rationale:** Cannot verify LED visibility, perceptual ray brightness, diagonal ray dimness (Pitfall 7), or text readability from automated tests alone. PNG output on an LCD monitor shows sub-threshold RGB values that are completely dark on LED hardware. Hardware testing is the final quality gate.
+
+**Delivers:** Confirmed LED visibility of sun body and rays at 2+ meter viewing distance; tuned alpha ranges, ray counts, and speed values if needed; "looks done but isn't" checklist cleared.
+
+**Addresses:** Pitfall 7 (diagonal ray dimness — may require alpha boost for 30-60 and 120-150 degree rays), alpha range validation against actual LED hardware thresholds.
+
+**Verification method:** `TEST_WEATHER=sun python src/main.py --simulated --save-frame` for before/after PNG comparison; physical Pixoo 64 testing with live animation.
+
+**Files:** `src/display/weather_anim.py` (parameter value tuning only, no structural changes).
 
 ### Phase Ordering Rationale
 
-- Color fix must precede README so the README documents the corrected animation system, not the broken one
-- Color fix has a hardware testing dependency; front-loading it avoids a late-cycle context switch back to code after documentation is underway
-- The two phases touch zero overlapping files — they could theoretically run in parallel, but sequential is safer given hardware testing is the bottleneck and the README should reference the fixed state
-- No phase requires additional library research during planning; both are fully specified by existing codebase knowledge
+- Phase 1 before Phase 2 because ray spawn coordinates reference `_SUN_X`, `_SUN_Y`, `_SUN_RADIUS` — finalizing the body first avoids rework on the ray system
+- Phase 2 before Phase 3 because hardware tuning requires a working radial system to tune
+- All three phases modify the same two files, eliminating cross-file coordination overhead
+- Test-first approach within each phase: write failing assertions, implement, confirm green
 
 ### Research Flags
 
-Phases needing deeper research during planning: None. Both phases are fully characterized by this research cycle.
+Phases with well-documented patterns (skip additional research-phase):
+- **Phase 1 (Sun Body):** Pillow `ellipse()` auto-clipping behavior is well-documented and verified against installed Pillow 12.1.1. No unknowns.
+- **Phase 2 (Radial Rays):** Polar-to-cartesian math is standard trigonometry. All pitfalls identified with concrete prevention strategies. No API unknowns.
 
-Phases with standard patterns (skip research-phase): Both phases. The color constants approach, compositing constraints, README structure, and Norwegian documentation conventions are all established.
+Phases that may need targeted investigation during implementation:
+- **Phase 3 (Hardware Tuning):** LED perceptual brightness is empirical. The alpha ranges (100-140 far, 160-220 near) are validated from v1.0, but the new fade curve changes effective RGB at various distances. Actual tuning values must be validated on the Pixoo 64 before the milestone is declared complete — this cannot be automated.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Codebase directly audited; no new dependencies needed; version constraints verified against PyPI |
-| Features | HIGH | Both features derived from existing codebase analysis and a user-reported hardware bug; scope is precise and bounded |
-| Architecture | HIGH | All 17 source files read and analyzed; debug history consulted; exact line numbers identified for all changes |
-| Pitfalls | HIGH | Pitfalls derive from actual codebase inspection, documented v1.0 debug sessions, and identified test suite gaps |
+| Stack | HIGH | Verified against installed Pillow 12.1.1 with working code proofs; math stdlib is stdlib. Zero uncertainty. |
+| Features | HIGH | Derived directly from codebase analysis, existing test contracts, and original bug report. Feature list is constrained by the animation's closed interface. |
+| Architecture | HIGH | Full codebase audit completed. Integration points precisely identified. Exact lines of code that change are enumerated. |
+| Pitfalls | HIGH | Derived from numerical simulation, Pillow documentation, project debug history — not speculation. Recovery steps confirmed as 1-2 line fixes each. |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Exact rain text color needs hardware validation:** STACK.md recommends orange `(255, 140, 60)` while FEATURES.md recommends white `(255, 255, 255)`. White is the stronger recommendation (maximum contrast against every animation type, industry-standard LED signage choice), but validate on physical hardware in Phase 1 — do not resolve by analysis alone. The 4x6 tiny font used for rain text makes readability non-negotiable.
-- **`COLOR_WEATHER_TEMP_NEG` cyan borderline case:** `(80, 200, 255)` could conflict with rain particles during sub-zero rain (sleet). STACK.md flags this as an edge case. Monitor during Phase 1 hardware testing; fix only if the problem is visible on the actual display.
-- **Snow far flake color:** Current `(200, 210, 230, 90)` is grey-ish and may be indistinguishable from rain at a glance. ARCHITECTURE.md recommends `(220, 230, 255, 90)` (cool white). Include in the Phase 1 color audit alongside rain.
+- **Precise alpha/MAX_DIST tuning values**: The fade curve formula and MAX_DIST value (22 vs 28) should be finalized during Phase 2 implementation based on computed effective-RGB at max distance. The formula `alpha = base_alpha * (1 - dist/MAX_DIST) ** 0.6` is a starting recommendation but the exponent (0.6) needs hardware validation. This is an expected tuning gap, not a research gap.
+
+- **Diagonal ray visibility on Pixoo 64**: Pitfall 7 (Bresenham diagonal dimness) is a known physical effect but whether it matters at the proposed alpha ranges (100-220) on this specific LED hardware cannot be determined without physical testing. Low probability given the high base alpha values, but flag for Phase 3 hardware check.
+
+- **`test_sun_alpha_above_minimum` compatibility**: The existing test asserts `max_alpha >= 100`. With distance-based fade, the "max alpha" in any given frame depends on how many rays are near the sun. Verify this test still passes with the new system, or update the assertion to test peak alpha at spawn rather than max across all pixels in a frame.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Codebase audit: all 17 source files directly read — color values, compositing pipeline, test suite gaps, exact line numbers
-- `.planning/debug/weather-animation-too-subtle.md` — documented root cause analysis from v1.0 compositing debug session
-- `.planning/todos/done/2026-02-20-weather-animation-and-rain-text-colors-indistinguishable.md` — user-reported bug with specific hardware symptoms
-- `.env.example` and `.gitignore` — what is protected vs what would be exposed in README
-- [About READMEs - GitHub Docs](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes) — README rendering, naming, placement
-- [Standard README](https://github.com/RichardLitt/standard-readme) — section structure and ordering conventions
-- [Pillow 12.1.1 on PyPI](https://pypi.org/project/pillow/) — version verification
-- [Shields.io Static Badge API](https://shields.io/badges) — badge format and Claude brand color `D97757`
-- [Color Difference - Wikipedia](https://en.wikipedia.org/wiki/Color_difference) — perceptual color distance theory, JND thresholds
+- `src/display/weather_anim.py` lines 276-368 — current `SunAnimation` class, exact code under modification
+- `tests/test_weather_anim.py` TestSunBody, TestAnimationVisibility, TestColorIdentity — test contracts and alpha thresholds
+- `src/display/renderer.py` `render_weather_zone()` — compositing pipeline, confirms `(bg, fg)` contract
+- `src/display/layout.py` WEATHER_ZONE — 64x24 at y=40, zone dimensions
+- `src/main.py` main loop — 1 FPS animation tick
+- `.planning/debug/resolved/weather-animation-too-subtle.md` — LED visibility thresholds (RGB 15,15,15 floor)
+- `.planning/debug/resolved/sunrays-showing-at-night.md` — day/night animation swap contract
+- `.planning/todos/done/2026-02-22-sun-rays-animation-unrecognizable-without-sun-in-weather-zone.md` — original user bug report
+- `docs/plans/2026-02-23-sun-ray-overhaul-design.md` — half-sun geometry, polar ray model specification
+- `docs/plans/2026-02-23-sun-ray-overhaul.md` — task ordering, test-first approach, specific code changes
+- Local benchmarks (this session): 0.02ms/tick for 14 rays at 15px on Python 3.14
 
 ### Secondary (MEDIUM confidence)
-- [LED Sign Color Combos for Visibility](https://www.ledsignsupply.com/designing-eye-catching-content-for-outdoor-led-signs/) — white/yellow on dark as top LED readability combinations
-- [Signage and Color Contrast](https://www.designworkplan.com/read/signage-and-color-contrast) — 70% brightness differential threshold for assured legibility
-- [Visme: Color Blind Friendly Palettes](https://visme.co/blog/color-blind-friendly-palette/) — blue-orange as safest color-blind-friendly pair
-- [Smashing Magazine: Designing for Colorblindness](https://www.smashingmagazine.com/2024/02/designing-for-colorblindness/) — channel separation principles
-- [iterate/olorm](https://github.com/iterate/olorm) — real Norwegian-language README using "Installasjon" terminology
+- [Pillow ImageDraw docs](https://pillow.readthedocs.io/en/stable/reference/ImageDraw.html) — `pieslice()`, `point()`, `line()` signatures and auto-clipping behavior
+- [Pillow GitHub issue #2496](https://github.com/python-pillow/Pillow/issues/2496) — RGBA draw overwrites pixels, does not alpha-blend
+- [Bresenham's line algorithm](https://en.wikipedia.org/wiki/Bresenham's_line_algorithm) — diagonal pixel density and perceptual dimness
+- [God Rays shader breakdown](https://www.cyanilux.com/tutorials/god-rays-shader-breakdown/) — distance attenuation, radial emission from point source
+- [FastLED pixel reference](https://github.com/FastLED/FastLED/wiki/Pixel-reference) — LED gamma correction and minimum brightness thresholds
 
-### Tertiary (LOW confidence)
-- [NRK Open Source](https://nrkno.github.io/) — Norwegian org README conventions (English default); limited sample size, inferred from pattern observation
-- Norwegian documentation conventions via NAV GitHub organization — inferred from pattern observation
+### Tertiary (MEDIUM-LOW confidence)
+- [LED Matrix pixel art tutorial](https://learn.adafruit.com/pixel-art-matrix-display/overview) — 64x32 bitmap animation patterns; applicable by analogy to 64x24 zone
+- [Pixel art tutorial (generalistprogrammer.com)](https://generalistprogrammer.com/tutorials/pixel-art-complete-tutorial-beginner-to-pro) — 1-2 pixel per frame motion guidance for LED displays
 
 ---
-*Research completed: 2026-02-21*
+*Research completed: 2026-02-23*
 *Ready for roadmap: yes*
