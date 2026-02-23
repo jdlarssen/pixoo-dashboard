@@ -388,12 +388,12 @@ class SunAnimation(WeatherAnimation):
         bg_draw = ImageDraw.Draw(bg)
         fg_draw = ImageDraw.Draw(fg)
 
-        # Sun body behind text (unchanged from Phase 9)
-        self._draw_sun_body(bg_draw)
-
         # Far rays on bg layer (behind text) -- ANIM-06
         for ray in self.far_rays:
             self._draw_ray(bg_draw, ray, (240, 200, 40))
+
+        # Sun body drawn after far rays so body pixels are not overwritten
+        self._draw_sun_body(bg_draw)
 
         # Near rays on fg layer (in front of text) -- ANIM-06
         for ray in self.near_rays:
