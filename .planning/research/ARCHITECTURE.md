@@ -1,278 +1,475 @@
-# Architecture Patterns
+# Architecture Research: Radial Sun Ray Integration
 
-**Domain:** v1.1 integration -- Norwegian README + weather color fix on existing Pixoo 64 dashboard
-**Researched:** 2026-02-21
-**Confidence:** HIGH (existing codebase fully audited, both changes are well-scoped)
+**Domain:** v1.2 Sun Ray Overhaul -- radial beam system replacing random sky-wide rays
+**Researched:** 2026-02-23
+**Confidence:** HIGH (existing codebase fully audited, integration points clearly bounded)
 
-## Current Architecture (As-Built v1.0)
+## Current SunAnimation Architecture (What Exists)
 
 ```
-divoom-hub/
-├── src/
-│   ├── main.py                    # Entry point, main loop, data refresh scheduling
-│   ├── config.py                  # .env-based config (DEVICE_IP, API keys, intervals)
-│   ├── device/
-│   │   └── pixoo_client.py        # Pixoo 64 connection, rate-limited push, brightness
-│   ├── display/
-│   │   ├── state.py               # DisplayState dataclass (equality for dirty flag)
-│   │   ├── layout.py              # Zone definitions + ALL color constants
-│   │   ├── renderer.py            # PIL compositor: state + fonts + anim -> 64x64 RGB
-│   │   ├── weather_anim.py        # 8 animation classes, bg/fg depth layers (RGBA)
-│   │   ├── weather_icons.py       # 10px programmatic pixel art icons, symbol mapping
-│   │   └── fonts.py               # BDF-to-PIL font loader
-│   └── providers/
-│       ├── clock.py               # Norwegian time/date formatting
-│       ├── bus.py                  # Entur GraphQL bus departures
-│       ├── weather.py             # MET Norway Locationforecast 2.0
-│       └── discord_bot.py         # MessageBridge + bot thread for display override
-├── assets/fonts/                  # BDF bitmap fonts (4x6, 5x8)
-├── tests/                         # 96 tests (clock, bus, weather, renderer, anim, fonts)
-├── .env.example                   # Configuration template
-├── .env                           # User's actual config (gitignored)
-├── pyproject.toml                 # Project metadata, dependencies
-├── com.divoom-hub.dashboard.plist # macOS launchd service wrapper
-└── debug_frame.png                # Last rendered frame (for development)
+SunAnimation(WeatherAnimation)
+  __init__():
+    far_rays: list[list[float]]   # 9 rays, each [x, y, speed, length, alpha]
+    near_rays: list[list[float]]  # 5 rays, each [x, y, speed, length, alpha]
+
+  _spawn_far(9):  random x across 0..63, random y across 0..23, diagonal fall
+  _spawn_near(5): random x across 0..63, random y across 0..23, diagonal fall
+
+  _draw_ray():    line from (x,y) angled down-right, advances y+speed, x+speed*0.4
+                  respawns at y=0 random x when past bottom/right edge
+
+  _draw_sun_body(): ellipse at (48, 4) radius 3 with glow ring at radius 4
+                    drawn on bg_layer only
+
+  tick():
+    bg = _empty() + sun_body + far_rays
+    fg = _empty() + near_rays
+    return (bg, fg)
 ```
 
-**No README.md exists.** The project root has zero documentation files.
+### Current Sun Constants
 
-## Component Boundaries
-
-| Component | Responsibility | Communicates With |
-|-----------|---------------|-------------------|
-| `config.py` | Load .env, validate, expose constants | All modules import from it |
-| `layout.py` | Zone pixel coords, ALL color constants | `renderer.py` imports zones + colors |
-| `weather_anim.py` | 8 animation types, produces (bg, fg) RGBA layers | `renderer.py` composites them, `main.py` selects animation |
-| `renderer.py` | Composites DisplayState + fonts + anim into 64x64 RGB | Reads from `layout.py`, `state.py`, `weather_icons.py` |
-| `state.py` | DisplayState dataclass with `from_now()` factory | `main.py` creates, `renderer.py` reads |
-| `main.py` | Main loop, scheduling, data refresh coordination | Orchestrates everything |
-| `pixoo_client.py` | Device push, rate limiting, brightness | Called by `main.py` |
-| `providers/*.py` | Fetch data from external APIs | Called by `main.py`, results flow into DisplayState |
-
-## v1.1 Changes: What Integrates Where
-
-### Change 1: Norwegian README (README.md at project root)
-
-**Type:** NEW FILE -- zero integration with existing code.
-
-**File:** `/README.md` (project root)
-
-**Integration points:** None. The README is a documentation file. It describes the existing architecture but does not touch any source code.
-
-**Content sources (data to document, not code changes):**
-- Project overview: from `PROJECT.md` context
-- Setup instructions: from `.env.example` (config template)
-- Architecture diagram: from existing `src/` structure
-- Zone layout: from `layout.py` (CLOCK_ZONE, DATE_ZONE, etc.)
-- API documentation: from `bus.py` (Entur) and `weather.py` (MET Norway)
-- Service setup: from `com.divoom-hub.dashboard.plist`
-- Discord integration: from `discord_bot.py`
-- Claude Code badge: static markdown badge element
-
-**Dependencies on existing code:** Read-only. README reads from the codebase to describe it; no code imports the README.
-
-**Test impact:** None. README does not change any behavior.
-
-### Change 2: Weather Animation/Rain Text Color Fix
-
-**Type:** MODIFY EXISTING FILES -- targeted color constant changes.
-
-**Problem (from todo):** Rain/snow animation particles and rain indicator text ("1/1mm") are both grey/blue, making them indistinguishable on the physical LED display. User reported: "The raindrops, or is it snow? I don't know, they are grey. So are the letters for 1/1."
-
-**Root cause:** The rain particles use `(40, 90, 200)` for far drops and `(60, 140, 255)` for near drops. Snow particles use `(200, 210, 230)` for far and `(255, 255, 255)` for near. The rain indicator text uses `COLOR_WEATHER_RAIN = (50, 180, 255)` -- vivid blue. On the LED, the rain particles and the rain text are both blue-ish tones that blend together. Snow particles in grey-white are also difficult to distinguish from rain.
-
-#### Files to Modify
-
-| File | What Changes | Why |
-|------|-------------|-----|
-| `src/display/weather_anim.py` | Rain particle fill colors in `RainAnimation.tick()` | Make rain particles distinctly blue (brighter, more saturated) vs current muted blue |
-| `src/display/weather_anim.py` | Snow particle fill colors in `SnowAnimation.tick()` | Make snow clearly white/bright, not grey-ish (current `(200, 210, 230)` is grey) |
-| `src/display/layout.py` | `COLOR_WEATHER_RAIN` constant | Change rain text color to a distinct hue from rain particle blue (e.g., cyan, or keep blue but change particle colors) |
-
-#### Specific Code Locations
-
-**`weather_anim.py` -- RainAnimation.tick() (lines 76-95):**
 ```python
-# Current far drop color:
-bg_draw.line([...], fill=(40, 90, 200, 100))     # muted blue, alpha 100
-# Current near drop color:
-fg_draw.line([...], fill=(60, 140, 255, 200))     # medium blue, alpha 200
+_SUN_X = 48        # center x of sun circle
+_SUN_Y = 4         # center y of sun circle
+_SUN_RADIUS = 3    # 7px diameter circle
 ```
-These need to shift to ensure rain reads as distinct blue water droplets, not grey.
 
-**`weather_anim.py` -- SnowAnimation.tick() (lines 154-176):**
+### Current Ray Behavior (Problems to Fix)
+
+1. **Rays spawn at random positions across entire 64x24 zone** -- no visual connection to the sun body
+2. **All rays move in same direction** (down-right at ~30 degrees) -- looks like diagonal rain in yellow
+3. **Rays respawn at y=0 with random x** -- again, no relationship to sun position
+4. **Sun body is a full circle** at y=4 -- but requirement calls for a half-sun clipped at top edge
+
+## Target Architecture (v1.2 Radial System)
+
+```
+SunAnimation(WeatherAnimation)   # same class, rewritten internals
+  __init__():
+    far_rays: list[dict]          # 9 rays, radial origin from sun
+    near_rays: list[dict]         # 5 rays, radial origin from sun
+
+  Sun body:
+    Half-semicircle at top-right, center at (48, 0), radius 7
+    Only bottom half visible (clipped by zone top edge at y=0)
+
+  Ray behavior:
+    Spawn at sun center (48, 0)
+    Emit at random angles (downward hemisphere: ~90-270 degrees from up)
+    Travel outward along their angle
+    Fade alpha with distance from sun
+    Respawn at origin when past zone bounds or fully faded
+```
+
+### System Overview: What Changes vs What Stays
+
+```
+UNCHANGED (do not touch):
+  +--------------------------------------------------+
+  | WeatherAnimation base class                       |
+  | .tick() -> (bg_layer, fg_layer) contract          |
+  | .reset() contract                                 |
+  | ._empty() -> 64x24 RGBA transparent image         |
+  | .width / .height (64x24)                          |
+  +--------------------------------------------------+
+  | get_animation() factory                            |
+  |   "clear" -> SunAnimation  (still maps here)     |
+  |   "partcloud" -> SunAnimation (still maps here)   |
+  | _ANIMATION_MAP, _NIGHT_ANIMATION_MAP              |
+  +--------------------------------------------------+
+  | renderer.py: render_weather_zone()                |
+  |   _composite_layer(bg) -> text -> _composite(fg)  |
+  | main.py: weather_anim.tick() call, 1 FPS loop     |
+  | CompositeAnimation, WindEffect wrappers            |
+  | All other animation classes (Rain, Snow, etc.)     |
+  +--------------------------------------------------+
+
+MODIFIED (SunAnimation internals only):
+  +--------------------------------------------------+
+  | SunAnimation._SUN_X = 48                          |
+  | SunAnimation._SUN_Y = 0  (was 4)                 |
+  | SunAnimation._SUN_RADIUS = 7  (was 3)            |
+  +--------------------------------------------------+
+  | _draw_sun_body() -> half-semicircle, not circle   |
+  | _spawn_far() -> radial angle + distance params    |
+  | _spawn_near() -> radial angle + distance params   |
+  | _draw_ray() -> radial line from sun outward       |
+  | tick() -> same (bg, fg) contract, new visuals     |
+  | reset() -> same contract, new spawn logic         |
+  +--------------------------------------------------+
+
+MODIFIED (test updates):
+  +--------------------------------------------------+
+  | test_weather_anim.py::TestSunBody                 |
+  |   Pixel position assertions update for new geom   |
+  | test_weather_anim.py::TestAnimationVisibility     |
+  |   sun alpha thresholds may need adjustment        |
+  | test_weather_anim.py::TestColorIdentity           |
+  |   sun yellow dominance test should still pass     |
+  +--------------------------------------------------+
+```
+
+## Component Responsibilities
+
+| Component | Responsibility | v1.2 Change? |
+|-----------|---------------|--------------|
+| `WeatherAnimation` (base) | Define 64x24 RGBA layer contract | NO -- untouched |
+| `SunAnimation` | Produce sun body + ray particles as (bg, fg) | YES -- rewrite internals |
+| `get_animation()` factory | Map weather codes to animation classes | NO -- still returns SunAnimation for clear/partcloud |
+| `_ANIMATION_MAP` dict | Weather group -> class mapping | NO |
+| `renderer.py` | Composite bg behind text, fg in front | NO -- consumes same (bg, fg) tuple |
+| `main.py` main_loop | Call weather_anim.tick() at 1 FPS | NO |
+| `layout.py` | Zone definitions, color constants | NO -- sun colors are inline in weather_anim.py |
+| `test_weather_anim.py` | Visibility, color identity, sun body assertions | YES -- update geometry assertions |
+
+## Integration Points
+
+### Integration Point 1: SunAnimation.__init__()
+
+**Current:** Creates `far_rays` and `near_rays` as `list[list[float]]` where each ray is `[x, y, speed, length, alpha]`.
+
+**New:** Each ray needs angle, distance-from-sun, and radial speed instead of cartesian velocity. Use a dict for clarity:
+
 ```python
-# Current far flake color:
-bg_draw.point((x, y), fill=(200, 210, 230, 90))   # grey-blue, alpha 90
-# Current near flake crystal color (via _draw_crystal):
-color = (255, 255, 255, 180)                        # white, alpha 180
+# New ray data structure
+{
+    "angle": float,      # radians, emission direction from sun center
+    "dist": float,       # current distance from sun center (starts ~radius)
+    "speed": float,      # pixels per tick outward travel
+    "length": float,     # ray line length in pixels
+    "max_alpha": int,    # peak alpha at sun body (fades with distance)
+}
 ```
-Far flakes are grey (`200, 210, 230`) which looks similar to rain. They should be brighter white.
 
-**`layout.py` -- COLOR_WEATHER_RAIN (line 61):**
+**Why dict over list:** The existing ray list `[x, y, speed, length, alpha]` uses positional indexing (`ray[0]`, `ray[1]`, etc.) which is fragile. Switching to dicts aligns with the pattern already used by `ClearNightAnimation` stars (which use dicts with named keys). This is an internal change -- no external API impact.
+
+**Impact:** `far_rays` and `near_rays` change from `list[list[float]]` to `list[dict]`. The `WindEffect` wrapper checks for `far_rays` attribute on inner animations but only for rain/snow (`far_drops`, `near_drops`, `far_flakes`, `near_flakes`). Sun rays are not wind-affected, so `WindEffect` never touches them. No compatibility issue.
+
+### Integration Point 2: _draw_sun_body()
+
+**Current:** Full ellipse at (48, 4) with radius 3 + glow ring at radius 4. Drawn on `bg_draw` (behind text).
+
+**New:** Half-semicircle at (48, 0) with radius 7. Only the bottom half is visible because the center is at the zone's top edge (y=0). The top half of the circle is clipped by the zone boundary.
+
 ```python
-COLOR_WEATHER_RAIN = (50, 180, 255)   # Vivid blue for rain indicator text
-```
-This is visually close to rain particle blue. Change to a distinct hue that contrasts with both rain and snow particle colors.
+# Current: full circle, small
+draw.ellipse([sx - r, sy - r, sx + r, sy + r], fill=...)
 
-#### Integration Constraints
-
-1. **Color palette coherence:** Weather zone already uses these colors:
-   - `COLOR_WEATHER_TEMP = (255, 200, 50)` -- warm yellow for temperature
-   - `COLOR_WEATHER_TEMP_NEG = (80, 200, 255)` -- cyan-blue for negative temp
-   - `COLOR_WEATHER_HILO = (120, 180, 160)` -- soft teal for high/low
-   - `COLOR_WEATHER_RAIN = (50, 180, 255)` -- vivid blue for rain text
-   New colors must not clash with these existing constants.
-
-2. **Alpha compositing pipeline:** Colors are composited via `_composite_layer()` in `renderer.py` (lines 121-125). This function does `Image.alpha_composite(zone_region, layer)` -- a single alpha application (the double-alpha bug was fixed in v1.0 plan 03-03). New alpha values must work through this single-pass composite.
-
-3. **3D depth contract:** `weather_anim.py` produces `(bg_layer, fg_layer)` tuples. Background layer renders behind text (dimmer), foreground renders in front (brighter). This depth layering must be preserved -- far particles stay dimmer than near particles.
-
-4. **Other animations affected:** Changing the color strategy for rain/snow may suggest reviewing all 8 animation types for visual consistency, but only rain and snow are explicitly broken. Cloud, sun, thunder, fog are distinguishable. Thunder reuses `RainAnimation` internally, so rain color changes propagate to thunder automatically.
-
-5. **Test impact:** `tests/test_weather_anim.py` tests animation frame generation. Color changes should not break structural tests (they verify frame shapes and particle counts, not specific color values). No test changes expected.
-
-#### Color Fix Strategy
-
-The core problem is **rain particles vs rain text** both being blue, and **rain particles vs snow particles** both being grey-ish.
-
-**Recommended approach -- differentiate by weather type color identity:**
-
-| Element | Current Color | Recommended Color | Rationale |
-|---------|--------------|-------------------|-----------|
-| Rain far drops | `(40, 90, 200, 100)` grey-blue | `(70, 130, 255, 100)` brighter blue | Make rain clearly blue, not grey |
-| Rain near drops | `(60, 140, 255, 200)` medium blue | `(80, 160, 255, 200)` vivid blue | Slightly brighter near drops for depth |
-| Snow far flakes | `(200, 210, 230, 90)` grey | `(220, 230, 255, 90)` cool white | White, not grey -- clearly snow |
-| Snow near crystal | `(255, 255, 255, 180)` white | Keep as-is | Already bright white |
-| Rain text ("1/1mm") | `(50, 180, 255)` vivid blue | `(100, 220, 255)` light cyan | Distinct from rain particle blue, still reads as "water" |
-
-The key insight: rain particles should be vivid blue, snow particles should be bright white, and rain text should be light cyan to differentiate from particle blue. This creates three distinct visual channels.
-
-## Data Flow for Color Fix
-
-```
-Weather condition changes (main.py)
-  │
-  v
-get_animation(weather_group)          # weather_anim.py -- selects animation class
-  │
-  v
-animation.tick()                       # produces (bg_layer, fg_layer) RGBA
-  │                                    # << COLOR CHANGES HERE in fill= parameters >>
-  v
-render_weather_zone(...)              # renderer.py
-  ├── _composite_layer(bg_layer)      # behind text
-  ├── draw.text(rain_text, COLOR_WEATHER_RAIN)  # << COLOR CHANGE HERE >>
-  └── _composite_layer(fg_layer)      # in front of text
-  │
-  v
-render_frame() -> 64x64 RGB Image
-  │
-  v
-pixoo_client.push_frame()
+# New: draw full circle but center at y=0, so top half is clipped by zone bounds
+# PIL will naturally clip anything drawn at negative y coordinates.
+# Center at (48, 0), radius 7 means:
+#   ellipse bbox = [41, -7, 55, 7]
+#   Only y=0..7 portion is visible = bottom semicircle
 ```
 
-The color changes are purely in the rendering data (fill colors and color constants). No flow changes, no structural changes, no API changes.
+**PIL clipping behavior:** PIL's `ImageDraw.ellipse()` draws within the image bounds automatically. Coordinates outside the image (y < 0) are simply not rendered. This means drawing a circle centered at y=0 produces a half-circle with zero extra code -- PIL handles the clipping.
 
-## Patterns to Follow
+**Why bg_layer:** Sun body stays on bg_layer (behind text) same as today. This preserves readability of weather text on the left side. The sun is at x=48, well right of the text at x=2.
 
-### Pattern 1: Color Constants in layout.py
+### Integration Point 3: _draw_ray()
 
-**What:** All user-visible colors are defined as named constants in `layout.py`, imported by `renderer.py`.
+**Current:** Takes a ray list, draws a line from (x, y) angled down-right, advances position each tick, respawns at y=0 when past bounds.
 
-**When:** For text colors and UI element colors that form the design palette.
+**New:** Converts polar (angle, distance) to cartesian for drawing. Draws a line from the ray's current position outward along its angle. Alpha fades proportionally with distance from sun.
 
-**Current practice:** `renderer.py` imports `COLOR_WEATHER_RAIN` from `layout.py`. Any rain text color change goes in `layout.py`.
+```python
+def _draw_ray(self, draw: ImageDraw.Draw, ray: dict, base_color: tuple) -> None:
+    angle = ray["angle"]
+    dist = ray["dist"]
+    length = ray["length"]
+    max_alpha = ray["max_alpha"]
 
-**Note:** Animation particle colors are currently hardcoded inline in `weather_anim.py` as `fill=(R, G, B, A)` tuples in each `tick()` method. These are NOT in `layout.py`. This is an existing pattern -- the animation colors were always inline because they include alpha values and are animation-specific, not part of the static UI palette. Keep this pattern for v1.1; refactoring to layout.py constants is optional polish.
+    # Convert polar to cartesian (origin = sun center)
+    cx = self._SUN_X + dist * math.cos(angle)
+    cy = self._SUN_Y + dist * math.sin(angle)
 
-### Pattern 2: New Documentation at Root
+    # Ray endpoint (extends further along same angle)
+    ex = self._SUN_X + (dist + length) * math.cos(angle)
+    ey = self._SUN_Y + (dist + length) * math.sin(angle)
 
-**What:** README.md is a single file at the project root. No docs/ directory, no multi-file documentation structure.
+    # Fade alpha with distance (linear falloff)
+    max_dist = max(self.width, self.height)  # ~64px
+    alpha = int(max_alpha * max(0, 1 - dist / max_dist))
 
-**When:** This project is small enough (17 source files, 2,321 LOC) that a single comprehensive README covers everything.
+    if alpha > 0:
+        draw.line(
+            [(int(cx), int(cy)), (int(ex), int(ey))],
+            fill=(*base_color, alpha),
+        )
 
-**Rationale:** Adding a docs/ folder for a project this size is over-engineering. The README should be self-contained with all sections: overview, setup, architecture, API docs, service config, development.
+    # Advance outward
+    ray["dist"] += ray["speed"]
 
-### Pattern 3: Test Mode for Visual Verification
+    # Respawn when past zone bounds or fully faded
+    if dist > max_dist or alpha <= 0:
+        self._respawn_ray(ray)
+```
 
-**What:** `main.py` supports `TEST_WEATHER=rain python src/main.py --simulated --save-frame` to visually verify animation rendering.
+**Key change:** Rays now move outward from sun center instead of falling downward. Alpha fades with distance instead of being constant. This creates the visual effect of rays "beaming" outward.
 
-**When:** After color changes, use this to verify the new colors look correct on the simulated display or in `debug_frame.png`.
+### Integration Point 4: tick() Return Contract
 
-**Why relevant:** The color fix cannot be fully verified in unit tests -- it requires visual inspection on actual LED hardware or at minimum the simulator. The test mode is the existing tool for this.
+**Unchanged.** `tick()` still returns `(bg_layer, fg_layer)` as RGBA 64x24 images:
+- `bg_layer`: sun body + far rays (behind text)
+- `fg_layer`: near rays (in front of text)
+
+The renderer's `render_weather_zone()` composites these layers identically to today. Zero changes needed in renderer.py.
+
+### Integration Point 5: Angle Distribution for Emission
+
+**New logic needed.** Rays must emit into the downward hemisphere since the sun is at the top of the zone. Angles should cover approximately 0 to pi radians (right side, downward, left side). Rays emitting upward (negative y) would be invisible since the sun is at y=0.
+
+```python
+# Emission angle range: pi/6 to 5*pi/6 (30 to 150 degrees)
+# This avoids near-horizontal rays that look unnatural
+# and covers the visible downward fan
+angle = random.uniform(math.pi / 6, 5 * math.pi / 6)
+```
+
+Using `pi/6` to `5*pi/6` (30 to 150 degrees in standard math angles where 0=right, pi/2=down) ensures rays fan out below the sun body. Purely horizontal rays (angle=0 or pi) would be hard to see and look wrong.
+
+### Integration Point 6: Respawn Logic
+
+**Current:** Ray respawns at y=0 with random x when past bottom edge.
+
+**New:** Ray respawns at the sun body's edge (distance = sun radius) with a new random angle. This creates continuous emission from the sun.
+
+```python
+def _respawn_ray(self, ray: dict) -> None:
+    ray["angle"] = random.uniform(math.pi / 6, 5 * math.pi / 6)
+    ray["dist"] = float(self._SUN_RADIUS)  # start at sun's edge
+    ray["speed"] = random.uniform(...)       # far vs near speed
+    ray["length"] = random.randint(...)      # far vs near length
+```
+
+### Integration Point 7: Test Assertions
+
+**Tests that need updating:**
+
+| Test | Current Assertion | New Assertion |
+|------|-------------------|---------------|
+| `test_sun_body_produces_warm_pixels_at_position` | Checks pixel at `(SUN_X=48, SUN_Y=4)` for warm yellow | Check pixel at `(48, 0)` or `(48, 3)` -- wherever the half-circle center/visible portion is |
+| `test_sun_body_has_glow` | Checks pixel at `(SUN_X - R - 1, SUN_Y)` = `(44, 4)` | Check glow at new position, accounting for half-circle geometry |
+| `test_sun_animation_still_has_rays` | Checks particle count > 10 | Should still pass -- same or more ray particles |
+| `test_sun_alpha_above_minimum` | `max_alpha >= 100` | Should still pass -- sun body alpha is 200+ |
+| `test_sun_particles_are_yellow_dominant` | R > B+50, G > B+30 | Should still pass -- same yellow color palette |
+
+**Tests that should pass without changes:**
+
+| Test | Why Safe |
+|------|----------|
+| `test_tick_returns_two_layers` | Contract unchanged -- still returns (bg, fg) RGBA 64x24 |
+| `test_get_animation_returns_correct_types` | SunAnimation not tested here (clear/partcloud mapped, not direct) |
+| `test_clear_day_returns_sun_animation` | Still returns SunAnimation instance |
+| `test_clear_day_unaffected_by_wind` | SunAnimation still not wind-applicable |
+| All color identity tests | Yellow dominance preserved |
+| All animation combo tests | SunAnimation not involved in composites/wind |
+
+## Data Flow
+
+### Rendering Pipeline (Unchanged)
+
+```
+main_loop (1 FPS)
+    |
+    v
+weather_anim.tick()
+    |
+    +--> SunAnimation.tick()
+    |      |
+    |      +--> bg = _empty()           # 64x24 RGBA transparent
+    |      +--> _draw_sun_body(bg_draw)  # half-circle at (48, 0) r=7
+    |      +--> for ray in far_rays:
+    |      |      _draw_ray(bg_draw, ray, (240, 200, 40))
+    |      +--> for ray in near_rays:
+    |      |      _draw_ray(fg_draw, ray, (255, 240, 60))
+    |      +--> return (bg, fg)
+    |
+    v
+render_frame(state, fonts, anim_frame=(bg, fg))
+    |
+    v
+render_weather_zone(draw, img, state, fonts, anim_layers=(bg, fg))
+    |
+    +--> _composite_layer(img, bg, zone_y=40)     # bg behind text
+    +--> draw.text(temperature, ...)                # weather text
+    +--> draw.text(high/low, ...)
+    +--> draw.text(rain_mm, ...)
+    +--> _composite_layer(img, fg, zone_y=40)      # fg in front of text
+    |
+    v
+client.push_frame(64x64 RGB image)
+```
+
+**The only code change is inside `SunAnimation`.** Everything upstream (main_loop timing, animation selection) and downstream (compositing, rendering, device push) is untouched.
+
+### Coordinate System
+
+```
+Weather zone: 64x24 pixels (x: 0-63, y: 0-23)
+Zone y=0 is at display y=40 (WEATHER_ZONE.y)
+
+Sun position in zone coordinates:
+  Center: (48, 0) -- top edge, right side
+  Radius: 7
+  Visible portion: bottom semicircle from y=0 to y=7
+
+Text positions in zone coordinates:
+  Temperature: (2, 1)
+  High/low: (2, 10)
+  Rain mm: (2, 17)
+
+Rays emit from (48, 0) into the zone below.
+Text is at x=2..~30, sun is at x=41..55.
+Minimal overlap -- rays may pass through text area, which is the intended
+3D depth effect (far rays behind text, near rays in front).
+```
+
+## Architectural Patterns
+
+### Pattern 1: Polar-to-Cartesian Particle System
+
+**What:** Store ray state in polar coordinates (angle + distance from origin) and convert to cartesian (x, y) only for drawing. All movement is in the radial direction (increasing distance).
+
+**Why:** Radial emission from a point source is naturally expressed in polar coordinates. Cartesian math would require computing angles retroactively and makes respawning awkward.
+
+**Trade-offs:** Slightly more math per ray (two cos/sin calls per tick per ray). With 14 total rays at 1 FPS, this is ~28 trig calls per second -- negligible.
+
+### Pattern 2: Distance-Based Alpha Fade
+
+**What:** Ray alpha decreases linearly with distance from sun center. At distance=0 (sun body), alpha is at maximum. At distance=max_dist, alpha is 0.
+
+**Why:** Creates the natural visual of rays being brightest near the sun and fading into the sky. Without fade, rays look like random lines.
+
+**Trade-offs:** Linear fade is simple and predictable. Exponential fade would look more realistic but is harder to tune for LED visibility. Start with linear, adjust if needed.
+
+### Pattern 3: Dict-Based Particle State (Matching ClearNightAnimation)
+
+**What:** Use dicts with named keys for ray state instead of positional lists.
+
+**Why:** `ClearNightAnimation` already uses this pattern for stars (`{"x": ..., "y": ..., "peak_alpha": ..., "state": ...}`). The sun ray system has similar complexity (angle, distance, speed, length, max_alpha). Named keys prevent bugs from positional indexing.
+
+**Existing precedent:**
+```python
+# ClearNightAnimation uses dicts:
+star = {"x": 10, "y": 5, "peak_alpha": 200, "state": 0, "timer": 3, ...}
+
+# Rain/Snow use lists:
+drop = [x, y]   # simple 2-element list, positional is fine
+
+# New sun rays are complex enough to warrant dicts:
+ray = {"angle": 1.2, "dist": 5.0, "speed": 1.5, "length": 4, "max_alpha": 180}
+```
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Extracting Animation Colors to Config
+### Anti-Pattern 1: Adding a New Animation Class
 
-**What:** Moving animation particle colors to `config.py` or `.env` as configurable values.
-**Why bad:** These are visual design decisions tuned for specific LED hardware, not user preferences. Making them configurable would create a false sense of flexibility while making the visual design harder to maintain as a coherent whole. The 3D depth system requires careful balance between bg/fg alpha values.
-**Instead:** Keep animation colors as hardcoded fill values in `weather_anim.py`. Keep the palette consistent by reviewing all animation types together during the color fix.
+**What:** Creating `RadialSunAnimation` as a separate class alongside `SunAnimation`.
+**Why bad:** The factory `_ANIMATION_MAP` maps `"clear" -> SunAnimation`. Changing the map or adding a new class means modifying the factory, all tests that check `isinstance(anim, SunAnimation)`, and potentially breaking the `get_animation()` contract. It is unnecessary complexity -- this is a rewrite of internals, not a new animation type.
+**Instead:** Modify `SunAnimation` in place. Same class, same external interface, new internal behavior.
 
-### Anti-Pattern 2: Adding an English README Alongside Norwegian
+### Anti-Pattern 2: Changing the (bg, fg) Layer Contract
 
-**What:** Creating both README.md (English) and README.no.md (Norwegian).
-**Why bad:** The project requirement is specifically a Norwegian README. The user preference is Norwegian language for this personal dashboard project. Maintaining two README files doubles documentation maintenance.
-**Instead:** Single README.md in Norwegian. Code comments and docstrings remain in English (they already are and should stay that way).
+**What:** Making SunAnimation return a third layer, or changing the layer semantics.
+**Why bad:** The entire rendering pipeline in `renderer.py` is built around exactly two layers: bg composited before text, fg composited after text. Changing this contract ripples through `render_weather_zone()`, `render_frame()`, and all tests.
+**Instead:** Work within the existing two-layer system. Sun body + far rays on bg, near rays on fg. This is the same split as today.
 
-### Anti-Pattern 3: Changing Compositing Logic During Color Fix
+### Anti-Pattern 3: Modifying the Weather Zone Size
 
-**What:** Modifying `_composite_layer()` in `renderer.py` while fixing colors.
-**Why bad:** The compositing was fixed in v1.0 phase 03-03 after a thorough debug session. It works correctly now (single alpha application). Changing it alongside color values makes it impossible to isolate which change affected the visual result.
-**Instead:** Only change fill color values and color constants. If compositing issues resurface, that is a separate investigation.
+**What:** Expanding the weather zone to accommodate a larger sun.
+**Why bad:** The zone pixel budget is exactly `11 + 8 + 1 + 19 + 1 + 24 = 64px`. Changing any zone disrupts the entire layout. The weather zone is 64x24 and that is fixed.
+**Instead:** Design the half-sun and rays to fit within 64x24. A radius-7 semicircle occupies 15x7 pixels -- fits easily in the 64x24 zone.
 
-## Build Order Recommendation
+### Anti-Pattern 4: Touching Other Animations
 
-**Color fix first, then README.**
+**What:** "While we're in weather_anim.py, let's also improve rain/cloud/snow..."
+**Why bad:** Scope creep. The milestone is specifically about sun rays. Other animations were tuned and tested in v1.0/v1.1. Touching them risks regressions with no benefit to the stated goal.
+**Instead:** Only modify `SunAnimation` and its test assertions.
 
-### Rationale:
+## Build Order (Suggested Phase Structure)
 
-1. **Color fix informs README content.** The README should document the current state of the project, including weather animations. If colors are wrong when the README is written, the README would describe a broken state. Fix first, document the fixed state.
+### Phase 1: Sun Body Geometry
 
-2. **Color fix has test dependencies.** The fix needs visual verification (`TEST_WEATHER` mode, `--save-frame`, ideally hardware test). This is faster to iterate on without the context switch of writing documentation.
+**What:** Change `_draw_sun_body()` from full circle at (48,4) r=3 to half-semicircle at (48,0) r=7.
 
-3. **README has zero code dependencies.** The README can be written at any point since it does not modify any source files. It reads FROM the codebase but does not write TO it.
+**Files:** `src/display/weather_anim.py` (SunAnimation constants + `_draw_sun_body`)
 
-4. **Independent work streams.** These two changes touch completely different files with zero overlap:
-   - Color fix: `src/display/weather_anim.py`, `src/display/layout.py`
-   - README: `README.md` (new file at root)
+**Why first:** The sun body is the visual anchor. Rays need to know where to emit from. Establishing the body position first means ray spawn logic can reference the correct constants.
 
-### Suggested Phase Structure:
+**Verification:** `TEST_WEATHER=sun python src/main.py --simulated --save-frame`, inspect `debug_frame.png`.
+
+**Tests:** Update `TestSunBody.test_sun_body_produces_warm_pixels_at_position` and `test_sun_body_has_glow` for new coordinates.
+
+### Phase 2: Radial Ray System
+
+**What:** Replace ray data structure and spawn/draw/advance/respawn logic with polar coordinate system. Distance-based alpha fade.
+
+**Files:** `src/display/weather_anim.py` (SunAnimation `__init__`, `_spawn_far`, `_spawn_near`, `_draw_ray`, `tick`, `reset`)
+
+**Why second:** Depends on Phase 1 for sun center position. This is the core visual change.
+
+**Verification:** `TEST_WEATHER=sun --save-frame`, multiple frames to see ray motion. Also `TEST_WEATHER=clear` to confirm it works through the factory.
+
+**Tests:** Update `TestSunBody.test_sun_animation_still_has_rays`. Existing visibility and color identity tests should pass without changes (same alpha ranges, same yellow color family).
+
+### Phase 3: Tuning and Test Finalization
+
+**What:** Fine-tune ray count, speed ranges, alpha falloff curve, angle distribution, and ray lengths for visual quality on LED hardware. Finalize all test assertions.
+
+**Files:** `src/display/weather_anim.py` (parameter values), `tests/test_weather_anim.py` (any remaining assertion fixes)
+
+**Why third:** Tuning requires the system to be functional. Cannot tune what does not exist yet.
+
+**Verification:** Physical LED hardware testing with `--save-frame` for before/after comparison.
+
+### Dependency Graph
 
 ```
-Phase 1: Weather Color Fix
-  Files modified: weather_anim.py, layout.py
-  Verification: TEST_WEATHER=rain/snow --save-frame, visual inspection
-  Risk: Low (color values only, no structural changes)
-
-Phase 2: Norwegian README
-  Files created: README.md
-  Content sources: PROJECT.md, .env.example, layout.py, all src/ modules
-  Verification: Read-through, ensure all sections match actual codebase
-  Risk: None (documentation only)
+Phase 1: Sun Body Geometry
+    |
+    v
+Phase 2: Radial Ray System (depends on Phase 1 for sun position)
+    |
+    v
+Phase 3: Tuning + Tests (depends on Phase 2 for working system)
 ```
+
+All three phases modify the same two files (`weather_anim.py` and `test_weather_anim.py`). No cross-file dependencies. No changes to any other module.
 
 ## File Change Summary
 
-| File | Action | Change Type | Lines Affected |
-|------|--------|-------------|---------------|
-| `README.md` | CREATE | New documentation file | N/A (new) |
-| `src/display/weather_anim.py` | MODIFY | Fill color tuples in RainAnimation.tick(), SnowAnimation.tick() | ~4 lines (2 rain colors, 2 snow colors) |
-| `src/display/layout.py` | MODIFY | `COLOR_WEATHER_RAIN` constant value | 1 line |
+| File | Action | What Changes |
+|------|--------|-------------|
+| `src/display/weather_anim.py` | MODIFY | SunAnimation class internals only: constants, __init__, spawn, draw, tick, reset |
+| `tests/test_weather_anim.py` | MODIFY | TestSunBody assertions for new geometry, possibly TestAnimationVisibility thresholds |
 
-**Total code changes: ~5 lines across 2 files.**
-**Total new files: 1 (README.md).**
+**Files NOT changed:**
 
-No test changes expected. No config changes. No dependency changes. No architectural changes.
+| File | Why Not |
+|------|---------|
+| `src/display/renderer.py` | Consumes same (bg, fg) tuple -- no interface change |
+| `src/display/layout.py` | Sun colors are inline in weather_anim.py, not in layout.py |
+| `src/display/weather_icons.py` | Static 10px icons, unrelated to animation |
+| `src/main.py` | Calls `weather_anim.tick()` generically -- no SunAnimation-specific code |
+| `src/config.py` | No new config needed |
+| All other animation classes | Rain, Snow, Cloud, Thunder, Fog, ClearNight, Composite, Wind -- untouched |
+| All other test files | No renderer/layout/integration changes |
+
+**Total scope: 2 files modified. Zero new files. Zero new dependencies.**
 
 ## Sources
 
-- Codebase audit: all 17 source files read and analyzed (HIGH confidence)
-- Debug session: `.planning/debug/weather-animation-too-subtle.md` -- compositing fix history (HIGH confidence)
-- Todo: `.planning/todos/done/2026-02-20-weather-animation-and-rain-text-colors-indistinguishable.md` -- problem statement (HIGH confidence)
-- Project context: `.planning/PROJECT.md` -- requirements and constraints (HIGH confidence)
+- Codebase audit: all source files in `src/display/` and `tests/` read and analyzed (HIGH confidence)
+- `SunAnimation` class: `src/display/weather_anim.py` lines 276-368 (HIGH confidence -- direct code reading)
+- Renderer compositing: `src/display/renderer.py` `render_weather_zone()` lines 129-208 (HIGH confidence)
+- Weather zone layout: `src/display/layout.py` WEATHER_ZONE at y=40, 64x24 (HIGH confidence)
+- Test suite: `tests/test_weather_anim.py` TestSunBody, TestAnimationVisibility, TestColorIdentity (HIGH confidence)
+- Main loop: `src/main.py` animation tick at 1 FPS (HIGH confidence)
+- PIL ellipse clipping behavior: standard PIL/Pillow behavior, coordinates outside image bounds are clipped (HIGH confidence -- well-documented PIL behavior)
+- Project requirements: `.planning/PROJECT.md` ANIM-01, ANIM-02, ANIM-03 (HIGH confidence)
 
 ---
-*Architecture research for: Divoom Hub v1.1 Documentation & Polish*
-*Researched: 2026-02-21*
+*Architecture research for: Divoom Hub v1.2 Sun Ray Overhaul*
+*Researched: 2026-02-23*

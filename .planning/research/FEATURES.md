@@ -1,142 +1,111 @@
 # Feature Landscape
 
-**Domain:** Norwegian README documentation + LED weather color fix for Pixoo 64 dashboard
-**Researched:** 2026-02-21
-**Milestone:** v1.1 Documentation & Polish
+**Domain:** Radial sun ray animation overhaul for Pixoo 64 weather dashboard
+**Researched:** 2026-02-23
+**Milestone:** v1.2 Sun Ray Overhaul
 
 ## Table Stakes
 
-Features users expect. Missing = project feels incomplete.
-
-### README Documentation
+Features that make the sun animation recognizable as sunshine on a 64x64 LED display. Missing = animation looks abstract/confusing (the exact problem that triggered this overhaul).
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| Prosjektbeskrivelse (overview) | First thing visitors read; explains what the display does and why | Low | 2-3 paragraphs covering: what it is (always-on entryway dashboard), what it shows (klokke, buss, vaer), and the core value (glance without pulling out your phone). A photo of the running display elevates this from good to great |
-| Installasjon (installation) | Users need to go from zero to running | Low | Clone, `python -m venv .venv`, `pip install .`, copy `.env.example` to `.env`. The existing `.env.example` has excellent inline docs already -- reference it rather than duplicating |
-| Oppsett / Konfigurasjon (configuration) | 7+ env vars that need explaining, some with non-obvious values | Low | Table of all `.env` variables with required/optional flags. Key guidance: how to find your bus stop quay IDs from stoppested.entur.org, how to find coordinates for weather, MET User-Agent requirements |
-| Bruk (usage) | How to start the dashboard | Low | `python src/main.py --ip X.X.X.X`, `--simulated` for testing without hardware, `--save-frame` for debugging. Document `TEST_WEATHER` env var for visual testing of weather animations |
-| Kjore som tjeneste (launchd service) | The plist exists but needs user-facing docs | Low | Step-by-step: edit paths in plist, `cp` to `~/Library/LaunchAgents/`, `launchctl load`, check status, view logs. Already documented in plist XML comments -- extract and format for README |
-| Skjermoppsett (display layout) | The 64x64 pixel budget is the project's core constraint | Low | ASCII art zone diagram: klokke 11px, dato 8px, skillelinje 1px, buss 19px, skillelinje 1px, vaer 24px = 64px. This makes the project tangible to readers |
-| Krav (requirements) | What you need before starting | Low | Python 3.10+, Pixoo 64 on same LAN, macOS for launchd (note: systemd alternative for Linux). List pip dependencies from pyproject.toml |
-
-### Weather Color Fix
-
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Rain text vs rain animation distinguishability | Reported as indistinguishable on physical hardware. `COLOR_WEATHER_RAIN (50, 180, 255)` clashes with rain drops `(40, 90, 200)` far and `(60, 140, 255)` near | Low | All three are blue-family hues. On LED at 2+ meters, perceptual distance is too small. This is the primary bug |
-| Verify all text-animation combinations | After fixing rain, confirm the other 7 animation types don't have similar issues | Low | Systematic check: temperature text vs each animation, hi/lo text vs each animation, rain indicator text vs each animation. Most are already fine based on code analysis |
+| Half-sun body at top edge of weather zone | Without a visible sun, rays look like random streaks. The original todo explicitly calls this out: "hard to understand that the sun rays are sun rays." A semicircle clipped at y=0 implies the sun is just above the horizon/zone boundary | Low | Draw full ellipse centered at (48, 0) with radius 7. Pillow naturally clips the top half beyond the image boundary, producing a 14px-wide, 7px-tall arc. Two-layer glow: dimmer outer (r+2) then bright inner body |
+| Rays originate from sun center | Rays that spawn randomly across the 64x24 zone have no spatial relationship to the sun body. Radial emission from the sun position is what makes the visual read as "sunshine" vs "random yellow lines" | Med | Store rays in polar coordinates (angle, distance) relative to sun center (48, 0). Convert to cartesian for drawing. Angle range: 0.05pi to 0.95pi (downward-facing semicircle fan) |
+| Rays fade with distance | Light attenuates. Without fade, rays look like solid lines flying away from the sun rather than beams of light. Distance-based alpha fade is the key visual cue that these are light beams, not particles | Low | Linear fade: `alpha = base_alpha * (1.0 - distance / MAX_DIST)`. Kill ray when alpha drops below ~5 (below LED visibility threshold). MAX_DIST of 28 covers most of the weather zone |
+| Ray respawn at sun origin | Continuous animation requires rays to loop. When a ray fades out or exits the zone, it must reappear at the sun with a new random angle, maintaining the illusion of continuous light emission | Low | On respawn: reset distance to 0, assign new random angle in the downward fan, re-randomize speed and length. Initial rays staggered at varying distances so animation starts mid-flow, not as a burst |
+| Two-depth-layer system preserved | The existing animation architecture composites bg (behind text) and fg (in front of text) for a 3D depth effect. Sun rays must continue to use this system. Far rays behind weather text, near rays over it | Low | Far rays: 9 count, slower (0.4-0.8 speed), shorter (2-4px), dimmer (alpha 100-140), color (240, 200, 40). Near rays: 5 count, faster (0.8-1.6 speed), longer (4-7px), brighter (alpha 160-220), color (255, 240, 60). These values match the existing palette exactly |
+| Yellow color palette maintained | Sun = warm yellow is established across the dashboard (clock icon, weather icon, existing animation). Changing it would break the visual language | Low | No color changes needed. Far: (240, 200, 40), Near: (255, 240, 60), Body: (255, 220, 60) with (255, 200, 40) glow. All proven LED-visible at current alpha ranges |
+| Tests pass for new geometry | ANIM-03 requirement. Existing tests assert sun body position, glow presence, ray activity, yellow color dominance, and alpha minimums. These must pass with new coordinates | Med | TestSunBody needs coordinate updates for (48, 0) and radius 7 vs old (48, 4) and radius 3. Glow check pixel coordinate changes. TestColorIdentity and TestAnimationVisibility should pass without changes since color/alpha ranges are preserved |
 
 ## Differentiators
 
-Features that set the project apart. Not expected, but valued.
-
-### README Documentation
+Features that elevate the sun animation beyond "minimally recognizable." Not strictly required but make the visual effect polished.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| "Bygget med Claude Code" transparency section | Honest about AI-assisted development process. Explicitly requested in milestone | Low | Shield.io badge at top of README + short section explaining the development process. Link to Anthropic/Claude Code. This is not just a badge -- it tells the story of how the project was built |
-| Vaeranimasjoner (weather animation docs) | The 3D depth-layered animation system is the most impressive technical feature | Med | Describe bg/fg compositing, the 6 animation types (rain, snow, sun, fog, clouds, thunder), alpha tuning (65-180 range) for LED hardware. A screenshot or GIF would add significant value but is optional |
-| Arkitektur / Oversikt (architecture) | Clean module structure deserves documentation | Med | Module map: `src/display/` (renderer, layout, state, fonts, weather_anim, weather_icons), `src/providers/` (clock, bus, weather, discord_bot), `src/device/` (pixoo_client). Data flow: providers fetch -> DisplayState -> renderer composites -> pixoo_client pushes |
-| API-dokumentasjon (external APIs) | Two APIs with specific requirements that tripped up development | Med | Entur JourneyPlanner v3 GraphQL (quay IDs, ET-Client-Name header, refresh rate), MET Locationforecast 2.0 (User-Agent required, If-Modified-Since caching, rate limits). Document the gotchas |
-| Discord-meldinger (Discord integration) | Not obvious that a pixel display can receive push messages | Low | Brief section: create Discord bot, get token, set channel ID in .env, send `!msg hello` in the channel. Explain MessageBridge thread safety |
-| Bursdagspaaskeegg (birthday easter egg) | Fun personal touch | Low | Mention `BIRTHDAY_DATES` env var, describe golden crown + sparkles effect on configured dates |
-| Feilhaandtering (error resilience docs) | Engineering choices worth documenting for other builders | Low | Staleness indicators (orange dot), fallback to last-good data, 300-push connection refresh, graceful degradation |
-| Norsk tegnsett (Norwegian character support) | Solved a non-trivial problem: aeoaa on pixel displays | Low | Explain why custom rendering was needed (native Pixoo has no aeoaa), which BDF fonts (hzeller 4x6, 5x8), how they were validated |
-
-### Weather Color Fix
-
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Perceptually distinct color palette | Each weather state has a clear visual identity that never clashes with overlaid text | Med | Not just fixing one color -- opportunity to verify the entire palette is LED-safe. But scope should be limited to actual problems |
-| Maintain rain's blue identity in animation | Rain animation should still feel blue/watery | Low | Fix the TEXT color, not the animation. The rain drops are the artistic element; the "2.5mm" text is informational |
+| Staggered initial ray distances | Without staggering, all rays start at distance 0 on animation init/reset, producing an ugly burst effect. Staggering makes the animation look like it was already running | Low | On spawn: `distance = random.uniform(0, MAX_DIST)` instead of 0. Already in the design plan. Minimal code, big visual impact |
+| Ray length varies per ray | Fixed-length rays look mechanical. Variable length (2-4px far, 4-7px near) adds organic quality. The existing rain/snow animations use similar per-particle randomization | Low | Already specified in the ray spawn parameters. Each ray gets its own random length on spawn and respawn |
+| Angle range avoids pure horizontal | Rays at exactly 0 or pi radians shoot perfectly horizontal, which looks unnatural. Constraining to 0.05pi-0.95pi keeps all rays in a visually pleasing downward fan | Low | `random.uniform(0.05 * math.pi, 0.95 * math.pi)` -- one line. Prevents edge-case visual artifacts where a ray hugs the top edge |
+| Ray origin clustering test | A test that verifies rays cluster near the sun position rather than scattering randomly. This is the regression gate that prevents reintroduction of the original bug | Med | Count non-transparent pixels within radius 15 of sun vs outside. Assert at least 30% are near the sun on first tick. This is the "did we actually fix the core problem?" test |
+| Smooth reset behavior | `reset()` method should re-stagger rays at varied distances, matching the init behavior. A reset that puts all rays at distance 0 creates a visible burst artifact whenever weather data refreshes | Low | `reset()` clears and re-calls `_spawn_far(9)` and `_spawn_near(5)`, which already include distance staggering. Consistent with all other animation reset methods |
 
 ## Anti-Features
 
-Features to explicitly NOT build.
+Features to explicitly NOT build for this milestone.
 
 | Anti-Feature | Why Avoid | What to Do Instead |
 |--------------|-----------|-------------------|
-| English README alongside Norwegian | Milestone explicitly calls for Norwegian README. Dual-language doubles maintenance for a personal project | Single Norwegian README in Bokmal. English speakers can use browser translation. One-line English summary at the very top is fine |
-| Nynorsk variant | The user writes Bokmal. Nynorsk is a separate written standard used by ~10% of Norwegians. Adding it doubles maintenance with no benefit for this personal project | Write consistently in Bokmal |
-| Auto-generated API reference (Sphinx/mkdocs) | 2,321 LOC codebase with good existing docstrings. Auto-doc tooling adds build complexity disproportionate to project size | Good docstrings in code (already present) + architecture section in README |
-| Interactive color picker / configurable colors | Over-engineering. The color problem needs 1-2 constant changes in layout.py, not a configuration system | Hardcode correct LED-safe colors. Document the color palette in README for anyone forking |
-| Per-weather-condition text color overrides | Adds complexity (8 weather conditions x N text elements) for minimal gain | Use text colors that contrast with ALL animation types, not per-type overrides |
-| Comprehensive Norwegian translation of code comments | Code comments and docstrings are in English by convention. Translating them adds no value and makes the code harder to maintain | Keep code in English, README in Norwegian |
+| Dynamic ray count based on weather intensity | Sun animation does not receive precipitation_mm or any intensity parameter. Clear sky is clear sky -- there's no "intensity" gradient for sunshine. Adding unused parameters bloats the API | Keep fixed 9 far + 5 near rays. If variable sunshine intensity is ever needed (partly cloudy), it belongs in a future CompositeAnimation combining SunAnimation with CloudAnimation |
+| Rotating sun body or pulsing glow | At 64x64 resolution with a 7px radius semicircle, rotation or pulsing would look like flickering artifacts, not animation. LED pixels have discrete brightness levels -- subtle glow pulsing gets quantized to visible jumps | Static sun body with static glow. The rays provide all the animation. The body is the anchor point |
+| Curved/bent rays | Rays that curve as they travel would require bezier rendering per frame, adding complexity for a visual effect invisible at this resolution. At 64x64, a 4-7 pixel line segment has no room to curve meaningfully | Straight line segments from polar-to-cartesian math. Pillow's `draw.line()` is perfectly suited |
+| Ray width variation (thick/thin rays) | Pillow's `draw.line()` width parameter on short line segments at this resolution produces blocky rectangles, not elegant beams. Width 1 is the correct choice at 64x64 | All rays width 1. Visual distinction between far/near comes from alpha and length, not width |
+| Per-pixel dithering on ray bodies | Dithering techniques (checkerboard patterns for semi-transparency) are used in sprite-based pixel art where true alpha isn't available. The RGBA compositing pipeline already handles transparency correctly -- dithering would fight the alpha system | Use alpha channel for all transparency effects. The RGBA compositing pipeline (Image.alpha_composite) handles this natively |
+| Wind effect on sun rays | WindEffect currently targets particle lists (far_drops, near_drops, far_flakes, near_flakes). Sun rays use polar coordinates (angle, distance), not cartesian positions. Wind would need to modify angles, which produces bizarre visual results (rays bending sideways) | Sun rays are not affected by wind. This matches reality: sunbeams don't blow sideways. If wind is strong enough to matter, the weather condition would be clouds/rain, not clear sky |
+| Sunrise/sunset color transitions | Changing ray colors from warm-yellow to orange-red based on time of day adds complexity (time dependency in animation, color interpolation) for minimal visual payoff at this resolution | Fixed warm yellow palette. Time-of-day awareness already exists at the weather routing level (is_night selects ClearNightAnimation). If sunrise/sunset effects are ever desired, they belong in new animation classes |
+| Sun body position varies with time | Moving the sun across the weather zone to simulate sun position adds an API dependency (time/azimuth), complicates the ray origin math, and the 64x24 zone is too small for the motion to be meaningful | Fixed position at (48, 0). Top-right of weather zone, clear of left-side weather text. Static anchor |
 
 ## Feature Dependencies
 
 ```
-README (all sections can be written in parallel, but logical reading order matters):
-  Prosjektbeskrivelse -> Krav -> Installasjon -> Oppsett -> Bruk -> Tjeneste
-  Skjermoppsett (standalone, can be placed after Bruk)
-  Arkitektur (standalone, references module structure)
-  API-dokumentasjon (standalone, references Oppsett for env vars)
-  Discord-meldinger (requires Oppsett context)
-  Vaeranimasjoner (requires Arkitektur context)
-  Bursdagspaaskeegg (standalone mini-section)
-  Feilhaandtering (requires Arkitektur context)
-  "Bygget med Claude Code" (standalone, placed at end or as badge at top)
+Sun Body (half-sun semicircle at y=0)
+  |
+  +--> Ray Origin (rays emit from sun position)
+  |      |
+  |      +--> Ray Fade (alpha decreases with distance from origin)
+  |      |
+  |      +--> Ray Respawn (loop back to origin when faded/exited)
+  |      |
+  |      +--> Staggered Init (rays start at varied distances)
+  |
+  +--> Depth Layers (far rays on bg, near rays on fg)
+         |
+         +--> Color Palette (preserved yellows on each layer)
 
-Weather Color Fix:
-  Identify clashing colors in layout.py -> Choose replacement -> Update constant
-  -> Verify all 8 weather animation types still work -> Hardware test
-  (No dependency on README features -- can be done in parallel)
+Test Updates
+  |
+  +--> Sun Body Tests (new coordinates for TestSunBody)
+  |
+  +--> Ray Origin Test (new TestSunRayOrigin clustering assertion)
+  |
+  +--> Existing Tests (TestColorIdentity, TestAnimationVisibility should pass unchanged)
+
+Note: All ray features depend on sun body position being finalized first.
+The body position (48, 0) determines the polar coordinate origin for all rays.
 ```
 
 ## MVP Recommendation
 
-### README: Write in this order
+The implementation plan in `docs/plans/2026-02-23-sun-ray-overhaul.md` already captures the correct task ordering. Summarized here:
 
-1. **Prosjektbeskrivelse** -- the hook. What it is, what it shows, why it exists. Include display photo if available
-2. **Skjermoppsett** -- the 64x64 zone layout diagram. Makes the project tangible immediately
-3. **Krav + Installasjon + Oppsett + Bruk** -- practical core. Clone to running in 5 minutes
-4. **Kjore som tjeneste** -- launchd for always-on operation
-5. **"Bygget med Claude Code"** -- transparency badge and section (explicitly requested in milestone)
-6. **Arkitektur** -- module map and data flow for anyone forking or understanding the code
-7. **Remaining differentiators** -- API docs, Discord, birthday, error handling, animations, Norwegian chars
+### Prioritize (in order):
 
-**Defer:** None. This is a documentation milestone -- all sections should be written. The ordering above is priority for the reader experience, not a phasing suggestion.
+1. **Update sun body tests** -- Write failing tests for new half-sun geometry at (48, 0) with radius 7. Tests drive the implementation.
+2. **Add ray origin clustering test** -- Write failing test that rays cluster near the sun. This is the regression gate for the core bug fix.
+3. **Rewrite SunAnimation class** -- Replace cartesian random-position rays with polar radial-emission rays. New half-sun body. This is the single production code change.
+4. **Full test suite verification** -- All 96+ tests must pass, confirming no regressions in other animations.
 
-### Weather Color Fix: Specific recommendation
+### Defer:
 
-**The problem:** `COLOR_WEATHER_RAIN = (50, 180, 255)` (vivid blue) is rendered as rain indicator text ("2.5mm") in the weather zone. This text sits inside the rain animation, where drops are `(40, 90, 200, alpha=100)` (far/dim) and `(60, 140, 255, alpha=200)` (near/bright). All three are blue-family hues. On a 64x64 LED matrix viewed at 2+ meters, the perceptual distance between these colors is below the just-noticeable-difference threshold, making the text invisible during rain.
+- **Visual hardware testing** -- Can only be done on the physical Pixoo 64. Not blockable in automated tests. Verify after deployment that the half-sun is visible and rays read as "sunshine" at 2+ meters viewing distance.
+- **Alpha tuning** -- The current alpha ranges (100-140 far, 160-220 near) are empirically validated from v1.0. Start with these values. Only tune if physical hardware testing reveals visibility issues.
 
-**Analysis of current color usage in weather zone:**
+### Complexity Assessment:
 
-| Element | Current Color | RGB | Against Rain Anim | Status |
-|---------|--------------|-----|-------------------|--------|
-| Temperature (positive) | `COLOR_WEATHER_TEMP` | `(255, 200, 50)` | Warm yellow vs blue drops | OK -- high contrast |
-| Temperature (negative) | `COLOR_WEATHER_TEMP_NEG` | `(80, 200, 255)` | Cyan vs blue drops | Borderline -- cyan is close to blue but distinct enough due to green channel. Monitor but no fix needed now |
-| High/Low text | `COLOR_WEATHER_HILO` | `(120, 180, 160)` | Teal vs blue drops | OK -- green channel separates it |
-| Rain indicator | `COLOR_WEATHER_RAIN` | `(50, 180, 255)` | Blue vs blue drops | BROKEN -- same hue family, alpha blending makes it worse |
-| Snow crystals (anim) | N/A | `(255, 255, 255, 180)` | White vs any text | OK -- snow is bright white, text colors are all distinct |
-| Sun rays (anim) | N/A | `(255, 230, 90)` | Yellow vs temp text | Borderline -- same yellow family, but sun animation alpha is low enough that text reads through |
+This is a **low-risk, focused refactor** of a single animation class. The change is entirely within `SunAnimation` in `weather_anim.py`, touching no other animation classes, no rendering pipeline, no providers, and no layout code. The math (polar to cartesian, distance-based fade) is straightforward trigonometry. The main risk is coordinate/geometry bugs, which the test suite catches.
 
-**The fix:** Change `COLOR_WEATHER_RAIN` to a color that contrasts with blue rain drops. Recommended:
-
-| Option | RGB Value | Rationale | LED Readability |
-|--------|-----------|-----------|-----------------|
-| **Bright white** | `(255, 255, 255)` | Maximum luminance contrast against blue. Industry standard for info text on dark LED backgrounds. White reads through every animation type | BEST |
-| **Warm yellow** | `(255, 220, 100)` | Close to `COLOR_MESSAGE` yellow family. Yellow-on-blue is the #1 LED sign readability combination per signage research. Semantic risk: could confuse with temperature display | GOOD |
-| **Light cyan-white** | `(200, 240, 255)` | Stays in cool-water family while adding enough brightness to separate from pure blue drops. Subtlest change | ADEQUATE |
-
-**Recommendation:** Use `(255, 255, 255)` bright white because:
-1. Rain indicator text ("2.5mm") is purely informational -- it conveys a number, not a mood. Readability is paramount
-2. White has maximum luminance contrast against every animation type: blue rain, grey clouds, yellow sun, white snow (snow animation occupies different zone space), grey fog
-3. LED sign research consistently ranks white-on-dark as the most readable combination, with a brightness differential well above the 70% threshold for assured legibility
-4. The 4x6 "tiny" font used for rain text is already at the minimum readable size -- it cannot afford ANY contrast reduction
-5. Simple one-line change in `layout.py`: `COLOR_WEATHER_RAIN = (255, 255, 255)`
-
-**What NOT to change:** No changes needed for `COLOR_WEATHER_TEMP`, `COLOR_WEATHER_TEMP_NEG`, `COLOR_WEATHER_HILO`, or any animation colors. The bug is specifically the rain indicator text vs rain animation overlap.
+**Estimated scope:** ~90 lines of production code change (replace `SunAnimation`), ~40 lines of test changes. No new files, no new dependencies.
 
 ## Sources
 
-- [LED Sign Color Combos for Visibility](https://www.ledsignsupply.com/designing-eye-catching-content-for-outdoor-led-signs/) -- Yellow/white on dark as top LED readability combinations (MEDIUM confidence)
-- [Signage and Color Contrast](https://www.designworkplan.com/read/signage-and-color-contrast) -- 70% brightness differential threshold for assured legibility, Arthur & Passini 1992 method (MEDIUM confidence)
-- [Best Color Combinations for Signs 2025](https://www.indigosigns.com/news/best-color-combinations-sign-2025-update) -- High-contrast pairing recommendations for LED displays (MEDIUM confidence)
-- [About READMEs - GitHub Docs](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes) -- README auto-rendering, naming, placement conventions (HIGH confidence)
-- [Standard README](https://github.com/RichardLitt/standard-readme) -- Section structure and ordering conventions for GitHub READMEs (HIGH confidence)
-- [iterate/olorm](https://github.com/iterate/olorm) -- Real Norwegian-language README using "Installasjon" terminology (MEDIUM confidence)
-- [Color Difference - Wikipedia](https://en.wikipedia.org/wiki/Color_difference) -- Perceptual color distance theory, JND thresholds, CIE color spaces (HIGH confidence)
-- Codebase analysis: `src/display/weather_anim.py` lines 79, 90 (rain drop colors), `src/display/layout.py` line 61 (`COLOR_WEATHER_RAIN`), `src/display/renderer.py` lines 196-202 (rain text rendering) -- actual color values causing the clash (HIGH confidence)
+- Codebase analysis: `src/display/weather_anim.py` lines 276-368 (existing SunAnimation), `src/display/layout.py` line 23 (WEATHER_ZONE: 64x24 at y=40) -- PRIMARY source for constraints and existing patterns (HIGH confidence)
+- Codebase analysis: `tests/test_weather_anim.py` lines 603-632 (TestSunBody), lines 113-117 (sun alpha test), lines 220-231 (sun color test) -- existing test contracts (HIGH confidence)
+- Design plan: `docs/plans/2026-02-23-sun-ray-overhaul-design.md` -- half-sun geometry, polar ray model, depth layers specification (HIGH confidence)
+- Implementation plan: `docs/plans/2026-02-23-sun-ray-overhaul.md` -- task ordering, test-first approach, specific code changes (HIGH confidence)
+- Original bug report: `.planning/todos/done/2026-02-22-sun-rays-animation-unrecognizable-without-sun-in-weather-zone.md` -- user feedback that sun rays are "hard to understand" without visible sun (HIGH confidence)
+- [Sun Beams / God Rays Shader Breakdown](https://www.cyanilux.com/tutorials/god-rays-shader-breakdown/) -- distance-based attenuation, radial emission from point source, fade math applicable to 2D (MEDIUM confidence)
+- [God Rays Part 1](https://blog.cclarke-magrab.me/blogs/graphics/god-rays-01) -- ray-casting from point source, sampling along ray path, directional scattering approximation (MEDIUM confidence)
+- [Volumetric Lighting - Wikipedia](https://en.wikipedia.org/wiki/Volumetric_lighting) -- crepuscular rays theory, light scattering through medium (HIGH confidence)
+- [Pixel Art Tutorial: Complete Guide](https://generalistprogrammer.com/tutorials/pixel-art-complete-tutorial-beginner-to-pro) -- 64x64 canvas guidance, 1-2 pixel movement per frame max for smooth animation, 4-16 color palette per sprite (MEDIUM confidence)
+- [Semi-Transparency Dithering - Lospec](https://lospec.com/pixel-art-tutorials/semi-transparency-dither-by-st0ven) -- dithering as transparency substitute; confirms RGBA alpha compositing is the correct approach when true alpha is available (MEDIUM confidence)
+- [LED Matrix Display for Pixel Art](https://learn.adafruit.com/pixel-art-matrix-display/overview) -- LED matrix fundamentals, 64x32 bitmap handling, animation sprite sheet patterns (MEDIUM confidence)

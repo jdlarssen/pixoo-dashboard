@@ -1,208 +1,195 @@
-# Stack Research
+# Technology Stack
 
-**Domain:** LED dashboard documentation and color accessibility (v1.1 milestone)
-**Researched:** 2026-02-21
-**Confidence:** HIGH
+**Project:** Divoom Hub v1.2 -- Sun Ray Overhaul
+**Researched:** 2026-02-23
+**Scope:** Radial sun ray emission with distance-based alpha fading on 64x24 RGBA weather zone
 
 ## Executive Finding
 
-No new dependencies are needed for v1.1. The Norwegian README is a pure Markdown authoring task. The weather particle color fix is a constants-only change in `layout.py` and `weather_anim.py`. The existing stack (Python 3.12+, Pillow, pixoo) handles everything required.
+No new dependencies needed. Zero. The existing stack (Pillow 12.1.1, Python `math` stdlib) already provides every capability required for radial ray drawing with alpha fading. The `math` module is already imported in `weather_anim.py`. Pillow's `ImageDraw.point()`, `ImageDraw.line()`, and `ImageDraw.pieslice()` all correctly handle RGBA fill colors on RGBA images. Verified against the installed Pillow 12.1.1 with working code proofs.
 
-## Existing Stack (Validated -- No Changes Needed)
+## Existing Stack (No Changes)
 
 ### Core Technologies
 
 | Technology | Version | Purpose | Status |
 |------------|---------|---------|--------|
-| Python | 3.12+ (venv runs 3.14) | Runtime | Keep as-is |
-| Pillow | >=12.1.0 (latest: 12.1.1) | Image rendering, RGBA compositing | Keep as-is, version constraint already correct |
-| pixoo | latest | Device communication over LAN | Keep as-is |
-| discord.py | >=2.0 | Message override bot | Keep as-is |
-| python-dotenv | >=1.0 | .env config loading | Keep as-is |
+| Python | 3.14 (venv) | Runtime | Keep as-is |
+| Pillow | 12.1.1 (installed) | RGBA image rendering, compositing | Keep as-is |
+| `math` stdlib | N/A (stdlib) | `cos`, `sin`, `radians` for polar-to-cartesian | Already imported in `weather_anim.py` |
+| `random` stdlib | N/A (stdlib) | Particle spawning, jitter | Already imported in `weather_anim.py` |
 
-### Dev Dependencies
+### pyproject.toml
 
-| Tool | Purpose | Status |
-|------|---------|--------|
-| pytest | Test suite (96 tests) | Keep as-is |
-| ruff | Linting, line-length=100 | Keep as-is |
+No changes needed. Current `Pillow>=12.1.0` constraint is correct.
 
-## Feature 1: Norwegian README
+## Drawing Techniques for Radial Sun Rays
 
-### What's Needed: Nothing New
+### Technique 1: Half-Sun Body with `pieslice()`
 
-The README is a single `README.md` file written in Norwegian Bokmal. This requires no tooling, no libraries, and no build steps. GitHub renders Markdown natively with full UTF-8 support for Norwegian characters (ae, oe, aa).
+Use `ImageDraw.pieslice()` for the semicircular sun body at the top-right of the weather zone. This is the correct Pillow primitive for drawing a filled arc/wedge shape.
 
-### README Structure Decisions
+**Why pieslice, not ellipse:** The sun is a half-circle (only the bottom half is visible, the top half is above the weather zone edge). `pieslice()` with `start=0, end=180` draws exactly this shape. `ellipse()` draws full circles only.
 
-| Decision | Recommendation | Why |
-|----------|---------------|-----|
-| Language | Norwegian Bokmal | User preference, matches the dashboard's Norwegian date display. All code comments are English, so international developers can still navigate the codebase. |
-| File name | `README.md` (root) | GitHub convention. Single README, no need for separate `README.no.md` / `README.en.md` since this is a personal project. |
-| Encoding | UTF-8 (default) | GitHub and all modern editors handle this natively. No BOM needed. |
+**Verified signature:** `pieslice(xy, start, end, fill=None, outline=None, width=1)`
 
-### Claude Code Transparency Badge
-
-Use a shields.io static badge. No dependency, just a Markdown image link.
-
-```markdown
-![Bygd med Claude Code](https://img.shields.io/badge/Bygd%20med-Claude%20Code-D97757?logo=claude&logoColor=white)
+**Proven code:**
+```python
+# Sun at (48, 0) in the 64x24 weather zone, radius 7
+cx, cy, r = 48, 0, 7
+draw.pieslice([cx-r, cy-r, cx+r, cy+r], start=0, end=180, fill=(255, 220, 60, 200))
 ```
 
-The color `D97757` is Anthropic's official Claude brand color. The badge text "Bygd med" is Norwegian for "Built with".
+**Verified output:** Produces a clean 15px-wide semicircle from y=0 to y=7, spanning x=41 to x=55. 96 filled pixels. Correct RGBA alpha preserved.
 
-**Source:** [Shields.io Static Badge API](https://shields.io/badges) -- HIGH confidence
+**Confidence:** HIGH -- tested against installed Pillow 12.1.1, pixel output verified.
 
-### Norwegian README Conventions
+### Technique 2: Pixel-by-Pixel Rays with Distance-Based Alpha Fade
 
-No formal Norwegian-specific README standard exists (confirmed via search). Norwegian open source projects (e.g., NRK) typically write READMEs in English for broader reach. Since this is a personal/hobby project targeting a Norwegian household, writing in Bokmal is the right call. Follow standard GitHub README structure adapted to Norwegian:
+For rays that fade with distance, draw each pixel individually using `ImageDraw.point()` with alpha computed from distance to sun center. This is the only way to get per-pixel alpha variation along a line in Pillow (Pillow's `line()` method uses a single fill color for the entire line).
 
-| Section (Norwegian) | Purpose |
-|---------------------|---------|
-| Oversikt | Project overview with photo/screenshot |
-| Funksjoner | Feature list |
-| Oppsett | Installation and setup |
-| Konfigurasjon | .env configuration reference |
-| Arkitektur | System architecture overview |
-| API-er | Entur and MET Norway API details |
-| Tjeneste | launchd service setup |
-| Discord | Message override feature |
-| Utvikling | Development setup, testing |
-| Bygd med Claude Code | AI transparency section |
+**Why point-by-point, not `line()`:** `ImageDraw.line()` accepts one `fill` color for the whole line. It cannot vary alpha along the line's length. To fade from alpha=180 near the sun to alpha=40 at the tip, each pixel must be drawn individually.
 
-## Feature 2: Weather Particle Color Fix
+**Polar-to-cartesian conversion:**
+```python
+import math
 
-### The Problem
+cx, cy = 48, 0  # sun center
+angle_rad = math.radians(angle_deg)
+cos_a = math.cos(angle_rad)
+sin_a = math.sin(angle_rad)
 
-The current color assignments create indistinguishable elements on the Pixoo 64 LED hardware:
-
-| Element | Current Color (RGB) | Visual Result |
-|---------|---------------------|---------------|
-| Rain text (`COLOR_WEATHER_RAIN`) | `(50, 180, 255)` | Blue |
-| Rain far drops (bg) | `(40, 90, 200, 100)` | Blue |
-| Rain near drops (fg) | `(60, 140, 255, 200)` | Blue |
-
-All three are blue-channel-dominant. On a 64x64 LED matrix, the rain precipitation text ("2.5mm") bleeds into rain drop particles because they share the same hue. The text becomes invisible during rain animation.
-
-### What's Needed: Color Constant Changes Only
-
-This is a pure code change in two files:
-- `src/display/layout.py` -- change `COLOR_WEATHER_RAIN`
-- `src/display/weather_anim.py` -- potentially adjust particle colors
-
-No new libraries or dependencies required. PIL/Pillow's RGBA compositing already handles alpha blending correctly.
-
-### Recommended Color Palette Fix
-
-The fix strategy is to separate text and animation into distinct color channels so they remain distinguishable even when overlapping via alpha compositing.
-
-**Principle:** Text uses warm/hot colors (yellow, orange, white). Animations use cool colors (blue for rain, white for snow). This creates channel separation that survives alpha blending on LED hardware.
-
-#### Current Problem Colors
-
-```
-Rain text:       (50, 180, 255)   -- blue, same hue as rain drops
-Rain particles:  (40-60, 90-140, 200-255) -- blue
+for d in range(start_d, end_d):
+    x = int(cx + d * cos_a)
+    y = int(cy + d * sin_a)
+    if 0 <= x < 64 and 0 <= y < 24:
+        progress = d / max_length
+        alpha = int(base_alpha * (1.0 - progress))
+        draw.point((x, y), fill=(r, g, b, max(alpha, min_alpha)))
 ```
 
-#### Recommended Fix
+**Performance:** 0.02ms per tick for 14 rays at 15-pixel length. The 1 FPS rate limit gives 1000ms per frame. Ray drawing uses 0.002% of the frame budget. Performance is a non-issue.
 
-| Element | Current | Proposed | Why |
-|---------|---------|----------|-----|
-| `COLOR_WEATHER_RAIN` (text) | `(50, 180, 255)` blue | `(255, 140, 60)` orange | Warm color contrasts against cool blue rain particles. Orange is highly visible on LED. Blue-orange is the safest color-blind-friendly pair. |
-| Rain far drops (bg) | `(40, 90, 200, 100)` | Keep as-is | Blue rain drops are visually correct for rain. The problem is the TEXT color matching, not the particle color. |
-| Rain near drops (fg) | `(60, 140, 255, 200)` | Keep as-is | Same reasoning. |
+**Confidence:** HIGH -- benchmarked on this machine, verified pixel output with correct alpha values.
 
-**Why orange for rain text:**
-1. **Channel separation:** Orange (R=255, G=140, B=60) is red-channel-dominant. Rain particles (B=200-255) are blue-channel-dominant. They cannot blend into each other on LED hardware.
-2. **Color-blind safe:** Blue + orange is the recommended color-blind-friendly pair. It works for deuteranopia (red-green, 8% of men), protanopia (red-green, 1%), and tritanopia (blue-yellow, <0.01%).
-3. **Consistent with existing palette:** `COLOR_BUS_DIR2` already uses `(255, 180, 50)` amber/orange, proving this hue works on the Pixoo 64 hardware.
-4. **LED brightness:** Orange requires high R and moderate G values, both of which LED matrices render brightly.
+### Technique 3: Pre-computed Trig Values (Optimization)
 
-**Confidence:** HIGH -- Based on established color theory (channel separation), confirmed LED behavior from v1.0 development (alpha values 65-180 range), and the project's own validated color palette.
+Cache `math.cos(angle_rad)` and `math.sin(angle_rad)` per ray rather than recomputing each tick. Each ray's angle is fixed at spawn time; only the "progress" distance changes per tick.
 
-#### Snow Animation Consideration
+```python
+# At ray spawn time:
+ray["cos_a"] = math.cos(math.radians(angle_deg))
+ray["sin_a"] = math.sin(math.radians(angle_deg))
 
-Snow particles are white `(200-255, 210-255, 230-255)`. The temperature text `COLOR_WEATHER_TEMP` is warm yellow `(255, 200, 50)` -- already distinct from white. The high/low text `COLOR_WEATHER_HILO` is teal `(120, 180, 160)` -- also distinct. No snow color changes needed.
+# At draw time (per pixel):
+x = int(cx + d * ray["cos_a"])
+y = int(cy + d * ray["sin_a"])
+```
 
-#### Full Weather Zone Color Audit
+**Why:** Not for performance (it is already fast) but for code clarity. Computing trig once at spawn makes the per-tick draw loop cleaner.
 
-| Element | Color | Channel Dominance | Conflict? |
-|---------|-------|-------------------|-----------|
-| Temp text (positive) | `(255, 200, 50)` | Red/Yellow | No -- distinct from all animations |
-| Temp text (negative) | `(80, 200, 255)` | Cyan-Blue | Potential conflict with rain drops |
-| Hi/Lo text | `(120, 180, 160)` | Teal/Green | No -- distinct channel |
-| Rain text | `(50, 180, 255)` | **Blue -- CONFLICTS with rain** | **YES -- fix to orange** |
-| Rain bg particles | `(40, 90, 200)` | Blue | No -- this is correct for rain |
-| Rain fg particles | `(60, 140, 255)` | Blue | No -- this is correct for rain |
-| Snow bg particles | `(200, 210, 230)` | White/cool | No -- temp text is yellow, distinct |
-| Snow fg crystals | `(255, 255, 255)` | Pure white | No -- temp text is yellow, distinct |
-| Sun rays | `(220-255, 180-230, 60-90)` | Yellow/Gold | Minor overlap with temp text, but sun + temp together is visually coherent |
+**Confidence:** HIGH -- standard math optimization, trivial.
 
-**Secondary fix to consider:** `COLOR_WEATHER_TEMP_NEG` at `(80, 200, 255)` is cyan-blue, which could conflict with rain particles during sub-zero rain (sleet). Consider shifting to a lighter cyan like `(100, 220, 255)` or keeping as-is since sleet + negative temp is a narrow edge case. Flag for testing on hardware.
+## Math Functions Required
+
+All available in Python `math` stdlib, already imported in `weather_anim.py`:
+
+| Function | Purpose | Example |
+|----------|---------|---------|
+| `math.cos(rad)` | X component of polar-to-cartesian | `x = cx + d * cos(angle)` |
+| `math.sin(rad)` | Y component of polar-to-cartesian | `y = cy + d * sin(angle)` |
+| `math.radians(deg)` | Convert degrees to radians | `math.radians(225)` for down-left |
+| `math.pi` | Full circle = 2*pi, semicircle = pi | Angle range calculation |
+
+No `numpy`, no `math.atan2`, no `math.sqrt` needed. The ray system only needs forward conversion (polar -> cartesian), never the reverse.
+
+## Angle Convention for Ray Emission
+
+Standard math convention used by both Pillow and Python `math`:
+- 0 degrees = 3 o'clock (right)
+- 90 degrees = 6 o'clock (down, in screen coordinates where Y increases downward)
+- 180 degrees = 9 o'clock (left)
+- 270 degrees = 12 o'clock (up)
+
+For a sun at top-right emitting rays downward and to the left into the weather zone, the useful angle range is approximately **180 to 360 degrees** (the bottom semicircle in screen coordinates). Pillow's `pieslice(start=0, end=180)` uses the same convention (0=right, going clockwise to 180=left), which draws the bottom half -- the visible half of the sun.
+
+**Confidence:** HIGH -- verified with pieslice output and polar ray drawing tests.
+
+## Alpha Fading Strategy
+
+The project's established alpha ranges (from v1.0 LED hardware tuning):
+- LED pixels below ~RGB(15,15,15) produce no visible light
+- Alpha values 65-230 are the validated visible range after compositing
+- Far layer (bg): alpha 90-150
+- Near layer (fg): alpha 160-230
+
+For distance-based ray fading:
+
+| Ray Depth | Base Alpha (near sun) | Minimum Alpha (tip) | Rationale |
+|-----------|----------------------|---------------------|-----------|
+| Far (bg) | 130-150 | 40-60 | Dim rays visible behind text, fade to near-invisible |
+| Near (fg) | 180-220 | 60-80 | Bright rays over text, fade but stay LED-visible |
+
+These ranges maintain compatibility with the existing LED visibility thresholds established in v1.0 and tested in `test_weather_anim.py`.
+
+**Confidence:** HIGH -- based on existing validated alpha ranges in the codebase (see `weather_anim.py` lines 8-9 and test assertions).
 
 ## What NOT to Add
 
 | Avoid | Why | What to Do Instead |
 |-------|-----|-------------------|
-| Documentation generators (Sphinx, MkDocs) | This is a single README for a personal project, not a library with API docs | Write `README.md` directly in Markdown |
-| i18n/l10n libraries | Single language (Norwegian), no runtime translation needed | Hardcode Norwegian text in README |
-| Color palette libraries (colorspacious, etc.) | The fix is 1-2 RGB constant changes, not a dynamic palette system | Hand-pick colors based on channel separation |
-| Image generation for README screenshots | Screenshots should be actual photos of the display running, not generated images | Take a photo of the physical Pixoo 64 |
-| Markdown linting (markdownlint, etc.) | Over-engineering for a single file | Review manually or use editor's built-in preview |
-| Additional fonts or rendering libraries | BDF bitmap fonts already handle Norwegian characters | No changes to font pipeline |
+| numpy | Overkill for 14 rays x 15 pixels. Pure Python math is 0.02ms/tick. numpy's import overhead alone would be larger than the total computation. | Use `math.cos()` / `math.sin()` from stdlib |
+| Anti-aliasing libraries | 64x64 LED pixels are physically large. Anti-aliasing produces sub-pixel blending that is invisible on LED hardware and wastes alpha budget. | Draw with `point()` at integer coordinates |
+| Cairo / skia-python | Alternative 2D renderers. Would require rewriting the entire rendering pipeline. Pillow already does everything needed. | Keep Pillow |
+| Bresenham line algorithm (manual) | Pillow's `line()` already implements this internally. For faded rays, pixel-by-pixel with `point()` is the correct approach anyway. | Use `point()` for faded rays, `line()` where uniform alpha suffices |
+| New animation framework / particles library | The existing `WeatherAnimation` base class with `tick()` returning `(bg_layer, fg_layer)` is the right pattern. Sun rays are just a new set of particles. | Extend `SunAnimation` in place |
 
 ## Alternatives Considered
 
-| Recommended | Alternative | Why Not |
-|-------------|-------------|---------|
-| Orange rain text `(255, 140, 60)` | Green rain text `(50, 255, 100)` | Green conflicts with `COLOR_URGENCY_GREEN` in the bus zone above. While different zones, visual consistency matters. |
-| Orange rain text `(255, 140, 60)` | White rain text `(255, 255, 255)` | White conflicts with snow particles. Rain and snow share the `sleet` mapping, so rain text could appear during snow animation. |
-| Orange rain text `(255, 140, 60)` | Magenta rain text `(255, 80, 200)` | Magenta is not in the existing palette vocabulary. Orange already has precedent (bus direction 2). |
-| Single README.md in Norwegian | README.md (EN) + README.no.md (NO) | Personal project, single audience. Dual READMEs add maintenance burden with no benefit. |
-| shields.io static badge | Custom SVG badge | shields.io is the GitHub standard. No reason to custom-build. |
+| Category | Recommended | Alternative | Why Not |
+|----------|-------------|-------------|---------|
+| Sun body shape | `pieslice()` | `ellipse()` cropped | pieslice directly draws semicircle; cropping adds unnecessary compositing step |
+| Ray rendering | `point()` per pixel | `line()` with segments | `line()` cannot vary alpha per pixel. Segments would produce visible alpha steps (banding) at this resolution. |
+| Ray rendering | `point()` per pixel | Pre-render ray images | Over-engineering. There are only ~14 rays, each ~15 pixels. Direct drawing is simpler and equally fast. |
+| Angle range | 180-360 degrees | Configurable arc | The sun is always at top-right. Hardcoded emission range is simpler and correct. Make it a class constant for testability. |
+| Alpha interpolation | Linear fade `1.0 - (d/max_d)` | Quadratic / exponential | Linear is visually correct for LED: LED brightness is already non-linear (gamma ~2.2), so linear alpha produces a perceived exponential fade. Start simple, tune on hardware if needed. |
+
+## Files That Will Change
+
+For the roadmap's benefit:
+
+| File | Change | Why |
+|------|--------|-----|
+| `src/display/weather_anim.py` | Rewrite `SunAnimation` class | New radial ray system replacing random sky-wide rays |
+| `tests/test_weather_anim.py` | Update `TestSunBody` and sun-related assertions | New geometry (pieslice semicircle, radial rays) |
+
+No new files. No new imports. No dependency changes.
 
 ## Installation
 
-No new packages to install. The existing `pyproject.toml` already covers everything:
+No changes needed:
 
 ```bash
-# Already works -- no changes needed
-pip install -e .
-pip install -e ".[dev]"
+# Nothing to install -- existing dependencies cover everything
+pip install -e .       # already works
+pip install -e ".[dev]" # already works
 ```
 
 ## Version Compatibility
 
-| Package | Current Constraint | Latest Available | Notes |
-|---------|-------------------|------------------|-------|
-| Pillow | >=12.1.0 | 12.1.1 | Compatible, minor patch. No action needed. |
-| discord.py | >=2.0 | 2.x | Compatible. |
-| python-dotenv | >=1.0 | 1.x | Compatible. |
-| pixoo | (unpinned) | latest | No version constraint in pyproject.toml. Works as-is. |
-
-## Files That Will Change
-
-For the roadmap's benefit, here are the exact files impacted by each feature:
-
-### Norwegian README
-- **New:** `README.md` (project root)
-- No other file changes
-
-### Weather Color Fix
-- **Modified:** `src/display/layout.py` -- change `COLOR_WEATHER_RAIN` constant
-- **Possibly modified:** `src/display/weather_anim.py` -- only if particle colors also need adjustment (likely not)
-- **Modified:** Tests that assert on `COLOR_WEATHER_RAIN` value (if any)
+| Package | Constraint | Installed | Required Feature | Status |
+|---------|-----------|-----------|-----------------|--------|
+| Pillow | >=12.1.0 | 12.1.1 | `pieslice()` with RGBA fill, `point()` with RGBA fill | Available since Pillow 2.0+. Verified working. |
+| Python | >=3.10 | 3.14 | `math.cos`, `math.sin`, `math.radians` | Available since Python 1.0. |
 
 ## Sources
 
-- [Pillow 12.1.1 on PyPI](https://pypi.org/project/pillow/) -- version verification, HIGH confidence
-- [Shields.io Static Badge API](https://shields.io/badges) -- badge format and Claude brand color, HIGH confidence
-- [Visme: Color Blind Friendly Palettes](https://visme.co/blog/color-blind-friendly-palette/) -- blue-orange as safest pair, MEDIUM confidence
-- [Smashing Magazine: Designing for Colorblindness](https://www.smashingmagazine.com/2024/02/designing-for-colorblindness/) -- channel separation principles, MEDIUM confidence
-- [NRK Open Source](https://nrkno.github.io/) -- Norwegian org README conventions (English default), LOW confidence (limited sample)
-- Codebase analysis of `src/display/layout.py` and `src/display/weather_anim.py` -- color audit, HIGH confidence (primary source)
+- [Pillow 12.1.1 ImageDraw documentation](https://pillow.readthedocs.io/en/stable/reference/ImageDraw.html) -- pieslice(), line(), point() signatures and RGBA support. HIGH confidence.
+- [Python math module documentation](https://docs.python.org/3/library/math.html) -- cos, sin, radians availability. HIGH confidence.
+- Codebase verification: `weather_anim.py` already imports `math` and `random`. Already uses `ImageDraw.Draw()` on RGBA images. HIGH confidence (primary source).
+- Local benchmarks: 0.02ms/tick for 14 rays at 15px length on this hardware. HIGH confidence (measured).
+- Local pixel verification: pieslice and point-by-point rays produce correct RGBA output on Pillow 12.1.1. HIGH confidence (tested).
 
 ---
-*Stack research for: Divoom Hub v1.1 (Documentation & Polish)*
-*Researched: 2026-02-21*
+*Stack research for: Divoom Hub v1.2 (Sun Ray Overhaul)*
+*Researched: 2026-02-23*
