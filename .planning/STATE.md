@@ -11,24 +11,24 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 Milestone: v1.2 Sun Ray Overhaul
 Phase: 9 of 10 (Sun Body)
-Plan: 0 of ? in current phase
-Status: Ready to plan
-Last activity: 2026-02-23 -- Roadmap created for v1.2
+Plan: 1 of 1 in current phase
+Status: Phase 9 complete
+Last activity: 2026-02-23 -- Completed 09-01 sun body plan
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0 (this milestone)
-- Average duration: -
-- Total execution time: -
+- Total plans completed: 1 (this milestone)
+- Average duration: 1min
+- Total execution time: 1min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 09 | 1 | 1min | 1min |
 
 ## Milestone History
 
@@ -43,6 +43,9 @@ Progress: [░░░░░░░░░░] 0%
 
 Full log in PROJECT.md Key Decisions table.
 
+- **09-01:** Radius 8 for corner-anchored sun (visible arc ~64 body + ~65 glow pixels)
+- **09-01:** Glow spread +2px at alpha 60; static body (no pulse at 1 FPS)
+
 ### Pending Todos
 
 None.
@@ -54,5 +57,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Roadmap created for v1.2 milestone
+Stopped at: Completed 09-01-PLAN.md
 Resume file: None
