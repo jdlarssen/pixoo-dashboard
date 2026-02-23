@@ -276,17 +276,19 @@ class CloudAnimation(WeatherAnimation):
 class SunAnimation(WeatherAnimation):
     """Sun body with rays beaming downward at two depths.
 
-    A small sun circle is drawn in the top-right of the weather zone,
-    giving visual context so the rays are recognizable as sunshine.
+    A corner-anchored quarter-sun arc is drawn at the top-right corner
+    of the weather zone, giving visual context so the rays are
+    recognizable as sunshine.  PIL clips the full circle to the 64x24
+    image bounds automatically, producing the visible arc.
 
     Far rays (behind): dimmer, thinner, slower.
     Near rays (in front): brighter, longer, faster -- beaming over text.
     """
 
-    # Sun body position (top-right of weather zone, clear of left-side text)
-    _SUN_X = 48
-    _SUN_Y = 4
-    _SUN_RADIUS = 3
+    # Sun body position (top-right corner, clipped by both top and right edges)
+    _SUN_X = 63
+    _SUN_Y = 0
+    _SUN_RADIUS = 8
 
     def __init__(self, width: int = 64, height: int = 24) -> None:
         super().__init__(width, height)
@@ -331,16 +333,25 @@ class SunAnimation(WeatherAnimation):
             ray[1] = 0.0
 
     def _draw_sun_body(self, draw: ImageDraw.Draw) -> None:
-        """Draw a warm sun circle with a soft glow in the weather zone."""
-        sx, sy, r = self._SUN_X, self._SUN_Y, self._SUN_RADIUS
+        """Draw a corner-anchored quarter-sun arc at the top-right of the zone.
+
+        Two concentric ellipses provide a two-layer glow effect:
+        - Outer: dimmer warm yellow glow extending +2px beyond the body
+        - Inner: bright warm yellow sun body
+
+        PIL automatically clips pixels outside the 64x24 image bounds,
+        creating the visible quarter-sun arc without manual clipping.
+        """
+        cx, cy, r = self._SUN_X, self._SUN_Y, self._SUN_RADIUS
+        glow_r = r + 2
         # Outer glow (larger, dimmer)
         draw.ellipse(
-            [sx - r - 1, sy - r - 1, sx + r + 1, sy + r + 1],
-            fill=(255, 200, 40, 80),
+            [cx - glow_r, cy - glow_r, cx + glow_r, cy + glow_r],
+            fill=(255, 200, 40, 60),
         )
-        # Sun body (bright warm yellow)
+        # Inner body (bright warm yellow)
         draw.ellipse(
-            [sx - r, sy - r, sx + r, sy + r],
+            [cx - r, cy - r, cx + r, cy + r],
             fill=(255, 220, 60, 200),
         )
 
