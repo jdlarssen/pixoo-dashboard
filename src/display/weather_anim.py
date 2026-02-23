@@ -274,21 +274,26 @@ class CloudAnimation(WeatherAnimation):
 
 
 class SunAnimation(WeatherAnimation):
-    """Sun body with rays beaming downward at two depths.
+    """Polar radial sun rays emitting from a corner-anchored sun body.
 
     A corner-anchored quarter-sun arc is drawn at the top-right corner
-    of the weather zone, giving visual context so the rays are
-    recognizable as sunshine.  PIL clips the full circle to the 64x24
-    image bounds automatically, producing the visible arc.
+    of the weather zone.  Rays radiate outward from the sun center in a
+    downward-facing fan (95-160 degrees), fading in alpha with distance.
+    Rays respawn at the sun origin when they reach max distance or exit
+    the zone, and start at staggered distances for a mid-flow look.
 
-    Far rays (behind): dimmer, thinner, slower.
-    Near rays (in front): brighter, longer, faster -- beaming over text.
+    Far rays (behind): dimmer, shorter tails, slower -- ambient glow.
+    Near rays (in front): brighter, longer tails, faster -- parallax depth.
     """
 
     # Sun body position (top-right corner, clipped by both top and right edges)
     _SUN_X = 63
     _SUN_Y = 0
     _SUN_RADIUS = 8
+
+    # Fan geometry: downward-facing arc from top-right corner
+    _FAN_MIN_DEG = 95.0    # just past straight-down
+    _FAN_MAX_DEG = 160.0   # toward bottom-left corner
 
     def __init__(self, width: int = 64, height: int = 24) -> None:
         super().__init__(width, height)
@@ -299,38 +304,60 @@ class SunAnimation(WeatherAnimation):
 
     def _spawn_far(self, count: int) -> None:
         for _ in range(count):
-            self.far_rays.append([
-                float(random.randint(0, self.width - 1)),
-                float(random.randint(0, self.height - 1)),
-                random.uniform(0.5, 0.9),   # slower
-                random.randint(2, 4),        # shorter
-                random.randint(100, 140),    # moderate
-            ])
+            angle = random.uniform(self._FAN_MIN_DEG, self._FAN_MAX_DEG)
+            speed = random.uniform(0.3, 0.6)
+            max_dist = random.uniform(20.0, 30.0)
+            base_alpha = random.randint(90, 130)
+            distance = random.uniform(0, max_dist)  # staggered start (ANIM-07)
+            self.far_rays.append([angle, distance, speed, max_dist, float(base_alpha)])
 
     def _spawn_near(self, count: int) -> None:
         for _ in range(count):
-            self.near_rays.append([
-                float(random.randint(0, self.width - 1)),
-                float(random.randint(0, self.height - 1)),
-                random.uniform(1.0, 1.8),    # faster
-                random.randint(4, 7),         # longer
-                random.randint(160, 220),     # bright
-            ])
+            angle = random.uniform(self._FAN_MIN_DEG, self._FAN_MAX_DEG)
+            speed = random.uniform(0.5, 1.0)
+            max_dist = random.uniform(15.0, 25.0)
+            base_alpha = random.randint(150, 210)
+            distance = random.uniform(0, max_dist)  # staggered start (ANIM-07)
+            self.near_rays.append([angle, distance, speed, max_dist, float(base_alpha)])
 
     def _draw_ray(self, draw: ImageDraw.Draw, ray: list[float], color: tuple) -> None:
-        x, y, speed, length, alpha = ray[0], ray[1], ray[2], int(ray[3]), int(ray[4])
-        x1, y1 = int(x), int(y)
-        x2, y2 = int(x + length * 0.5), int(y + length)
-        if 0 <= x1 < self.width and 0 <= y1 < self.height:
-            draw.line(
-                [(x1, y1), (min(x2, self.width - 1), min(y2, self.height - 1))],
-                fill=(*color, alpha),
-            )
-        ray[0] += speed * 0.4
-        ray[1] += speed
-        if ray[1] >= self.height or ray[0] >= self.width:
-            ray[0] = float(random.randint(0, self.width - 1))
+        angle, distance, speed, max_dist, base_alpha = ray
+
+        # Advance outward from sun origin
+        distance += speed
+        ray[1] = distance
+
+        # Polar to cartesian
+        rad = math.radians(angle)
+        x = self._SUN_X + math.cos(rad) * distance
+        y = self._SUN_Y + math.sin(rad) * distance
+
+        # Respawn if out of zone or past max distance
+        if distance >= max_dist or x < 0 or x >= self.width or y < 0 or y >= self.height:
+            # Reset distance and re-randomize for organic variety (Pitfall 5)
+            ray[0] = random.uniform(self._FAN_MIN_DEG, self._FAN_MAX_DEG)
             ray[1] = 0.0
+            ray[2] = random.uniform(0.3, 0.6) if base_alpha < 140 else random.uniform(0.5, 1.0)
+            ray[3] = random.uniform(20.0, 30.0) if base_alpha < 140 else random.uniform(15.0, 25.0)
+            ray[4] = float(random.randint(90, 130) if base_alpha < 140 else random.randint(150, 210))
+            return
+
+        # Distance-based alpha fade (ANIM-04)
+        fade = 1.0 - (distance / max_dist)
+        alpha = int(base_alpha * fade)
+        if alpha < 15:  # below LED visibility threshold
+            return
+
+        # Draw ray segment: short line trailing back toward origin
+        x1, y1 = int(x), int(y)
+        tail_len = 2 if base_alpha < 140 else 3  # far=shorter, near=longer
+        tx = x - math.cos(rad) * tail_len
+        ty = y - math.sin(rad) * tail_len
+        x2 = int(max(0, min(tx, self.width - 1)))
+        y2 = int(max(0, min(ty, self.height - 1)))
+
+        if 0 <= x1 < self.width and 0 <= y1 < self.height:
+            draw.line([(x2, y2), (x1, y1)], fill=(*color, alpha))
 
     def _draw_sun_body(self, draw: ImageDraw.Draw) -> None:
         """Draw a corner-anchored quarter-sun arc at the top-right of the zone.
@@ -361,12 +388,14 @@ class SunAnimation(WeatherAnimation):
         bg_draw = ImageDraw.Draw(bg)
         fg_draw = ImageDraw.Draw(fg)
 
-        # Sun body behind text for context
+        # Sun body behind text (unchanged from Phase 9)
         self._draw_sun_body(bg_draw)
 
+        # Far rays on bg layer (behind text) -- ANIM-06
         for ray in self.far_rays:
             self._draw_ray(bg_draw, ray, (240, 200, 40))
 
+        # Near rays on fg layer (in front of text) -- ANIM-06
         for ray in self.near_rays:
             self._draw_ray(fg_draw, ray, (255, 240, 60))
 
