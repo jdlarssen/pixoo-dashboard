@@ -30,7 +30,7 @@ Archived to `.planning/milestones/v1.1-ROADMAP.md`
 - Integer phases (9, 10): Planned milestone work
 - Decimal phases (9.1, 9.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 9: Sun Body** - Half-sun semicircle with two-layer glow anchoring the weather zone
+- [x] **Phase 9: Sun Body** - Half-sun semicircle with two-layer glow anchoring the weather zone (completed 2026-02-23)
 - [ ] **Phase 10: Radial Ray System** - Polar ray emission from sun with depth layers and fade
 
 ## Phase Details
@@ -72,5 +72,5 @@ Phases execute in numeric order: 9 -> 10
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 9. Sun Body | v1.2 | 0/1 | Planned | - |
+| 9. Sun Body | v1.2 | Complete    | 2026-02-23 | - |
 | 10. Radial Ray System | v1.2 | 0/? | Not started | - |
