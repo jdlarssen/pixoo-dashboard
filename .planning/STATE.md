@@ -40,6 +40,10 @@ Progress: [██████████] 100%
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- Phase 11 added: Discord status logging for remote monitoring
+
 ### Decisions
 
 Full log in PROJECT.md Key Decisions table.
