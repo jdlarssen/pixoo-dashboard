@@ -44,11 +44,10 @@ Archived to `.planning/milestones/v1.1-ROADMAP.md`
   2. The sun body has a two-layer glow -- a dimmer outer ring and a brighter warm-yellow inner fill
   3. No sun pixels render above the weather zone boundary (clipping is clean)
   4. Sun body tests pass, asserting correct position, radius, and boundary clipping
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 09-01: TBD
-- [ ] 09-02: TBD
+- [ ] 09-01-PLAN.md — Corner-anchored quarter-sun body with two-layer glow and updated tests
 
 ### Phase 10: Radial Ray System
 **Goal**: Sun rays emit outward from the sun body in a natural radial pattern with depth and fade
@@ -73,5 +72,5 @@ Phases execute in numeric order: 9 -> 10
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 9. Sun Body | v1.2 | 0/? | Not started | - |
+| 9. Sun Body | v1.2 | 0/1 | Planned | - |
 | 10. Radial Ray System | v1.2 | 0/? | Not started | - |
