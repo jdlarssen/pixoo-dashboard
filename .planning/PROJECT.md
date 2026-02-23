@@ -37,7 +37,9 @@ Glance at the display and instantly know: what time it is, when the next buses l
 
 ### Active
 
-None — v1.1 milestone complete.
+- [ ] Half-sun body at top-right of weather zone with radial ray emission (ANIM-01)
+- [ ] Sun rays originate from sun and fade with distance (ANIM-02)
+- [ ] Update sun body and ray tests for new geometry (ANIM-03)
 
 ### Out of Scope
 
@@ -94,5 +96,14 @@ Weather color issue fixed in v1.1 Phase 7. Norwegian README (414 lines) added in
 - **v1.0 MVP** — Shipped 2026-02-21. Full dashboard with clock, bus, weather, Discord override, birthday easter egg.
 - **v1.1 Documentation & Polish** — Shipped 2026-02-21. Weather color fix (Phase 7) + comprehensive Norwegian README (Phase 8, 414 lines, 15 DOC requirements).
 
+## Current Milestone: v1.2 Sun Ray Overhaul
+
+**Goal:** Replace random sky-wide sun rays with radial beams that emit outward from a half-sun at the top-right of the weather zone.
+
+**Target features:**
+- Half-sun semicircle (radius 7) clipped at top edge of weather zone at x=48
+- Rays emit radially from sun, fade with distance, respawn continuously
+- Preserve two-depth-layer system (far/near) and yellow color palette
+
 ---
-*Last updated: 2026-02-21 after v1.1 milestone*
+*Last updated: 2026-02-23 after v1.2 milestone start*
