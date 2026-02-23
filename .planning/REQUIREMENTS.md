@@ -11,16 +11,16 @@ Requirements for sun ray overhaul. Each maps to roadmap phases.
 
 - [x] **ANIM-01**: Sun appears as a half-sun semicircle (r=7) clipped at the top-right of the weather zone at (48, 0)
 - [x] **ANIM-02**: Sun body has two-layer glow (outer dim, inner bright warm yellow)
-- [ ] **ANIM-03**: Rays emit radially outward from sun center across a downward-facing fan
-- [ ] **ANIM-04**: Ray alpha fades with distance from sun
-- [ ] **ANIM-05**: Rays respawn at sun origin when faded or exited zone
-- [ ] **ANIM-06**: Far rays (9) on bg layer, near rays (5) on fg layer — depth system preserved
-- [ ] **ANIM-07**: Staggered initial ray distances so animation starts mid-flow
+- [x] **ANIM-03**: Rays emit radially outward from sun center across a downward-facing fan
+- [x] **ANIM-04**: Ray alpha fades with distance from sun
+- [x] **ANIM-05**: Rays respawn at sun origin when faded or exited zone
+- [x] **ANIM-06**: Far rays (9) on bg layer, near rays (5) on fg layer — depth system preserved
+- [x] **ANIM-07**: Staggered initial ray distances so animation starts mid-flow
 
 ### Testing
 
 - [x] **TEST-01**: Sun body tests updated for new position and radius
-- [ ] **TEST-02**: Ray origin clustering test — rays concentrate near sun, not randomly scattered
+- [x] **TEST-02**: Ray origin clustering test — rays concentrate near sun, not randomly scattered
 
 ## Future Requirements
 
@@ -42,13 +42,13 @@ None — this is a focused overhaul milestone.
 |-------------|-------|--------|
 | ANIM-01 | Phase 9 | Complete |
 | ANIM-02 | Phase 9 | Complete |
-| ANIM-03 | Phase 10 | Pending |
-| ANIM-04 | Phase 10 | Pending |
-| ANIM-05 | Phase 10 | Pending |
-| ANIM-06 | Phase 10 | Pending |
-| ANIM-07 | Phase 10 | Pending |
+| ANIM-03 | Phase 10 | Complete |
+| ANIM-04 | Phase 10 | Complete |
+| ANIM-05 | Phase 10 | Complete |
+| ANIM-06 | Phase 10 | Complete |
+| ANIM-07 | Phase 10 | Complete |
 | TEST-01 | Phase 9 | Complete |
-| TEST-02 | Phase 10 | Pending |
+| TEST-02 | Phase 10 | Complete |
 
 **Coverage:**
 - v1.2 requirements: 9 total
