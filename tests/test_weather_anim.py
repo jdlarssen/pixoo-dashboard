@@ -648,6 +648,86 @@ class TestSunBody:
         assert len(colors) > 10, f"Only {len(colors)} particles -- rays should still be active"
 
 
+class TestRadialRays:
+    """Verify polar radial ray system in SunAnimation.
+
+    Tests validate that rays emit from the sun origin in a polar fan,
+    fade with distance, respawn correctly, and start staggered.
+    """
+
+    def test_ray_origin_clustering(self):
+        """Rays should cluster near sun origin, not be randomly scattered (ANIM-03/TEST-02)."""
+        anim = SunAnimation()
+
+        # Tick several times to let rays distribute
+        for _ in range(10):
+            anim.tick()
+
+        # Collect current ray head positions
+        sun_x, sun_y = SunAnimation._SUN_X, SunAnimation._SUN_Y
+        distances_from_sun = []
+
+        for ray in anim.far_rays + anim.near_rays:
+            angle, distance, speed, max_dist, base_alpha = ray
+            rad = math.radians(angle)
+            x = sun_x + math.cos(rad) * distance
+            y = sun_y + math.sin(rad) * distance
+            dist = math.sqrt((x - sun_x) ** 2 + (y - sun_y) ** 2)
+            distances_from_sun.append(dist)
+
+        avg_dist = sum(distances_from_sun) / len(distances_from_sun)
+        assert avg_dist < 20.0, (
+            f"Average ray distance from sun ({avg_dist:.1f}px) too large -- "
+            f"rays should cluster near origin, not scatter randomly"
+        )
+
+    def test_rays_have_polar_state(self):
+        """Ray lists should use the 5-element polar state format."""
+        anim = SunAnimation()
+        assert len(anim.far_rays) == 9, f"Expected 9 far rays, got {len(anim.far_rays)}"
+        assert len(anim.near_rays) == 5, f"Expected 5 near rays, got {len(anim.near_rays)}"
+
+        # Check structure of a sample far ray
+        ray = anim.far_rays[0]
+        assert len(ray) == 5, f"Ray should have 5 elements, got {len(ray)}"
+        assert 95.0 <= ray[0] <= 160.0, f"Angle {ray[0]} outside fan range 95-160"
+        assert ray[1] >= 0, f"Distance {ray[1]} should be non-negative"
+
+    def test_rays_respawn_after_max_distance(self):
+        """Rays should reset distance when reaching max_dist (ANIM-05)."""
+        anim = SunAnimation()
+        ray = anim.far_rays[0]
+        # Force ray close to max distance so next tick pushes it past
+        ray[1] = ray[3] - 0.1  # distance = max_dist - 0.1
+
+        anim.tick()
+
+        # After tick, ray should have respawned (distance near 0)
+        # or advanced just past and been reset
+        assert ray[1] < ray[2] + 0.1, (
+            f"Ray distance {ray[1]:.1f} should be near 0 after respawn "
+            f"(speed is {ray[2]:.1f})"
+        )
+
+    def test_staggered_initial_distances(self):
+        """Rays should start at varied distances, not all at origin (ANIM-07)."""
+        anim = SunAnimation()
+        all_distances = [ray[1] for ray in anim.far_rays + anim.near_rays]
+
+        # At least half should have distance > 1.0 (staggered, not all at origin)
+        staggered = sum(1 for d in all_distances if d > 1.0)
+        assert staggered >= len(all_distances) // 2, (
+            f"Only {staggered}/{len(all_distances)} rays staggered (distance > 1.0) -- "
+            f"most should start mid-travel, not at origin"
+        )
+
+        # Distances should not all be identical (variation present)
+        unique_distances = set(round(d, 2) for d in all_distances)
+        assert len(unique_distances) > 1, (
+            "All ray distances identical -- should have random variation"
+        )
+
+
 class TestSnowIntensity:
     """Verify snow particle count scales with precipitation amount."""
 
