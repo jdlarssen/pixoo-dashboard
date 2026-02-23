@@ -601,29 +601,45 @@ class TestRainIntensity:
 
 
 class TestSunBody:
-    """Verify sun body is visible in SunAnimation for visual context."""
+    """Verify corner-anchored quarter-sun body in SunAnimation."""
 
     def test_sun_body_produces_warm_pixels_at_position(self):
-        """Sun body should produce warm yellow pixels near its position."""
+        """Sun body should produce warm yellow pixels in the visible arc area."""
         anim = SunAnimation()
         bg, fg = anim.tick()
-        # Sun body is drawn in bg layer at (_SUN_X, _SUN_Y)
-        sx, sy = SunAnimation._SUN_X, SunAnimation._SUN_Y
-        pixel = bg.getpixel((sx, sy))
+        # Check a pixel clearly within the visible arc (not at exact corner
+        # boundary where PIL rasterization can be inconsistent)
+        pixel = bg.getpixel((58, 3))
         r, g, b, a = pixel
-        assert a >= 150, f"Sun body center alpha {a} too low"
+        assert a >= 150, f"Sun body alpha {a} too low at visible arc position (58, 3)"
         assert r > b + 50, f"Sun body not warm yellow: R={r} B={b}"
 
     def test_sun_body_has_glow(self):
         """Sun body should have a softer glow around the core."""
         anim = SunAnimation()
         bg, fg = anim.tick()
-        sx, sy = SunAnimation._SUN_X, SunAnimation._SUN_Y
+        cx = SunAnimation._SUN_X
         r = SunAnimation._SUN_RADIUS
-        # Check a pixel just outside the main body (in the glow)
-        glow_pixel = bg.getpixel((sx - r - 1, sy))
-        _, _, _, a = glow_pixel
-        assert a > 0, "No glow detected around sun body"
+        # Check a pixel just outside the body radius but within glow radius
+        glow_x = cx - r - 1
+        if 0 <= glow_x < 64:
+            glow_pixel = bg.getpixel((glow_x, 2))
+            _, _, _, a = glow_pixel
+            assert a > 0, "No glow detected around sun body"
+
+    def test_sun_body_clipped_at_boundary(self):
+        """Image bounds enforce clipping and sun is visibly present."""
+        anim = SunAnimation()
+        bg, fg = anim.tick()
+        assert bg.size == (64, 24), f"bg size {bg.size} != (64, 24)"
+        # Count non-transparent pixels to verify the sun is visible
+        non_transparent = sum(
+            1 for x in range(64) for y in range(24)
+            if bg.getpixel((x, y))[3] > 0
+        )
+        assert non_transparent > 30, (
+            f"Sun barely visible: only {non_transparent} non-transparent pixels"
+        )
 
     def test_sun_animation_still_has_rays(self):
         """Sun animation should still produce ray particles alongside the body."""
