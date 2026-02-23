@@ -9,8 +9,8 @@ Requirements for sun ray overhaul. Each maps to roadmap phases.
 
 ### Animation
 
-- [ ] **ANIM-01**: Sun appears as a half-sun semicircle (r=7) clipped at the top-right of the weather zone at (48, 0)
-- [ ] **ANIM-02**: Sun body has two-layer glow (outer dim, inner bright warm yellow)
+- [x] **ANIM-01**: Sun appears as a half-sun semicircle (r=7) clipped at the top-right of the weather zone at (48, 0)
+- [x] **ANIM-02**: Sun body has two-layer glow (outer dim, inner bright warm yellow)
 - [ ] **ANIM-03**: Rays emit radially outward from sun center across a downward-facing fan
 - [ ] **ANIM-04**: Ray alpha fades with distance from sun
 - [ ] **ANIM-05**: Rays respawn at sun origin when faded or exited zone
@@ -19,7 +19,7 @@ Requirements for sun ray overhaul. Each maps to roadmap phases.
 
 ### Testing
 
-- [ ] **TEST-01**: Sun body tests updated for new position and radius
+- [x] **TEST-01**: Sun body tests updated for new position and radius
 - [ ] **TEST-02**: Ray origin clustering test — rays concentrate near sun, not randomly scattered
 
 ## Future Requirements
@@ -40,14 +40,14 @@ None — this is a focused overhaul milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ANIM-01 | Phase 9 | Pending |
-| ANIM-02 | Phase 9 | Pending |
+| ANIM-01 | Phase 9 | Complete |
+| ANIM-02 | Phase 9 | Complete |
 | ANIM-03 | Phase 10 | Pending |
 | ANIM-04 | Phase 10 | Pending |
 | ANIM-05 | Phase 10 | Pending |
 | ANIM-06 | Phase 10 | Pending |
 | ANIM-07 | Phase 10 | Pending |
-| TEST-01 | Phase 9 | Pending |
+| TEST-01 | Phase 9 | Complete |
 | TEST-02 | Phase 10 | Pending |
 
 **Coverage:**
