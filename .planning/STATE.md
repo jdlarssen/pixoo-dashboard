@@ -2,17 +2,18 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-21)
+See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Glance at the display and instantly know: what time it is, when the next buses leave, and what the weather is doing -- without pulling out your phone.
-**Current focus:** All milestones complete. No active work.
+**Current focus:** v1.2 Sun Ray Overhaul
 
 ## Current Position
 
-Milestone: v1.1 Documentation & Polish -- SHIPPED
-Phase: All phases complete (7-8)
-Status: Milestone archived. No active milestone.
-Last activity: 2026-02-21 -- v1.1 milestone archived and tagged
+Milestone: v1.2 Sun Ray Overhaul
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-23 — Milestone v1.2 started
 
 ## Milestone History
 
@@ -29,8 +30,7 @@ Full log in PROJECT.md Key Decisions table.
 
 ### Pending Todos
 
-1. Rain animation intensity should reflect precipitation amount (display)
-2. Sun rays animation unrecognizable without sun in weather zone (display)
+None — rain intensity already implemented, sun rays is the current milestone.
 
 ### Blockers/Concerns
 
@@ -38,6 +38,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-21
-Stopped at: v1.1 milestone archived and tagged. No active milestone.
+Last session: 2026-02-23
+Stopped at: Defining v1.2 milestone requirements
 Resume file: None
