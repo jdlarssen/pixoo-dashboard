@@ -59,11 +59,10 @@ Plans:
   3. Rays continuously respawn at the sun origin when they fade out or exit the zone -- animation never stalls
   4. Far rays appear behind weather text and near rays appear in front, preserving the depth effect
   5. Animation starts mid-flow with rays at staggered distances -- no initial burst from the sun
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 10-01: TBD
-- [ ] 10-02: TBD
+- [ ] 10-01-PLAN.md — Polar radial ray system with distance fade, respawn, depth layers, and clustering test
 
 ## Progress
 
@@ -73,4 +72,4 @@ Phases execute in numeric order: 9 -> 10
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 9. Sun Body | v1.2 | Complete    | 2026-02-23 | - |
-| 10. Radial Ray System | v1.2 | 0/? | Not started | - |
+| 10. Radial Ray System | v1.2 | 0/1 | Not started | - |
