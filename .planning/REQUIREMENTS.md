@@ -40,21 +40,21 @@ None — this is a focused overhaul milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ANIM-01 | — | Pending |
-| ANIM-02 | — | Pending |
-| ANIM-03 | — | Pending |
-| ANIM-04 | — | Pending |
-| ANIM-05 | — | Pending |
-| ANIM-06 | — | Pending |
-| ANIM-07 | — | Pending |
-| TEST-01 | — | Pending |
-| TEST-02 | — | Pending |
+| ANIM-01 | Phase 9 | Pending |
+| ANIM-02 | Phase 9 | Pending |
+| ANIM-03 | Phase 10 | Pending |
+| ANIM-04 | Phase 10 | Pending |
+| ANIM-05 | Phase 10 | Pending |
+| ANIM-06 | Phase 10 | Pending |
+| ANIM-07 | Phase 10 | Pending |
+| TEST-01 | Phase 9 | Pending |
+| TEST-02 | Phase 10 | Pending |
 
 **Coverage:**
 - v1.2 requirements: 9 total
-- Mapped to phases: 0
-- Unmapped: 9
+- Mapped to phases: 9
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-23*
-*Last updated: 2026-02-23 after initial definition*
+*Last updated: 2026-02-23 after roadmap creation*
