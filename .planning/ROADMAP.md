@@ -89,5 +89,5 @@ Phases execute in numeric order: 9 -> 10
 **Plans**: 2 plans
 
 Plans:
-- [ ] 11-01-PLAN.md -- Core monitoring module (MonitorBridge, HealthTracker, embed builders, tests)
+- [x] 11-01-PLAN.md -- Core monitoring module (MonitorBridge, HealthTracker, embed builders, tests)
 - [ ] 11-02-PLAN.md -- Bot extension, config, main loop integration, human verification
