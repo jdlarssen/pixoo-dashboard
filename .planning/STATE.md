@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-24)
 Phase: None (between milestones)
 Plan: N/A
 Status: v1.2 milestone complete -- archived
-Last activity: 2026-02-24 -- Completed quick-1 device keep-alive plan
+Last activity: 2026-02-24 - Completed quick task 1: Implement device keep-alive ping + auto-reboot recovery
 
 Progress: [██████████] 100%
 
@@ -52,6 +52,12 @@ None.
 ### Blockers/Concerns
 
 None.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 1 | Implement device keep-alive ping + auto-reboot recovery | 2026-02-24 | 4cd24d8 | [1-implement-device-keep-alive-ping-auto-re](./quick/1-implement-device-keep-alive-ping-auto-re/) |
 
 ## Session Continuity
 
