@@ -44,3 +44,28 @@
 
 ---
 
+
+## v1.2 Sun Ray Overhaul (Shipped: 2026-02-24)
+
+**Phases:** 3 | **Plans:** 4 | **Tasks:** 9 | **LOC:** 6,716 Python (3,676 src + 3,040 tests)
+**Timeline:** 2 days (2026-02-23 → 2026-02-24) | **Git range:** cbe411d..6a66ca9
+**Requirements:** 16/16 complete (ANIM-01-07 + TEST-01-03 + MON-01-06)
+
+**Delivered:** Radial sun ray overhaul with corner-anchored half-sun body + Discord-based remote health monitoring with debounced error/recovery embeds.
+
+**Key accomplishments:**
+1. Corner-anchored quarter-sun body (r=8) with two-layer warm-yellow glow using PIL auto-clipping
+2. Polar radial ray system in 95-160° fan with distance-based alpha fade and continuous respawn
+3. MonitorBridge for thread-safe sync-to-async Discord embed delivery with 5s timeout
+4. HealthTracker debounced state machine with per-component failure thresholds (bus=3, weather=2, device=5)
+5. Discord bot extended with monitoring channel, status command, and startup/shutdown lifecycle embeds
+6. Dynamic bus stop name and weather location resolution for human-readable startup embed
+
+**Known Tech Debt:**
+- `health_tracker._monitor` assigned via direct private attribute write (fragile if refactored to double-underscore)
+- `HealthTracker(monitor=None)` tracks state in memory even when monitoring disabled (trivial overhead)
+
+**Archives:** `milestones/v1.2-ROADMAP.md` | `milestones/v1.2-REQUIREMENTS.md` | `milestones/v1.2-MILESTONE-AUDIT.md`
+
+---
+
