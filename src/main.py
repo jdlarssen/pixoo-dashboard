@@ -22,10 +22,13 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 from src.config import (
+    BUS_QUAY_DIRECTION1,
+    BUS_QUAY_DIRECTION2,
     BUS_REFRESH_INTERVAL,
     DEVICE_IP,
     DISCORD_BOT_TOKEN,
     DISCORD_CHANNEL_ID,
+    DISCORD_MONITOR_CHANNEL_ID,
     FONT_DIR,
     FONT_SMALL,
     FONT_TINY,
@@ -41,6 +44,7 @@ from src.display.weather_anim import WeatherAnimation, get_animation
 from src.display.weather_icons import symbol_to_group
 from src.providers.bus import fetch_bus_data
 from src.providers.discord_bot import MessageBridge, start_discord_bot
+from src.providers.discord_monitor import HealthTracker, MonitorBridge, startup_embed, shutdown_embed
 from src.providers.sun import is_dark
 from src.providers.weather import WeatherData, fetch_weather_safe
 from src.device.pixoo_client import PixooClient
@@ -93,6 +97,7 @@ def main_loop(
     *,
     save_frame: bool = False,
     message_bridge: MessageBridge | None = None,
+    health_tracker: HealthTracker | None = None,
 ) -> None:
     """Run the dashboard main loop.
 
@@ -109,6 +114,7 @@ def main_loop(
         fonts: Font dictionary with keys "small", "tiny".
         save_frame: If True, save each rendered frame to debug_frame.png.
         message_bridge: Optional MessageBridge from Discord bot for message override.
+        health_tracker: Optional HealthTracker for monitoring integration.
     """
     # --- TEST MODE: hardcode weather for visual testing ---
     # Set TEST_WEATHER env var to: clear, rain, snow, fog (cycles on restart)
@@ -167,10 +173,14 @@ def main_loop(
                 last_good_bus = fresh_bus
                 last_good_bus_time = now_mono
                 logger.info("Bus data refreshed: dir1=%s dir2=%s", bus_data[0], bus_data[1])
+                if health_tracker:
+                    health_tracker.record_success("bus_api")
             else:
                 # API failed -- keep using last-good data
                 bus_data = last_good_bus
                 logger.warning("Bus fetch failed, using last-good data (age=%.0fs)", now_mono - last_good_bus_time if last_good_bus_time > 0 else 0)
+                if health_tracker:
+                    health_tracker.record_failure("bus_api", "Bus API returned no data")
 
         # Independent 600-second weather data refresh
         if test_weather_mode and test_weather_mode in test_weather_map:
@@ -200,6 +210,8 @@ def main_loop(
                 weather_data = fresh_weather
                 last_good_weather = fresh_weather
                 last_good_weather_time = now_mono
+                if health_tracker:
+                    health_tracker.record_success("weather_api")
                 logger.info(
                     "Weather refreshed: %.1f°C %s precip=%.1fmm",
                     weather_data.temperature,
@@ -227,6 +239,8 @@ def main_loop(
                 # API failed -- keep using last-good data
                 weather_data = last_good_weather
                 logger.warning("Weather fetch failed, using last-good data (age=%.0fs)", now_mono - last_good_weather_time if last_good_weather_time > 0 else 0)
+                if health_tracker:
+                    health_tracker.record_failure("weather_api", "Weather API returned no data")
 
         # Calculate staleness flags
         bus_age = now_mono - last_good_bus_time if last_good_bus_time > 0 else 0
@@ -283,7 +297,14 @@ def main_loop(
                 frame.save("debug_frame.png")
                 logger.info("Saved debug_frame.png")
 
-            client.push_frame(frame)
+            try:
+                client.push_frame(frame)
+                if health_tracker:
+                    health_tracker.record_success("device")
+            except Exception as e:
+                logger.exception("Failed to push frame to device")
+                if health_tracker:
+                    health_tracker.record_failure("device", str(e))
             if state_changed:
                 logger.info("Pushed frame: %s %s", current_state.time_str, current_state.date_str)
             needs_push = False
@@ -324,8 +345,41 @@ def main() -> None:
     logger.info("Connecting to Pixoo 64 at %s (simulated=%s)", args.ip, args.simulated)
     client = PixooClient(ip=args.ip, simulated=args.simulated)
 
+    # Set up monitoring (optional -- requires DISCORD_MONITOR_CHANNEL_ID)
+    monitor_bridge = None
+    health_tracker = HealthTracker(monitor=None)
+
+    def on_ready_callback(bot_client):
+        nonlocal monitor_bridge
+        if DISCORD_MONITOR_CHANNEL_ID:
+            monitor_bridge = MonitorBridge(bot_client, int(DISCORD_MONITOR_CHANNEL_ID))
+            health_tracker._monitor = monitor_bridge
+            try:
+                embed = startup_embed(
+                    pixoo_ip=args.ip,
+                    bus_quay_dir1=BUS_QUAY_DIRECTION1,
+                    bus_quay_dir2=BUS_QUAY_DIRECTION2,
+                    weather_lat=WEATHER_LAT,
+                    weather_lon=WEATHER_LON,
+                )
+                monitor_bridge.send_embed(embed)
+                logger.info("Monitoring active -- startup embed sent to channel %s", DISCORD_MONITOR_CHANNEL_ID)
+            except Exception:
+                logger.exception("Failed to send startup embed")
+
     # Start Discord bot in background thread (optional)
-    message_bridge = start_discord_bot(DISCORD_BOT_TOKEN, DISCORD_CHANNEL_ID)
+    if DISCORD_MONITOR_CHANNEL_ID:
+        message_bridge = start_discord_bot(
+            DISCORD_BOT_TOKEN,
+            DISCORD_CHANNEL_ID,
+            monitor_channel_id=DISCORD_MONITOR_CHANNEL_ID,
+            health_tracker=health_tracker,
+            on_ready_callback=on_ready_callback,
+        )
+    else:
+        message_bridge = start_discord_bot(DISCORD_BOT_TOKEN, DISCORD_CHANNEL_ID)
+        logger.info("Discord monitoring not configured (no DISCORD_MONITOR_CHANNEL_ID)")
+
     if message_bridge:
         logger.info("Discord bot started for message override")
     else:
@@ -333,9 +387,17 @@ def main() -> None:
 
     logger.info("Starting dashboard main loop (Ctrl+C to stop)")
     try:
-        main_loop(client, fonts, save_frame=args.save_frame, message_bridge=message_bridge)
+        main_loop(client, fonts, save_frame=args.save_frame, message_bridge=message_bridge, health_tracker=health_tracker)
     except KeyboardInterrupt:
         logger.info("Shutting down")
+        # Best-effort shutdown embed (2-second timeout)
+        if monitor_bridge:
+            try:
+                embed = shutdown_embed()
+                monitor_bridge.send_embed(embed)
+                logger.info("Shutdown embed sent")
+            except Exception:
+                logger.debug("Could not send shutdown embed (expected on forced kill)")
 
 
 if __name__ == "__main__":
