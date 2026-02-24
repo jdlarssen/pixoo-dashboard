@@ -135,6 +135,62 @@ class TestPushFrameErrorHandling:
         client._pixoo.push.assert_not_called()
 
 
+class TestPushFrameReturnValue:
+    """push_frame() returns True/False/None to indicate success/error/skipped."""
+
+    def test_returns_true_on_success(self, client, test_image):
+        """Successful push returns True."""
+        result = client.push_frame(test_image)
+        assert result is True
+
+    def test_returns_false_on_network_error(self, client, test_image):
+        """Network error during push returns False (not None)."""
+        client._pixoo.push.side_effect = ReadTimeout("Read timed out")
+        result = client.push_frame(test_image)
+        assert result is False
+
+    def test_returns_false_on_oserror(self, client, test_image):
+        """OSError (host down) returns False."""
+        client._pixoo.push.side_effect = OSError("Host is down")
+        result = client.push_frame(test_image)
+        assert result is False
+
+    def test_returns_none_during_cooldown(self, client, test_image):
+        """Cooldown skip returns None (not False)."""
+        import time
+
+        client._error_until = time.monotonic() + 60
+        result = client.push_frame(test_image)
+        assert result is None
+
+    def test_returns_none_when_rate_limited(self, client, test_image):
+        """Rate-limit skip returns None (not False)."""
+        import time
+
+        client._last_push_time = time.monotonic()
+        result = client.push_frame(test_image)
+        assert result is None
+
+    def test_caller_can_distinguish_error_from_skip(self, client, test_image):
+        """Callers can use 'is True/False/None' to route health tracking."""
+        import time
+
+        # Success case
+        result = client.push_frame(test_image)
+        assert result is True
+
+        # Error case
+        client._last_push_time = 0.0
+        client._error_until = 0.0
+        client._pixoo.push.side_effect = ConnectionError("refused")
+        result = client.push_frame(test_image)
+        assert result is False
+
+        # Skip case (cooldown from the error above)
+        result = client.push_frame(test_image)
+        assert result is None
+
+
 class TestSetBrightnessErrorHandling:
     """set_brightness() should catch network errors and not crash."""
 

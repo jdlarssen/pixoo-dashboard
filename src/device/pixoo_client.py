@@ -101,7 +101,7 @@ class PixooClient:
         self._last_push_time: float = 0.0
         self._error_until: float = 0.0  # monotonic time when cooldown expires
 
-    def push_frame(self, image: Image.Image) -> None:
+    def push_frame(self, image: Image.Image) -> bool | None:
         """Push a PIL Image frame to the device.
 
         Enforces a minimum 1.0-second interval between pushes. The Pixoo 64
@@ -116,17 +116,22 @@ class PixooClient:
 
         Args:
             image: A PIL RGB Image (should be 64x64 for Pixoo 64).
+
+        Returns:
+            True if the frame was delivered to the device.
+            False if a communication error occurred (device unreachable).
+            None if the push was skipped (rate limit or error cooldown).
         """
         now = time.monotonic()
 
         # Respect error cooldown
         if now < self._error_until:
-            return
+            return None
 
         # Rate limit: enforce minimum interval
         elapsed = now - self._last_push_time
         if self._last_push_time > 0 and elapsed < _MIN_PUSH_INTERVAL:
-            return
+            return None
 
         try:
             self._pixoo.draw_image(image)
@@ -135,8 +140,9 @@ class PixooClient:
             logger.warning("Device communication error during push_frame: %s", exc)
             self._error_until = time.monotonic() + _ERROR_COOLDOWN
             logger.info("Device cooldown: pausing pushes for %.0fs", _ERROR_COOLDOWN)
-            return
+            return False
         self._last_push_time = time.monotonic()
+        return True
 
     def set_brightness(self, level: int) -> None:
         """Set device brightness, capped at MAX_BRIGHTNESS.
@@ -164,8 +170,8 @@ class PixooClient:
         """
         try:
             test_image = Image.new("RGB", (self._size, self._size), color=(0, 0, 40))
-            self.push_frame(test_image)
-            return True
+            result = self.push_frame(test_image)
+            return result is True
         except Exception:
             logger.exception("Device connection test failed")
             return False
