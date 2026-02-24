@@ -73,3 +73,21 @@ Phases execute in numeric order: 9 -> 10
 |-------|-----------|----------------|--------|-----------|
 | 9. Sun Body | v1.2 | Complete    | 2026-02-23 | - |
 | 10. Radial Ray System | 1/1 | Complete   | 2026-02-23 | - |
+
+### Phase 11: Discord Status Logging for Remote Monitoring
+
+**Goal**: Application health is remotely observable via Discord -- problems reported automatically, silence means healthy
+**Depends on**: Phase 10
+**Requirements**: MON-01, MON-02, MON-03, MON-04, MON-05, MON-06, TEST-03
+**Success Criteria** (what must be TRUE):
+  1. Startup embed appears in monitoring channel with config summary when app launches
+  2. Error embeds appear after sustained component failures (debounced, not on first blip)
+  3. Recovery embeds appear with downtime duration when failed components recover
+  4. "status" command in monitoring channel returns a health snapshot embed
+  5. App runs identically without DISCORD_MONITOR_CHANNEL_ID set -- zero overhead
+  6. Existing display-message channel behavior is completely unchanged
+**Plans**: 2 plans
+
+Plans:
+- [ ] 11-01-PLAN.md -- Core monitoring module (MonitorBridge, HealthTracker, embed builders, tests)
+- [ ] 11-02-PLAN.md -- Bot extension, config, main loop integration, human verification
