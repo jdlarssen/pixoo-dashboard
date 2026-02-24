@@ -10,6 +10,7 @@ prevent cascading failures when the device is in a degraded state.
 """
 
 import functools
+import json
 import logging
 import time
 
@@ -100,6 +101,7 @@ class PixooClient:
         self._size = size
         self._last_push_time: float = 0.0
         self._error_until: float = 0.0  # monotonic time when cooldown expires
+        self._ip = ip
 
     def push_frame(self, image: Image.Image) -> bool | None:
         """Push a PIL Image frame to the device.
@@ -143,6 +145,48 @@ class PixooClient:
             return False
         self._last_push_time = time.monotonic()
         return True
+
+    def ping(self) -> bool | None:
+        """Send a lightweight health-check to keep the device WiFi alive.
+
+        Uses Channel/GetAllConf which returns device config without any
+        visual side-effect. Respects error cooldown.
+
+        Returns:
+            True if device responded, False on communication error,
+            None if skipped (error cooldown active).
+        """
+        now = time.monotonic()
+        if now < self._error_until:
+            return None
+
+        try:
+            self._pixoo.validate_connection()
+            return True
+        except (RequestException, OSError) as exc:
+            logger.warning("Device ping failed: %s", exc)
+            self._error_until = time.monotonic() + _ERROR_COOLDOWN
+            return False
+
+    def reboot(self) -> bool:
+        """Send Device/SysReboot command to force the device to restart.
+
+        Best-effort: the device may not respond if it's truly offline,
+        or may disconnect mid-reboot. Either case returns False.
+
+        Returns:
+            True if the reboot command was acknowledged, False otherwise.
+        """
+        try:
+            _requests_module.post(
+                f"http://{self._ip}/post",
+                json.dumps({"Command": "Device/SysReboot"}),
+            )
+            logger.warning("Device reboot command sent to %s", self._ip)
+            return True
+        except (RequestException, OSError) as exc:
+            logger.warning("Device reboot failed: %s", exc)
+            return False
 
     def set_brightness(self, level: int) -> None:
         """Set device brightness, capped at MAX_BRIGHTNESS.

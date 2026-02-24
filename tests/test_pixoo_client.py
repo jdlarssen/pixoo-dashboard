@@ -23,6 +23,7 @@ def client():
         c._size = 64
         c._last_push_time = 0.0
         c._error_until = 0.0
+        c._ip = "192.168.0.193"
         return c
 
 
@@ -231,3 +232,68 @@ class TestSetBrightnessErrorHandling:
         client.set_brightness(100)
         # MAX_BRIGHTNESS is 90, so it should be capped
         client._pixoo.set_brightness.assert_called_once_with(90)
+
+
+class TestPing:
+    """ping() sends a lightweight health check to keep the device's WiFi alive."""
+
+    def test_ping_returns_true_on_success(self, client):
+        """Successful ping returns True."""
+        client._pixoo.validate_connection.return_value = True
+        assert client.ping() is True
+
+    def test_ping_returns_false_on_network_error(self, client):
+        """Network error during ping returns False."""
+        client._pixoo.validate_connection.side_effect = ConnectionError("refused")
+        assert client.ping() is False
+
+    def test_ping_returns_false_on_oserror(self, client):
+        """OSError (host down) during ping returns False."""
+        client._pixoo.validate_connection.side_effect = OSError("Host is down")
+        assert client.ping() is False
+
+    def test_ping_returns_none_during_cooldown(self, client):
+        """Ping is skipped during error cooldown."""
+        import time
+        client._error_until = time.monotonic() + 60
+        assert client.ping() is None
+        client._pixoo.validate_connection.assert_not_called()
+
+    def test_ping_sets_cooldown_on_failure(self, client):
+        """Failed ping activates error cooldown."""
+        client._pixoo.validate_connection.side_effect = ConnectionError("refused")
+        client.ping()
+        assert client._error_until > 0
+
+
+class TestReboot:
+    """reboot() sends Device/SysReboot to force the device to restart."""
+
+    def test_reboot_returns_true_on_success(self, client):
+        """Successful reboot command returns True."""
+        with patch("src.device.pixoo_client._requests_module.post") as mock_post:
+            mock_post.return_value = MagicMock(status_code=200)
+            assert client.reboot() is True
+
+    def test_reboot_returns_false_on_network_error(self, client):
+        """Network error during reboot returns False."""
+        with patch("src.device.pixoo_client._requests_module.post") as mock_post:
+            mock_post.side_effect = ConnectionError("Host is down")
+            assert client.reboot() is False
+
+    def test_reboot_returns_false_on_timeout(self, client):
+        """Timeout during reboot returns False (device may already be rebooting)."""
+        with patch("src.device.pixoo_client._requests_module.post") as mock_post:
+            mock_post.side_effect = ReadTimeout("Read timed out")
+            assert client.reboot() is False
+
+    def test_reboot_sends_correct_command(self, client):
+        """Reboot sends Device/SysReboot to http://{ip}/post."""
+        with patch("src.device.pixoo_client._requests_module.post") as mock_post:
+            mock_post.return_value = MagicMock(status_code=200)
+            client.reboot()
+            mock_post.assert_called_once()
+            call_args = mock_post.call_args
+            assert "192.168.0.193" in call_args[0][0]
+            payload = call_args[0][1]
+            assert "Device/SysReboot" in payload
