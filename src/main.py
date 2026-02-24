@@ -319,16 +319,17 @@ def main_loop(
                 frame.save("debug_frame.png")
                 logger.info("Saved debug_frame.png")
 
-            try:
-                client.push_frame(frame)
+            push_result = client.push_frame(frame)
+            if push_result is True:
                 if health_tracker:
                     health_tracker.record_success("device")
-            except Exception as e:
-                logger.exception("Failed to push frame to device")
+                if state_changed:
+                    logger.info("Pushed frame: %s %s", current_state.time_str, current_state.date_str)
+            elif push_result is False:
+                # Communication error occurred (not just skipped by rate limit/cooldown)
                 if health_tracker:
-                    health_tracker.record_failure("device", str(e))
-            if state_changed:
-                logger.info("Pushed frame: %s %s", current_state.time_str, current_state.date_str)
+                    health_tracker.record_failure("device", "Device unreachable")
+            # push_result is None means skipped (rate limit / cooldown) -- no health action
             needs_push = False
 
         # Sleep 1s always.  The Pixoo 64 can handle ~1 push/second max.
