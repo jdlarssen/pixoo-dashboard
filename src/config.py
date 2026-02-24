@@ -67,6 +67,10 @@ WEATHER_USER_AGENT = os.environ.get("WEATHER_USER_AGENT", "pixoo-dashboard/1.0")
 DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN")  # None if not configured
 DISCORD_CHANNEL_ID = os.environ.get("DISCORD_CHANNEL_ID")  # None if not configured
 
+# Discord monitoring channel for remote health alerts (optional)
+# Sends error/recovery embeds -- silence means healthy
+DISCORD_MONITOR_CHANNEL_ID = os.environ.get("DISCORD_MONITOR_CHANNEL_ID")  # None if not configured
+
 # Birthday easter egg (optional -- comma-separated MM-DD dates)
 # Example: "01-01,06-15" for March 17 and December 16
 BIRTHDAY_DATES_RAW = os.environ.get("BIRTHDAY_DATES", "")

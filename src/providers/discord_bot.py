@@ -5,6 +5,10 @@ configured channel appear on the Pixoo display. Sending 'clear' removes
 the message. The bot is optional -- if DISCORD_BOT_TOKEN or DISCORD_CHANNEL_ID
 is not set, it simply does not start.
 
+Optionally supports a second monitoring channel for health alerts and on-demand
+status queries. Monitoring is purely additive -- if DISCORD_MONITOR_CHANNEL_ID
+is not set, the bot behaves exactly as before.
+
 Thread safety: MessageBridge uses a threading.Lock to safely pass messages
 from the async Discord bot thread to the synchronous main rendering loop.
 """
@@ -73,17 +77,31 @@ class MessageBridge:
             return self._message
 
 
-def run_discord_bot(bridge: MessageBridge, token: str, channel_id: int) -> None:
+def run_discord_bot(
+    bridge: MessageBridge,
+    token: str,
+    channel_id: int,
+    *,
+    monitor_channel_id: int | None = None,
+    health_tracker=None,
+    on_ready_callback=None,
+) -> None:
     """Run the Discord bot (blocking). Designed for background thread.
 
     Listens for messages in the configured channel. Any text message sets
     the display message. 'clear', 'cls', or 'reset' clears it. Reacts with
     a checkmark to confirm receipt.
 
+    Optionally listens on a monitoring channel for 'status' commands and
+    delegates lifecycle events via on_ready_callback.
+
     Args:
         bridge: MessageBridge to write messages to.
         token: Discord bot token.
-        channel_id: Discord channel ID to listen on.
+        channel_id: Discord channel ID to listen on for display messages.
+        monitor_channel_id: Optional monitoring channel ID for health alerts.
+        health_tracker: Optional HealthTracker for status command responses.
+        on_ready_callback: Optional callable(client) invoked when bot is ready.
     """
     import discord
 
@@ -94,29 +112,53 @@ def run_discord_bot(bridge: MessageBridge, token: str, channel_id: int) -> None:
     @client.event
     async def on_ready():
         logger.info("Discord bot connected as %s", client.user)
+        if on_ready_callback is not None:
+            try:
+                on_ready_callback(client)
+            except Exception:
+                logger.exception("on_ready_callback failed")
 
     @client.event
     async def on_message(message):
-        # Ignore messages from other channels
-        if message.channel.id != channel_id:
-            return
         # Ignore own messages
         if message.author == client.user:
             return
 
-        content = message.content.strip()
-        if content.lower() in ("clear", "cls", "reset"):
-            bridge.set_message(None)
-            logger.info("Display message cleared via Discord")
-        else:
-            bridge.set_message(content)
-            logger.info("Display message set: %s", content[:50])
+        # Display channel -- existing behavior (unchanged)
+        if message.channel.id == channel_id:
+            content = message.content.strip()
+            if content.lower() in ("clear", "cls", "reset"):
+                bridge.set_message(None)
+                logger.info("Display message cleared via Discord")
+            else:
+                bridge.set_message(content)
+                logger.info("Display message set: %s", content[:50])
 
-        # React to confirm receipt
-        try:
-            await message.add_reaction("\u2713")
-        except Exception:
-            pass
+            # React to confirm receipt
+            try:
+                await message.add_reaction("\u2713")
+            except Exception:
+                pass
+
+        # Monitoring channel -- status command
+        if monitor_channel_id is not None and message.channel.id == monitor_channel_id:
+            content = message.content.strip()
+            if content.lower() == "status" and health_tracker is not None:
+                try:
+                    from src.providers.discord_monitor import status_embed
+
+                    embed = status_embed(
+                        health_tracker.get_status(), health_tracker.uptime_s
+                    )
+                    await message.channel.send(embed=embed)
+                except Exception:
+                    logger.exception("Failed to send status embed")
+
+                # React to confirm receipt
+                try:
+                    await message.add_reaction("\u2713")
+                except Exception:
+                    pass
 
     try:
         client.run(token, log_handler=None)  # Suppress discord.py's own logging setup
@@ -124,15 +166,28 @@ def run_discord_bot(bridge: MessageBridge, token: str, channel_id: int) -> None:
         logger.exception("Discord bot crashed")
 
 
-def start_discord_bot(token: str | None, channel_id: str | None) -> MessageBridge | None:
+def start_discord_bot(
+    token: str | None,
+    channel_id: str | None,
+    *,
+    monitor_channel_id: str | None = None,
+    health_tracker=None,
+    on_ready_callback=None,
+) -> MessageBridge | None:
     """Start Discord bot in background thread. Returns MessageBridge or None.
 
     If token or channel_id is not provided, returns None (bot not started).
     The bot thread is a daemon -- it dies when the main process exits.
 
+    Monitoring is piggybacked on the same bot -- if the bot doesn't start
+    (no token/channel_id), monitoring doesn't start either.
+
     Args:
         token: Discord bot token (from DISCORD_BOT_TOKEN env var).
         channel_id: Discord channel ID string (from DISCORD_CHANNEL_ID env var).
+        monitor_channel_id: Optional monitoring channel ID string.
+        health_tracker: Optional HealthTracker for status command.
+        on_ready_callback: Optional callable(client) for bot ready event.
 
     Returns:
         MessageBridge instance if bot started, None if config missing.
@@ -141,9 +196,15 @@ def start_discord_bot(token: str | None, channel_id: str | None) -> MessageBridg
         return None
 
     bridge = MessageBridge()
+    monitor_id = int(monitor_channel_id) if monitor_channel_id else None
     thread = threading.Thread(
         target=run_discord_bot,
         args=(bridge, token, int(channel_id)),
+        kwargs={
+            "monitor_channel_id": monitor_id,
+            "health_tracker": health_tracker,
+            "on_ready_callback": on_ready_callback,
+        },
         daemon=True,
         name="discord-bot",
     )
