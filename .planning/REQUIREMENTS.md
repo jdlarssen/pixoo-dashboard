@@ -29,15 +29,15 @@ Requirements for Discord monitoring. Each maps to Phase 11 in roadmap.
 ### Monitoring
 
 - [ ] **MON-01**: Startup and shutdown lifecycle embeds sent to dedicated monitoring Discord channel
-- [ ] **MON-02**: Error embeds with diagnostic context (component, error type, duration, last success) after debounced failure detection
-- [ ] **MON-03**: Recovery embeds with downtime duration when failed components recover
+- [x] **MON-02**: Error embeds with diagnostic context (component, error type, duration, last success) after debounced failure detection
+- [x] **MON-03**: Recovery embeds with downtime duration when failed components recover
 - [ ] **MON-04**: On-demand "status" command in monitoring channel returns health snapshot embed
 - [ ] **MON-05**: Optional via DISCORD_MONITOR_CHANNEL_ID env var -- no channel configured = no monitoring, zero overhead
 - [ ] **MON-06**: Existing display-message channel completely untouched
 
 ### Testing
 
-- [ ] **TEST-03**: HealthTracker debounce, recovery, and embed builder tests
+- [x] **TEST-03**: HealthTracker debounce, recovery, and embed builder tests
 
 ## Future Requirements
 

@@ -5,24 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Glance at the display and instantly know: what time it is, when the next buses leave, and what the weather is doing -- without pulling out your phone.
-**Current focus:** v1.2 Sun Ray Overhaul -- Phase 10: Radial Ray System
+**Current focus:** Phase 11: Discord Status Logging for Remote Monitoring
 
 ## Current Position
 
-Milestone: v1.2 Sun Ray Overhaul
-Phase: 10 of 10 (Radial Ray System)
-Plan: 1 of 1 in current phase
-Status: Phase 10 complete -- milestone complete
-Last activity: 2026-02-23 -- Completed 10-01 radial ray system plan
+Phase: 11 (Discord Status Logging for Remote Monitoring)
+Plan: 1 of 2 complete in current phase
+Status: Plan 11-01 complete -- core monitoring module built
+Last activity: 2026-02-24 -- Completed 11-01 core monitoring module plan
 
-Progress: [██████████] 100%
+Progress: [█████-----] 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2 (this milestone)
+- Total plans completed: 3 (since v1.2)
 - Average duration: 2min
-- Total execution time: 4min
+- Total execution time: 7min
 
 **By Phase:**
 
@@ -30,6 +29,7 @@ Progress: [██████████] 100%
 |-------|-------|-------|----------|
 | 09 | 1 | 1min | 1min |
 | 10 | 1 | 3min | 3min |
+| 11 | 1 | 3min | 3min |
 
 ## Milestone History
 
@@ -53,6 +53,9 @@ Full log in PROJECT.md Key Decisions table.
 - **10-01:** 95-160 degree fan range for polar rays from top-right corner
 - **10-01:** Draw sun body after far rays to prevent PIL overwrite of body pixels
 - **10-01:** Re-randomize ray parameters on respawn for organic variety
+- **11-01:** Debounce thresholds: bus_api 3 failures/900s repeat, weather_api 2/1800s, device 5/300s, default 3/600s
+- **11-01:** MonitorBridge.send_embed() uses fut.result(timeout=5.0) for delivery confirmation
+- **11-01:** HealthTracker works with monitor=None for testing and disabled monitoring
 
 ### Pending Todos
 
@@ -64,6 +67,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-23
-Stopped at: Completed 10-01-PLAN.md -- v1.2 milestone complete
+Last session: 2026-02-24
+Stopped at: Completed 11-01-PLAN.md -- core monitoring module
 Resume file: None
