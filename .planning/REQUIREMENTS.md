@@ -28,12 +28,12 @@ Requirements for Discord monitoring. Each maps to Phase 11 in roadmap.
 
 ### Monitoring
 
-- [ ] **MON-01**: Startup and shutdown lifecycle embeds sent to dedicated monitoring Discord channel
+- [x] **MON-01**: Startup and shutdown lifecycle embeds sent to dedicated monitoring Discord channel
 - [x] **MON-02**: Error embeds with diagnostic context (component, error type, duration, last success) after debounced failure detection
 - [x] **MON-03**: Recovery embeds with downtime duration when failed components recover
-- [ ] **MON-04**: On-demand "status" command in monitoring channel returns health snapshot embed
-- [ ] **MON-05**: Optional via DISCORD_MONITOR_CHANNEL_ID env var -- no channel configured = no monitoring, zero overhead
-- [ ] **MON-06**: Existing display-message channel completely untouched
+- [x] **MON-04**: On-demand "status" command in monitoring channel returns health snapshot embed
+- [x] **MON-05**: Optional via DISCORD_MONITOR_CHANNEL_ID env var -- no channel configured = no monitoring, zero overhead
+- [x] **MON-06**: Existing display-message channel completely untouched
 
 ### Testing
 
@@ -66,19 +66,19 @@ None planned.
 | ANIM-07 | Phase 10 | Complete |
 | TEST-01 | Phase 9 | Complete |
 | TEST-02 | Phase 10 | Complete |
-| MON-01 | Phase 11 | Planned |
-| MON-02 | Phase 11 | Planned |
-| MON-03 | Phase 11 | Planned |
-| MON-04 | Phase 11 | Planned |
-| MON-05 | Phase 11 | Planned |
-| MON-06 | Phase 11 | Planned |
-| TEST-03 | Phase 11 | Planned |
+| MON-01 | Phase 11 | Complete |
+| MON-02 | Phase 11 | Complete |
+| MON-03 | Phase 11 | Complete |
+| MON-04 | Phase 11 | Complete |
+| MON-05 | Phase 11 | Complete |
+| MON-06 | Phase 11 | Complete |
+| TEST-03 | Phase 11 | Complete |
 
 **Coverage:**
 - v1.2 requirements: 9 total, 9 complete
-- Phase 11 requirements: 7 total, 0 complete
+- Phase 11 requirements: 7 total, 7 complete
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-23*
-*Last updated: 2026-02-24 after Phase 11 planning*
+*Last updated: 2026-02-24 after Phase 11 plan 02 complete*

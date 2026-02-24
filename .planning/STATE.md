@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 11 (Discord Status Logging for Remote Monitoring)
-Plan: 1 of 2 complete in current phase
-Status: Plan 11-01 complete -- core monitoring module built
-Last activity: 2026-02-24 -- Completed 11-01 core monitoring module plan
+Plan: 2 of 2 complete in current phase
+Status: Phase 11 complete -- all monitoring plans finished
+Last activity: 2026-02-24 -- Completed 11-02 bot extension and main loop integration
 
-Progress: [█████-----] 50%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3 (since v1.2)
-- Average duration: 2min
-- Total execution time: 7min
+- Total plans completed: 4 (since v1.2)
+- Average duration: 5min
+- Total execution time: 19min
 
 **By Phase:**
 
@@ -29,7 +29,7 @@ Progress: [█████-----] 50%
 |-------|-------|-------|----------|
 | 09 | 1 | 1min | 1min |
 | 10 | 1 | 3min | 3min |
-| 11 | 1 | 3min | 3min |
+| 11 | 2 | 15min | 8min |
 
 ## Milestone History
 
@@ -56,6 +56,10 @@ Full log in PROJECT.md Key Decisions table.
 - **11-01:** Debounce thresholds: bus_api 3 failures/900s repeat, weather_api 2/1800s, device 5/300s, default 3/600s
 - **11-01:** MonitorBridge.send_embed() uses fut.result(timeout=5.0) for delivery confirmation
 - **11-01:** HealthTracker works with monitor=None for testing and disabled monitoring
+- **11-02:** on_ready_callback pattern defers MonitorBridge creation until bot event loop is available
+- **11-02:** Monitor and display channels use independent if/if blocks for defensive separation
+- **11-02:** Bus stop names resolved dynamically via EnTur API; weather location via reverse geocoding
+- **11-02:** All health_tracker calls guarded with `if health_tracker:` for zero overhead when disabled
 
 ### Pending Todos
 
@@ -68,5 +72,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed 11-01-PLAN.md -- core monitoring module
+Stopped at: Completed 11-02-PLAN.md -- Phase 11 complete
 Resume file: None
