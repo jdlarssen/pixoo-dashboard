@@ -69,22 +69,35 @@ class TestEmbedBuilders:
         assert embed.color.value == 0x3498DB
 
     def test_startup_embed_has_config_fields(self):
-        """Startup embed contains Pixoo IP, Bus Stops, and Weather Location fields."""
+        """Startup embed contains Pixoo IP, bus stop, and Weather fields."""
         embed = startup_embed("192.168.1.100", "NSR:123", "NSR:456", 63.43, 10.39)
         field_names = [f.name for f in embed.fields]
         assert "Pixoo IP" in field_names
-        assert "Bus Stops" in field_names
-        assert "Weather Location" in field_names
+        assert "Bus Stop 1" in field_names
+        assert "Bus Stop 2" in field_names
+        assert "Weather" in field_names
+
+    def test_startup_embed_with_names(self):
+        """Startup embed uses human-readable names when provided."""
+        embed = startup_embed(
+            "10.0.0.5", "Q1", "Q2", 59.91, 10.75,
+            bus_name_dir1="Sentrum", bus_name_dir2="Lade",
+            weather_location="Trondheim",
+        )
+        fields = {f.name: f.value for f in embed.fields}
+        assert "Bus — Sentrum" in fields
+        assert "Bus — Lade" in fields
+        assert "Trondheim" in fields["Weather"]
 
     def test_startup_embed_field_values(self):
         """Startup embed fields contain the config values."""
         embed = startup_embed("10.0.0.5", "Q1", "Q2", 59.91, 10.75)
         fields = {f.name: f.value for f in embed.fields}
         assert fields["Pixoo IP"] == "10.0.0.5"
-        assert "Q1" in fields["Bus Stops"]
-        assert "Q2" in fields["Bus Stops"]
-        assert "59.91" in fields["Weather Location"]
-        assert "10.75" in fields["Weather Location"]
+        assert "Q1" in fields["Bus Stop 1"]
+        assert "Q2" in fields["Bus Stop 2"]
+        assert "59.91" in fields["Weather"]
+        assert "10.75" in fields["Weather"]
 
     def test_startup_embed_title(self):
         """Startup embed has correct title."""

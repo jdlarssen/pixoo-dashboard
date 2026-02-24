@@ -42,7 +42,7 @@ from src.display.renderer import render_frame
 from src.display.state import DisplayState
 from src.display.weather_anim import WeatherAnimation, get_animation
 from src.display.weather_icons import symbol_to_group
-from src.providers.bus import fetch_bus_data
+from src.providers.bus import fetch_bus_data, fetch_quay_name
 from src.providers.discord_bot import MessageBridge, start_discord_bot
 from src.providers.discord_monitor import HealthTracker, MonitorBridge, startup_embed, shutdown_embed
 from src.providers.sun import is_dark
@@ -55,6 +55,28 @@ logging.basicConfig(
     format="%(asctime)s [%(name)s] %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+def _reverse_geocode(lat: float, lon: float) -> str | None:
+    """Resolve lat/lon to a city name via OpenStreetMap Nominatim."""
+    import requests as _requests
+    try:
+        resp = _requests.get(
+            "https://nominatim.openstreetmap.org/reverse",
+            params={"lat": lat, "lon": lon, "format": "json", "zoom": 10},
+            headers={"User-Agent": "divoom-hub/1.0"},
+            timeout=5,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        address = data.get("address", {})
+        return (
+            address.get("city") or address.get("town")
+            or address.get("municipality") or address.get("village")
+        )
+    except Exception:
+        logger.debug("Reverse geocode failed for %s, %s", lat, lon)
+        return None
 
 
 def _precip_category(mm: float) -> str:
@@ -355,12 +377,18 @@ def main() -> None:
             monitor_bridge = MonitorBridge(bot_client, int(DISCORD_MONITOR_CHANNEL_ID))
             health_tracker._monitor = monitor_bridge
             try:
+                bus_name1 = fetch_quay_name(BUS_QUAY_DIRECTION1)
+                bus_name2 = fetch_quay_name(BUS_QUAY_DIRECTION2)
+                weather_location = _reverse_geocode(WEATHER_LAT, WEATHER_LON)
                 embed = startup_embed(
                     pixoo_ip=args.ip,
                     bus_quay_dir1=BUS_QUAY_DIRECTION1,
                     bus_quay_dir2=BUS_QUAY_DIRECTION2,
                     weather_lat=WEATHER_LAT,
                     weather_lon=WEATHER_LON,
+                    bus_name_dir1=bus_name1,
+                    bus_name_dir2=bus_name2,
+                    weather_location=weather_location,
                 )
                 monitor_bridge.send_embed(embed)
                 logger.info("Monitoring active -- startup embed sent to channel %s", DISCORD_MONITOR_CHANNEL_ID)
