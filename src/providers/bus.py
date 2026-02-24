@@ -127,6 +127,30 @@ def fetch_departures_safe(
         return None
 
 
+def fetch_quay_name(quay_id: str) -> str | None:
+    """Fetch the human-readable name for a quay ID.
+
+    Args:
+        quay_id: NSR quay identifier, e.g. "NSR:Quay:73154".
+
+    Returns:
+        Quay name string on success, None on failure.
+    """
+    query = '{quay(id: "%s") { name }}' % quay_id
+    try:
+        response = requests.post(
+            ENTUR_API_URL,
+            json={"query": query},
+            headers={"ET-Client-Name": ET_CLIENT_NAME},
+            timeout=10,
+        )
+        response.raise_for_status()
+        return response.json()["data"]["quay"]["name"]
+    except Exception:
+        logger.exception("Failed to fetch quay name for %s", quay_id)
+        return None
+
+
 def fetch_bus_data() -> tuple[list[int] | None, list[int] | None]:
     """Fetch departure data for both directions at the configured stop.
 

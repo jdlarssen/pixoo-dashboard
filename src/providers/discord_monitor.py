@@ -105,6 +105,9 @@ def startup_embed(
     bus_quay_dir2: str,
     weather_lat: float,
     weather_lon: float,
+    bus_name_dir1: str | None = None,
+    bus_name_dir2: str | None = None,
+    weather_location: str | None = None,
 ):
     """Build a blue startup embed with config summary.
 
@@ -114,6 +117,9 @@ def startup_embed(
         bus_quay_dir2: Quay ID for bus direction 2.
         weather_lat: Weather location latitude.
         weather_lon: Weather location longitude.
+        bus_name_dir1: Human-readable name for bus stop direction 1.
+        bus_name_dir2: Human-readable name for bus stop direction 2.
+        weather_location: Human-readable weather location name.
 
     Returns:
         discord.Embed with blue color and config fields.
@@ -126,13 +132,19 @@ def startup_embed(
         color=COLORS["startup"],
         timestamp=datetime.now(timezone.utc),
     )
-    embed.add_field(name="Pixoo IP", value=pixoo_ip, inline=True)
-    embed.add_field(
-        name="Bus Stops", value=f"{bus_quay_dir1}, {bus_quay_dir2}", inline=True
-    )
-    embed.add_field(
-        name="Weather Location", value=f"{weather_lat}, {weather_lon}", inline=True
-    )
+    embed.add_field(name="Pixoo IP", value=pixoo_ip, inline=False)
+
+    bus1_label = f"Bus — {bus_name_dir1}" if bus_name_dir1 else "Bus Stop 1"
+    bus2_label = f"Bus — {bus_name_dir2}" if bus_name_dir2 else "Bus Stop 2"
+    embed.add_field(name=bus1_label, value=bus_quay_dir1, inline=True)
+    embed.add_field(name=bus2_label, value=bus_quay_dir2, inline=True)
+
+    if weather_location:
+        weather_val = f"{weather_location} ({weather_lat}, {weather_lon})"
+    else:
+        weather_val = f"{weather_lat}, {weather_lon}"
+    embed.add_field(name="Weather", value=weather_val, inline=False)
+
     embed.set_footer(text="Divoom Hub Monitor")
     return embed
 
