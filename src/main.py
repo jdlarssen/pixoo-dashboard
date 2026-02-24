@@ -50,6 +50,11 @@ from src.providers.weather import WeatherData, fetch_weather_safe
 from src.device.pixoo_client import PixooClient
 from src.display.fonts import load_fonts
 
+# Keep-alive: ping device every 30s to prevent WiFi power-save disconnection
+_PING_INTERVAL = 30  # seconds between keep-alive pings
+_REBOOT_THRESHOLD = 5  # consecutive device failures before attempting reboot
+_REBOOT_RECOVERY_WAIT = 30  # seconds to wait after reboot for device to reconnect
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(message)s",
@@ -165,6 +170,11 @@ def main_loop(
     last_precip_mm: float = 0.0
     last_wind_speed: float = 0.0
     needs_push = False
+
+    # Device keep-alive tracking
+    last_device_success: float = 0.0  # monotonic time of last successful push or ping
+    consecutive_device_failures: int = 0
+    reboot_wait_until: float = 0.0  # monotonic time when reboot recovery wait ends
 
     # Staleness tracking -- preserve last-good data through API failures
     last_good_bus: tuple[list[int] | None, list[int] | None] = (None, None)
@@ -321,16 +331,46 @@ def main_loop(
 
             push_result = client.push_frame(frame)
             if push_result is True:
+                last_device_success = time.monotonic()
+                consecutive_device_failures = 0
                 if health_tracker:
                     health_tracker.record_success("device")
                 if state_changed:
                     logger.info("Pushed frame: %s %s", current_state.time_str, current_state.date_str)
             elif push_result is False:
-                # Communication error occurred (not just skipped by rate limit/cooldown)
+                consecutive_device_failures += 1
                 if health_tracker:
                     health_tracker.record_failure("device", "Device unreachable")
             # push_result is None means skipped (rate limit / cooldown) -- no health action
             needs_push = False
+
+        # --- Device keep-alive ping + auto-reboot recovery ---
+        if now_mono > reboot_wait_until:
+            # Check if we should attempt a reboot
+            if consecutive_device_failures >= _REBOOT_THRESHOLD:
+                logger.warning(
+                    "Device has %d consecutive failures, attempting reboot",
+                    consecutive_device_failures,
+                )
+                if client.reboot():
+                    reboot_wait_until = time.monotonic() + _REBOOT_RECOVERY_WAIT
+                    logger.info("Waiting %ds for device to recover after reboot", _REBOOT_RECOVERY_WAIT)
+                else:
+                    logger.warning("Reboot command failed (device may be fully offline)")
+                consecutive_device_failures = 0  # reset to avoid reboot spam
+
+            # Keep-alive ping when no recent device success
+            elif (now_mono - last_device_success) >= _PING_INTERVAL and last_device_success > 0:
+                ping_result = client.ping()
+                if ping_result is True:
+                    last_device_success = time.monotonic()
+                    consecutive_device_failures = 0
+                    if health_tracker:
+                        health_tracker.record_success("device")
+                elif ping_result is False:
+                    consecutive_device_failures += 1
+                    if health_tracker:
+                        health_tracker.record_failure("device", "Device ping failed")
 
         # Sleep 1s always.  The Pixoo 64 can handle ~1 push/second max.
         # Animation particles advance one step per tick, producing gentle
