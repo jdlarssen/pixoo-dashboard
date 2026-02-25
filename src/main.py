@@ -12,6 +12,7 @@ import argparse
 import logging
 import os
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -54,12 +55,33 @@ from src.display.fonts import load_fonts
 _PING_INTERVAL = 30  # seconds between keep-alive pings
 _REBOOT_THRESHOLD = 5  # consecutive device failures before attempting reboot
 _REBOOT_RECOVERY_WAIT = 30  # seconds to wait after reboot for device to reconnect
+_WATCHDOG_TIMEOUT = 120  # seconds before watchdog force-kills a hung process
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+def _watchdog_thread(heartbeat_ref: list[float], timeout: float = _WATCHDOG_TIMEOUT) -> None:
+    """Monitor main loop heartbeat; force-kill if stale.
+
+    Runs as a daemon thread. Checks every 30s whether the main loop
+    has updated its heartbeat timestamp. If the heartbeat is older than
+    *timeout* seconds, logs a critical message and calls os._exit(1)
+    so launchd can restart the process.
+    """
+    while True:
+        time.sleep(30)
+        elapsed = time.monotonic() - heartbeat_ref[0]
+        if elapsed > timeout:
+            logger.critical(
+                "Watchdog: main loop hung for %.0fs (threshold %ds), forcing exit",
+                elapsed,
+                timeout,
+            )
+            os._exit(1)
 
 
 def _reverse_geocode(lat: float, lon: float) -> str | None:
@@ -170,6 +192,12 @@ def main_loop(
     last_precip_mm: float = 0.0
     last_wind_speed: float = 0.0
     needs_push = False
+
+    # Watchdog: detect hung main loop and force-exit for launchd restart
+    heartbeat = [time.monotonic()]
+    watchdog = threading.Thread(target=_watchdog_thread, args=(heartbeat,), daemon=True)
+    watchdog.start()
+    logger.info("Watchdog started (timeout=%ds)", _WATCHDOG_TIMEOUT)
 
     # Device keep-alive tracking
     last_device_success: float = 0.0  # monotonic time of last successful push or ping
@@ -376,6 +404,9 @@ def main_loop(
         # Animation particles advance one step per tick, producing gentle
         # motion at 1 FPS that the LED display renders smoothly.
         time.sleep(1.0)
+
+        # Update watchdog heartbeat after each successful iteration
+        heartbeat[0] = time.monotonic()
 
 
 def main() -> None:
