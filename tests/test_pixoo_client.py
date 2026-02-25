@@ -11,7 +11,7 @@ import pytest
 from PIL import Image
 from requests.exceptions import ConnectionError, ReadTimeout
 
-from src.device.pixoo_client import PixooClient
+from src.device.pixoo_client import PixooClient, _ERROR_COOLDOWN_BASE, _ERROR_COOLDOWN_MAX
 
 
 @pytest.fixture
@@ -24,6 +24,7 @@ def client():
         c._last_push_time = 0.0
         c._error_until = 0.0
         c._ip = "192.168.0.193"
+        c._current_cooldown = _ERROR_COOLDOWN_BASE
         return c
 
 
@@ -297,3 +298,98 @@ class TestReboot:
             assert "192.168.0.193" in call_args[0][0]
             payload = call_args[0][1]
             assert "Device/SysReboot" in payload
+
+
+class TestExponentialBackoff:
+    """Exponential backoff: cooldown doubles on consecutive failures, resets on success."""
+
+    def test_first_failure_uses_base_cooldown(self, client, test_image):
+        """After one push_frame failure, cooldown is set ~3s from now and doubles for next."""
+        import time
+
+        client._last_push_time = 0.0
+        client._error_until = 0.0
+        client._pixoo.push.side_effect = ConnectionError("refused")
+
+        before = time.monotonic()
+        client.push_frame(test_image)
+        after = time.monotonic()
+
+        # _error_until should be ~3s from now (base cooldown)
+        assert client._error_until >= before + _ERROR_COOLDOWN_BASE
+        assert client._error_until <= after + _ERROR_COOLDOWN_BASE + 0.1
+        # _current_cooldown doubled for next failure
+        assert client._current_cooldown == 6.0
+
+    def test_consecutive_failures_double_cooldown(self, client, test_image):
+        """Each consecutive failure doubles the cooldown: 3->6->12->24->48."""
+        client._pixoo.push.side_effect = ConnectionError("refused")
+        expected_after = [6.0, 12.0, 24.0, 48.0]
+
+        for expected in expected_after:
+            client._error_until = 0.0
+            client._last_push_time = 0.0
+            client.push_frame(test_image)
+            assert client._current_cooldown == expected, (
+                f"Expected {expected}, got {client._current_cooldown}"
+            )
+
+    def test_cooldown_caps_at_max(self, client, test_image):
+        """Cooldown should never exceed _ERROR_COOLDOWN_MAX (60s)."""
+        client._pixoo.push.side_effect = ConnectionError("refused")
+        client._current_cooldown = 48.0
+
+        # First failure: 48 -> should cap at 60 (not 96)
+        client._error_until = 0.0
+        client._last_push_time = 0.0
+        client.push_frame(test_image)
+        assert client._current_cooldown == 60.0
+
+        # Second failure at cap: should stay at 60
+        client._error_until = 0.0
+        client._last_push_time = 0.0
+        client.push_frame(test_image)
+        assert client._current_cooldown == 60.0
+
+    def test_success_resets_cooldown_to_base(self, client, test_image):
+        """Successful push_frame resets cooldown back to base (3s)."""
+        client._current_cooldown = 24.0  # simulating prior failures
+        client._error_until = 0.0
+        client._last_push_time = 0.0
+
+        result = client.push_frame(test_image)
+        assert result is True
+        assert client._current_cooldown == _ERROR_COOLDOWN_BASE
+
+    def test_ping_failure_also_increases_backoff(self, client):
+        """Ping failure should also double the cooldown."""
+        client._error_until = 0.0
+        client._pixoo.validate_connection.side_effect = ConnectionError("refused")
+
+        client.ping()
+        assert client._current_cooldown == 6.0
+
+    def test_ping_success_resets_backoff(self, client):
+        """Successful ping resets cooldown to base."""
+        client._current_cooldown = 24.0
+        client._error_until = 0.0
+        client._pixoo.validate_connection.return_value = True
+
+        result = client.ping()
+        assert result is True
+        assert client._current_cooldown == _ERROR_COOLDOWN_BASE
+
+    def test_backoff_shared_between_push_and_ping(self, client, test_image):
+        """Push and ping share the same backoff state."""
+        # Push fails -> cooldown doubles to 6
+        client._pixoo.push.side_effect = ConnectionError("refused")
+        client._error_until = 0.0
+        client._last_push_time = 0.0
+        client.push_frame(test_image)
+        assert client._current_cooldown == 6.0
+
+        # Ping fails -> cooldown doubles to 12
+        client._pixoo.validate_connection.side_effect = ConnectionError("refused")
+        client._error_until = 0.0
+        client.ping()
+        assert client._current_cooldown == 12.0
