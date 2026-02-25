@@ -1,13 +1,17 @@
 """Tests for Discord monitoring module -- HealthTracker and embed builders."""
 
+import asyncio
 import time
-from unittest.mock import patch
+import threading
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import discord
+import pytest
 
 from src.providers.discord_monitor import (
     COLORS,
     HealthTracker,
+    MonitorBridge,
     error_embed,
     recovery_embed,
     shutdown_embed,
@@ -350,3 +354,105 @@ class TestHealthTracker:
         state = tracker._components["bus_api"]
         assert "UTC" in state.last_success_str
         assert state.last_success_str != "never"
+
+
+class TestMonitorBridgeSendEmbed:
+    """Tests for MonitorBridge.send_embed -- thread-safe embed delivery."""
+
+    def test_send_embed_from_event_loop_does_not_deadlock(self):
+        """send_embed called from the event loop thread must not deadlock.
+
+        Reproduces the startup race condition: on_ready runs on the event loop,
+        calls send_embed which schedules a coroutine on the same loop and blocks
+        with fut.result(). This deadlocks because the loop can't process the
+        coroutine while blocked.
+        """
+        loop = asyncio.new_event_loop()
+        send_called = asyncio.Event()
+
+        # Mock discord client with a working loop and channel
+        mock_client = MagicMock()
+        mock_client.loop = loop
+        mock_channel = MagicMock()
+
+        async def fake_send(**kwargs):
+            send_called.set()
+
+        mock_channel.send = fake_send
+        mock_client.get_channel.return_value = mock_channel
+
+        bridge = MonitorBridge(mock_client, 12345)
+        embed = discord.Embed(title="Test")
+
+        result = [None]
+        error = [None]
+
+        async def call_from_loop():
+            """Simulate on_ready calling send_embed on the event loop."""
+            try:
+                result[0] = bridge.send_embed(embed)
+            except Exception as exc:
+                error[0] = exc
+
+        def run_loop():
+            loop.run_until_complete(call_from_loop())
+
+        # Run with a timeout -- if it deadlocks, the thread will hang
+        thread = threading.Thread(target=run_loop)
+        thread.start()
+        thread.join(timeout=3.0)
+
+        if thread.is_alive():
+            # Deadlock detected -- force-stop the loop so test can fail cleanly
+            loop.call_soon_threadsafe(loop.stop)
+            thread.join(timeout=2.0)
+            pytest.fail("send_embed deadlocked when called from the event loop thread")
+
+        loop.close()
+        assert error[0] is None, f"send_embed raised: {error[0]}"
+        assert result[0] is True
+
+    def test_send_embed_from_other_thread(self):
+        """send_embed called from a different thread works normally."""
+        loop = asyncio.new_event_loop()
+
+        mock_client = MagicMock()
+        mock_client.loop = loop
+
+        mock_channel = MagicMock()
+
+        async def fake_send(**kwargs):
+            pass
+
+        mock_channel.send = fake_send
+        mock_client.get_channel.return_value = mock_channel
+
+        bridge = MonitorBridge(mock_client, 12345)
+        embed = discord.Embed(title="Test")
+
+        result = [None]
+
+        def call_from_other_thread():
+            result[0] = bridge.send_embed(embed)
+
+        # Run the event loop in a background thread
+        loop_thread = threading.Thread(target=loop.run_forever, daemon=True)
+        loop_thread.start()
+
+        try:
+            caller = threading.Thread(target=call_from_other_thread)
+            caller.start()
+            caller.join(timeout=5.0)
+            assert not caller.is_alive(), "send_embed hung from cross-thread call"
+            assert result[0] is True
+        finally:
+            loop.call_soon_threadsafe(loop.stop)
+            loop_thread.join(timeout=2.0)
+            loop.close()
+
+    def test_send_embed_channel_not_found(self):
+        """send_embed returns False when channel is not in cache."""
+        mock_client = MagicMock()
+        mock_client.get_channel.return_value = None
+        bridge = MonitorBridge(mock_client, 99999)
+        assert bridge.send_embed(discord.Embed(title="Test")) is False

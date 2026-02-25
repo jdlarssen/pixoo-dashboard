@@ -238,11 +238,14 @@ class MonitorBridge:
         success, False on any failure. NEVER propagates exceptions to the
         caller -- monitoring must not crash the main loop.
 
+        When called from the event loop thread (e.g. from on_ready), schedules
+        the send as a task instead of blocking, to avoid deadlocking the loop.
+
         Args:
             embed: discord.Embed to send.
 
         Returns:
-            True if embed was delivered, False otherwise.
+            True if embed was delivered (or scheduled), False otherwise.
         """
         import asyncio
 
@@ -254,6 +257,21 @@ class MonitorBridge:
                 )
                 return False
             coro = channel.send(embed=embed)
+
+            # Detect if we're on the event loop thread. Blocking here with
+            # fut.result() would deadlock because the coroutine needs the
+            # loop to run, but we'd be blocking the loop waiting for it.
+            try:
+                running_loop = asyncio.get_running_loop()
+            except RuntimeError:
+                running_loop = None
+
+            if running_loop is self._client.loop:
+                # On the event loop — schedule as a task (fire-and-forget).
+                running_loop.create_task(coro)
+                return True
+
+            # Cross-thread — block until delivered or timeout.
             fut = asyncio.run_coroutine_threadsafe(coro, self._client.loop)
             fut.result(timeout=5.0)
             return True
