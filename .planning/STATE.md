@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-24)
 Phase: None (between milestones)
 Plan: N/A
 Status: v1.2 milestone complete -- archived
-Last activity: 2026-02-24 - Completed quick task 1: Implement device keep-alive ping + auto-reboot recovery
+Last activity: 2026-02-25 - Completed quick task 2: Add exponential backoff for device reconnection
 
 Progress: [██████████] 100%
 
@@ -58,9 +58,10 @@ None.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 1 | Implement device keep-alive ping + auto-reboot recovery | 2026-02-24 | 4cd24d8 | [1-implement-device-keep-alive-ping-auto-re](./quick/1-implement-device-keep-alive-ping-auto-re/) |
+| 2 | Add exponential backoff for device reconnection | 2026-02-25 | 4e74f2b | [2-add-exponential-backoff-for-device-recon](./quick/2-add-exponential-backoff-for-device-recon/) |
 
 ## Session Continuity
 
-Last session: 2026-02-24
-Stopped at: Completed quick-1 device keep-alive plan
+Last session: 2026-02-25
+Stopped at: Completed quick-2 exponential backoff plan
 Resume file: None
