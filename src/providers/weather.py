@@ -7,7 +7,7 @@ to respect MET API terms of service.
 
 import logging
 from dataclasses import dataclass
-from datetime import date
+from datetime import datetime, timezone
 
 import requests
 
@@ -87,7 +87,7 @@ def _parse_high_low(timeseries: list[dict]) -> tuple[float, float]:
     Returns:
         Tuple of (high_temp, low_temp) in Celsius.
     """
-    today_str = date.today().isoformat()
+    today_str = datetime.now(timezone.utc).date().isoformat()
     temps = []
     for entry in timeseries:
         if entry["time"].startswith(today_str):

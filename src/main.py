@@ -101,7 +101,7 @@ def _reverse_geocode(lat: float, lon: float) -> str | None:
             address.get("city") or address.get("town")
             or address.get("municipality") or address.get("village")
         )
-    except Exception:
+    except (_requests.RequestException, KeyError, ValueError):
         logger.debug("Reverse geocode failed for %s, %s", lat, lon)
         return None
 
@@ -447,7 +447,7 @@ def main() -> None:
         nonlocal monitor_bridge
         if DISCORD_MONITOR_CHANNEL_ID:
             monitor_bridge = MonitorBridge(bot_client, int(DISCORD_MONITOR_CHANNEL_ID))
-            health_tracker._monitor = monitor_bridge
+            health_tracker.set_monitor(monitor_bridge)
             try:
                 bus_name1 = fetch_quay_name(BUS_QUAY_DIRECTION1)
                 bus_name2 = fetch_quay_name(BUS_QUAY_DIRECTION2)

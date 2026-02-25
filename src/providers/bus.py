@@ -23,11 +23,11 @@ logger = logging.getLogger(__name__)
 # GraphQL query for estimated departures at a specific quay.
 # timeRange: 3600 = look ahead 1 hour (3600 seconds).
 # omitNonBoarding: true = skip departures where passengers can't board.
-DEPARTURE_QUERY = """{
-  quay(id: "%s") {
+DEPARTURE_QUERY = """query($quayId: String!, $numDepartures: Int!) {
+  quay(id: $quayId) {
     id
     name
-    estimatedCalls(numberOfDepartures: %d, omitNonBoarding: true, timeRange: 3600) {
+    estimatedCalls(numberOfDepartures: $numDepartures, omitNonBoarding: true, timeRange: 3600) {
       expectedDepartureTime
       aimedDepartureTime
       realtime
@@ -72,11 +72,15 @@ def fetch_departures(
         KeyError: If the response structure is unexpected.
     """
     # Request extra departures to compensate for cancelled ones being filtered out
-    query = DEPARTURE_QUERY % (quay_id, num_departures + 3)
-
     response = requests.post(
         ENTUR_API_URL,
-        json={"query": query},
+        json={
+            "query": DEPARTURE_QUERY,
+            "variables": {
+                "quayId": quay_id,
+                "numDepartures": num_departures + 3,
+            },
+        },
         headers={"ET-Client-Name": ET_CLIENT_NAME},
         timeout=10,
     )
@@ -136,11 +140,14 @@ def fetch_quay_name(quay_id: str) -> str | None:
     Returns:
         Quay name string on success, None on failure.
     """
-    query = '{quay(id: "%s") { name }}' % quay_id
+    quay_name_query = "query($quayId: String!) { quay(id: $quayId) { name } }"
     try:
         response = requests.post(
             ENTUR_API_URL,
-            json={"query": query},
+            json={
+                "query": quay_name_query,
+                "variables": {"quayId": quay_id},
+            },
             headers={"ET-Client-Name": ET_CLIENT_NAME},
             timeout=10,
         )
