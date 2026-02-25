@@ -438,4 +438,4 @@ På disse datoene får displayet en festlig touch:
 
 ## Lisens
 
-Dette er et personlig hobbyprosjekt. Koden er tilgjengelig for inspirasjon og læring.
+MIT-lisens -- se [LICENSE](LICENSE) for detaljer.
