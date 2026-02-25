@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-24)
 Phase: None (between milestones)
 Plan: N/A
 Status: v1.2 milestone complete -- archived
-Last activity: 2026-02-25 - Completed quick task 2: Add exponential backoff for device reconnection
+Last activity: 2026-02-25 - Completed quick task 3: Update README with full refresh (7 corrections)
 
 Progress: [██████████] 100%
 
@@ -59,9 +59,10 @@ None.
 |---|-------------|------|--------|-----------|
 | 1 | Implement device keep-alive ping + auto-reboot recovery | 2026-02-24 | 4cd24d8 | [1-implement-device-keep-alive-ping-auto-re](./quick/1-implement-device-keep-alive-ping-auto-re/) |
 | 2 | Add exponential backoff for device reconnection | 2026-02-25 | 4e74f2b | [2-add-exponential-backoff-for-device-recon](./quick/2-add-exponential-backoff-for-device-recon/) |
+| 3 | Update README with full refresh (7 corrections) | 2026-02-25 | 4e5f235 | [3-update-readme-with-full-refresh-fix-inac](./quick/3-update-readme-with-full-refresh-fix-inac/) |
 
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Completed quick-2 exponential backoff plan
+Stopped at: Completed quick-3 README full refresh plan
 Resume file: None
