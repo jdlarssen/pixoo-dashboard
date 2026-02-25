@@ -72,7 +72,7 @@ Avhengigheter (installeres automatisk):
 ## Installasjon
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/divoom-hub.git
+git clone https://github.com/jdlarssen/pixoo-dashboard.git
 cd divoom-hub
 python -m venv .venv
 source .venv/bin/activate
@@ -115,6 +115,7 @@ Finn dine quay-ID-er på [stoppested.entur.org](https://stoppested.entur.org) og
 | `WEATHER_USER_AGENT` | User-Agent for MET Norway API (påbudt) | `pixoo-dashboard/1.0` |
 | `DISCORD_BOT_TOKEN` | Discord-bot-token for meldingsoverstyring | *(deaktivert)* |
 | `DISCORD_CHANNEL_ID` | Discord-kanal-ID for meldinger | *(deaktivert)* |
+| `DISCORD_MONITOR_CHANNEL_ID` | Discord-kanal-ID for statusovervåkning | *(deaktivert)* |
 | `BIRTHDAY_DATES` | Bursdagsdatoer for easter egg (MM-DD, kommaseparert) | *(ingen)* |
 
 <details>
@@ -133,6 +134,7 @@ WEATHER_LON=10.7522
 # WEATHER_USER_AGENT=pixoo-dashboard/1.0 epost@eksempel.no
 # DISCORD_BOT_TOKEN=din-bot-token-her
 # DISCORD_CHANNEL_ID=123456789012345678
+# DISCORD_MONITOR_CHANNEL_ID=123456789012345678
 # BIRTHDAY_DATES=03-17,12-16
 ```
 
@@ -240,6 +242,7 @@ src/
     ├── bus.py            # Entur JourneyPlanner v3 (GraphQL)
     ├── clock.py          # Norsk tid- og datoformatering
     ├── discord_bot.py    # Discord-meldingsoverstyring (daemon-tråd)
+    ├── discord_monitor.py  # Helseovervåkning og statusrapportering (Discord-embeds)
     ├── sun.py            # Astronomisk soloppgang/solnedgang (astral)
     └── weather.py        # MET Norway Locationforecast 2.0
 ```
@@ -250,15 +253,20 @@ src/
 main_loop()
   ├── fetch_bus_data()         → Entur GraphQL API (hvert 60. sekund)
   ├── fetch_weather_safe()     → MET Norway API (hvert 600. sekund)
-  ├── weather_anim.tick()      → bg/fg RGBA-lag (~3 FPS)
+  ├── weather_anim.tick()      → bg/fg RGBA-lag (~1 FPS)
   ├── DisplayState.from_now()  → dirty flag-sjekk
   ├── render_frame()           → 64x64 PIL-bilde
-  └── client.push_frame()     → Pixoo 64 via HTTP
+  ├── client.push_frame()      → Pixoo 64 via HTTP
+  │     ├── OK                 → oppdater last_device_success
+  │     └── Feil               → eksponentiell backoff (3s → 60s)
+  └── keep-alive (hvert 30s)
+        ├── client.ping()      → lettvekts helsesjekk
+        └── 5 feil på rad      → client.reboot() + 30s ventetid
 ```
 
 **Dirty flag-mønsteret:** `DisplayState` er en dataklasse med likhetskontroll. Hovedloopen sammenligner forrige og nåværende tilstand -- bildet rendres kun på nytt når noe faktisk har endret seg (nytt minutt, nye bussdata, nytt vær).
 
-**To hastigheter:** Når væranimasjon er aktiv kjører loopen med 0.35s pause (~3 FPS). Når det er stille vær, sover den 1 sekund mellom hver sjekk.
+**To hastigheter:** Hovedloopen kjører med 1.0s pause mellom hver iterasjon. Når væranimasjon er aktiv oppdateres animasjonsbildet hver iterasjon (~1 FPS). Når det er stille vær, sjekker loopen kun om tilstanden har endret seg.
 
 ---
 
@@ -357,7 +365,7 @@ Animasjonssystemet støtter sammensatte effekter når værforholdene tilsier det
 - **Vindeffekt:** Når det blåser legges en horisontal drift på partiklene basert på faktisk vindretning og vindstyrke fra MET API
 - **Kombo-regler:** Kraftig regn (> 3mm) legger automatisk tåke oppå regnet. Torden og regn med sterk vind (> 5 m/s) får vinddrift. Snø med vind > 3 m/s driver sidelengs.
 
-Animasjonene kjører med ~3 FPS (0.35s mellom hvert bilde). Alpha-verdier er tunet for LED-maskinvarens synlighet (65--180-området).
+Animasjonene kjører med ~1 FPS (1.0s mellom hvert bilde). Alpha-verdier er tunet for LED-maskinvarens synlighet (65--180-området).
 
 ---
 
@@ -394,9 +402,15 @@ Dashbordet er designet for å kjøre døgnkontinuerlig uten tilsyn. Flere lag me
 
 **Enhetstilkobling:**
 - `pixoo`-bibliotekets `refresh_connection_automatically` forhindrer at tilkoblingen låser seg etter ~300 push-operasjoner
-- Rate limiting: minimum 0.3 sekunder mellom hvert bilde (forhindrer tapte frames ved timing-jitter)
+- Rate limiting: minimum 1.0 sekund mellom hvert bilde (forhindrer tapte frames ved timing-jitter)
 - Lysstyrke begrenset til 90% (`MAX_BRIGHTNESS`) -- full lysstyrke kan krasje enheten
 - Nettverksfeil (timeout, tilkoblingsbrudd) fanges opp og logges -- dashbordet fortsetter å kjøre og prøver igjen neste iterasjon
+
+**Resiliens (keep-alive og gjenoppretting):**
+- **Keep-alive ping:** Hvert 30. sekund sender klienten en lettvekts ping (`Channel/GetAllConf`) til enheten for å forhindre at WiFi-strømsparingsmodus kobler fra
+- **Eksponentiell backoff:** Ved kommunikasjonsfeil starter en venteperiode på 3 sekunder som dobles for hver påfølgende feil (3s -> 6s -> 12s -> 24s -> ...) opp til maks 60 sekunder. Tilbakestilles til 3s ved første vellykkede kommunikasjon
+- **Auto-reboot:** Etter 5 sammenhengende enhetsfeil sendes en `Device/SysReboot`-kommando. Deretter venter systemet 30 sekunder for at enheten skal koble seg til igjen før normal drift gjenopptas
+- Alle tre mekanismene virker sammen: ping oppdager problemer tidlig, backoff forhindrer overbelastning av en treg enhet, og reboot er siste utvei når ingenting annet fungerer
 
 **Auto-lysstyrke (astronomisk):**
 - Bruker `astral`-biblioteket for å beregne faktisk soloppgang, solnedgang og sivil skumring basert på bredde-/lengdegrad
