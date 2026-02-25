@@ -462,8 +462,10 @@ def main() -> None:
                     bus_name_dir2=bus_name2,
                     weather_location=weather_location,
                 )
-                monitor_bridge.send_embed(embed)
-                logger.info("Monitoring active -- startup embed sent to channel %s", DISCORD_MONITOR_CHANNEL_ID)
+                if monitor_bridge.send_embed(embed):
+                    logger.info("Monitoring active -- startup embed sent to channel %s", DISCORD_MONITOR_CHANNEL_ID)
+                else:
+                    logger.warning("Monitoring active -- startup embed failed for channel %s", DISCORD_MONITOR_CHANNEL_ID)
             except Exception:
                 logger.exception("Failed to send startup embed")
 
