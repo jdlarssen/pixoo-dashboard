@@ -32,8 +32,10 @@ _DEVICE_TIMEOUT = 5  # seconds
 _MIN_PUSH_INTERVAL = 1.0
 
 # After a device communication error, pause before retrying to let the
-# device's embedded HTTP server recover.
-_ERROR_COOLDOWN = 3.0  # seconds
+# device's embedded HTTP server recover.  Cooldown doubles on each
+# consecutive failure (exponential backoff) and resets on success.
+_ERROR_COOLDOWN_BASE = 3.0   # initial cooldown after first failure
+_ERROR_COOLDOWN_MAX = 60.0   # maximum cooldown cap
 
 
 def _patch_requests_post(original_post):
@@ -102,6 +104,7 @@ class PixooClient:
         self._last_push_time: float = 0.0
         self._error_until: float = 0.0  # monotonic time when cooldown expires
         self._ip = ip
+        self._current_cooldown: float = _ERROR_COOLDOWN_BASE
 
     def push_frame(self, image: Image.Image) -> bool | None:
         """Push a PIL Image frame to the device.
@@ -140,9 +143,11 @@ class PixooClient:
             self._pixoo.push()
         except (RequestException, OSError) as exc:
             logger.warning("Device communication error during push_frame: %s", exc)
-            self._error_until = time.monotonic() + _ERROR_COOLDOWN
-            logger.info("Device cooldown: pausing pushes for %.0fs", _ERROR_COOLDOWN)
+            self._error_until = time.monotonic() + self._current_cooldown
+            logger.info("Device cooldown: pausing pushes for %.0fs (backoff)", self._current_cooldown)
+            self._current_cooldown = min(self._current_cooldown * 2, _ERROR_COOLDOWN_MAX)
             return False
+        self._current_cooldown = _ERROR_COOLDOWN_BASE
         self._last_push_time = time.monotonic()
         return True
 
@@ -162,10 +167,12 @@ class PixooClient:
 
         try:
             self._pixoo.validate_connection()
+            self._current_cooldown = _ERROR_COOLDOWN_BASE
             return True
         except (RequestException, OSError) as exc:
             logger.warning("Device ping failed: %s", exc)
-            self._error_until = time.monotonic() + _ERROR_COOLDOWN
+            self._error_until = time.monotonic() + self._current_cooldown
+            self._current_cooldown = min(self._current_cooldown * 2, _ERROR_COOLDOWN_MAX)
             return False
 
     def reboot(self) -> bool:
