@@ -11,7 +11,7 @@ import pytest
 from PIL import Image
 from requests.exceptions import ConnectionError, ReadTimeout
 
-from src.device.pixoo_client import PixooClient
+from src.device.pixoo_client import PixooClient, _ERROR_COOLDOWN_BASE
 
 
 @pytest.fixture
@@ -24,6 +24,7 @@ def client():
         c._last_push_time = 0.0
         c._error_until = 0.0
         c._ip = "192.168.0.193"
+        c._current_cooldown = _ERROR_COOLDOWN_BASE
         return c
 
 
