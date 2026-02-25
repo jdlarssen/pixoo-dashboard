@@ -13,6 +13,7 @@ Thread safety: MessageBridge uses a threading.Lock to safely pass messages
 from the async Discord bot thread to the synchronous main rendering loop.
 """
 
+import asyncio
 import logging
 import re
 import threading
@@ -114,7 +115,7 @@ def run_discord_bot(
         logger.info("Discord bot connected as %s", client.user)
         if on_ready_callback is not None:
             try:
-                on_ready_callback(client)
+                await asyncio.get_event_loop().run_in_executor(None, on_ready_callback, client)
             except Exception:
                 logger.exception("on_ready_callback failed")
 
@@ -138,7 +139,7 @@ def run_discord_bot(
             try:
                 await message.add_reaction("\u2713")
             except Exception:
-                pass
+                logger.debug("Could not add reaction to message %s", message.id)
 
         # Monitoring channel -- status command
         if monitor_channel_id is not None and message.channel.id == monitor_channel_id:
@@ -158,7 +159,7 @@ def run_discord_bot(
                 try:
                     await message.add_reaction("\u2713")
                 except Exception:
-                    pass
+                    logger.debug("Could not add reaction to message %s", message.id)
 
     try:
         client.run(token, log_handler=None)  # Suppress discord.py's own logging setup

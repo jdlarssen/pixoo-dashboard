@@ -336,6 +336,10 @@ class HealthTracker:
         self._components: dict[str, ComponentState] = {}
         self._created_at = time.monotonic()
 
+    def set_monitor(self, monitor) -> None:
+        """Set or replace the monitoring bridge (allows deferred initialization)."""
+        self._monitor = monitor
+
     @property
     def uptime_s(self) -> float:
         """Seconds since this HealthTracker was created."""

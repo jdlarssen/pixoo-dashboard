@@ -10,7 +10,6 @@ prevent cascading failures when the device is in a degraded state.
 """
 
 import functools
-import json
 import logging
 import time
 
@@ -187,7 +186,8 @@ class PixooClient:
         try:
             _requests_module.post(
                 f"http://{self._ip}/post",
-                json.dumps({"Command": "Device/SysReboot"}),
+                json={"Command": "Device/SysReboot"},
+                timeout=_DEVICE_TIMEOUT,
             )
             logger.warning("Device reboot command sent to %s", self._ip)
             return True

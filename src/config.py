@@ -80,7 +80,12 @@ for _d in BIRTHDAY_DATES_RAW.split(","):
     if _d:
         _parts = _d.split("-")
         if len(_parts) == 2:
-            BIRTHDAY_DATES.append((int(_parts[0]), int(_parts[1])))
+            try:
+                _month, _day = int(_parts[0]), int(_parts[1])
+                if 1 <= _month <= 12 and 1 <= _day <= 31:
+                    BIRTHDAY_DATES.append((_month, _day))
+            except ValueError:
+                pass
 
 
 def validate_config() -> None:
@@ -90,7 +95,7 @@ def validate_config() -> None:
         missing.append("BUS_QUAY_DIR1")
     if not BUS_QUAY_DIRECTION2:
         missing.append("BUS_QUAY_DIR2")
-    if WEATHER_LAT == 0 and WEATHER_LON == 0:
+    if not os.environ.get("WEATHER_LAT") or not os.environ.get("WEATHER_LON"):
         missing.append("WEATHER_LAT / WEATHER_LON")
     if missing:
         print(f"Missing required config (set in .env): {', '.join(missing)}", file=sys.stderr)

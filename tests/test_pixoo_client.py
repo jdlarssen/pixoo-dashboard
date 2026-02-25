@@ -296,8 +296,9 @@ class TestReboot:
             mock_post.assert_called_once()
             call_args = mock_post.call_args
             assert "192.168.0.193" in call_args[0][0]
-            payload = call_args[0][1]
-            assert "Device/SysReboot" in payload
+            payload = call_args[1]["json"]
+            assert payload["Command"] == "Device/SysReboot"
+            assert call_args[1]["timeout"] == 5
 
 
 class TestExponentialBackoff:
