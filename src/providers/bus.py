@@ -5,6 +5,7 @@ countdown minutes until each departure.
 """
 
 import logging
+import math
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -87,7 +88,10 @@ def fetch_departures(
     response.raise_for_status()
 
     data = response.json()
-    calls = data["data"]["quay"]["estimatedCalls"]
+    quay = data.get("data", {}).get("quay")
+    if quay is None:
+        raise ValueError(f"Quay {quay_id} not found or API error: {data.get('errors', 'unknown')}")
+    calls = quay.get("estimatedCalls", [])
     now = datetime.now(tz=timezone.utc)
 
     departures = []
@@ -96,10 +100,10 @@ def fetch_departures(
             continue  # Skip cancelled departures
         try:
             dep_time = datetime.fromisoformat(call["expectedDepartureTime"])
-            minutes = int((dep_time - now).total_seconds() / 60)
+            minutes = max(0, math.ceil((dep_time - now).total_seconds() / 60))
             departures.append(
                 BusDeparture(
-                    minutes=max(0, minutes),
+                    minutes=minutes,
                     is_realtime=call["realtime"],
                     destination=call["destinationDisplay"]["frontText"],
                     line=call["serviceJourney"]["line"]["publicCode"],

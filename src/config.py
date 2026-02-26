@@ -1,11 +1,14 @@
 """Configuration constants for Pixoo Dashboard."""
 
+import logging
 import os
 import sys
 from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 # Load .env file from project root
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -111,7 +114,7 @@ for _d in BIRTHDAY_DATES_RAW.split(","):
                 if 1 <= _month <= 12 and 1 <= _day <= 31:
                     BIRTHDAY_DATES.append((_month, _day))
             except ValueError:
-                pass
+                logger.warning("Ignoring invalid BIRTHDAY_DATES entry: %r", _d)
 
 
 def validate_config() -> None:
@@ -123,6 +126,14 @@ def validate_config() -> None:
         missing.append("BUS_QUAY_DIR2")
     if not os.environ.get("WEATHER_LAT") or not os.environ.get("WEATHER_LON"):
         missing.append("WEATHER_LAT / WEATHER_LON")
+    if not missing:
+        if not (-90 <= WEATHER_LAT <= 90) or not (-180 <= WEATHER_LON <= 180):
+            missing.append("WEATHER_LAT / WEATHER_LON (out of range)")
+        elif WEATHER_LAT == 0.0 and WEATHER_LON == 0.0 and (
+            os.environ.get("WEATHER_LAT", "0") == "0"
+            or os.environ.get("WEATHER_LON", "0") == "0"
+        ):
+            missing.append("WEATHER_LAT / WEATHER_LON (defaulted to 0,0)")
     if missing:
         print(f"Missing required config (set in .env): {', '.join(missing)}", file=sys.stderr)
         print("Copy .env.example to .env and fill in your values.", file=sys.stderr)

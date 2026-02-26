@@ -11,6 +11,7 @@ prevent cascading failures when the device is in a degraded state.
 
 import functools
 import logging
+import threading
 import time
 
 import requests as _requests_module
@@ -33,6 +34,7 @@ _DEVICE_TIMEOUT = DEVICE_HTTP_TIMEOUT
 _MIN_PUSH_INTERVAL = DEVICE_MIN_PUSH_INTERVAL
 _ERROR_COOLDOWN_BASE = DEVICE_ERROR_COOLDOWN_BASE
 _ERROR_COOLDOWN_MAX = DEVICE_ERROR_COOLDOWN_MAX
+_patch_lock = threading.Lock()
 
 
 def _patch_requests_post(original_post):
@@ -77,9 +79,10 @@ class PixooClient:
         # Monkey-patch requests.post BEFORE importing pixoo so that all
         # device HTTP calls from the pixoo library get a timeout.
         import pixoo.objects.pixoo as _pixoo_module
-        if not getattr(_requests_module.post, "_patched_with_timeout", False):
-            _requests_module.post = _patch_requests_post(_requests_module.post)
-            _requests_module.post._patched_with_timeout = True  # type: ignore[attr-defined]
+        with _patch_lock:
+            if not getattr(_requests_module.post, "_patched_with_timeout", False):
+                _requests_module.post = _patch_requests_post(_requests_module.post)
+                _requests_module.post._patched_with_timeout = True  # type: ignore[attr-defined]
 
         from pixoo import Pixoo
 

@@ -15,7 +15,8 @@ class TestWatchdog:
         heartbeat = [time.monotonic()]
         exit_called = threading.Event()
 
-        with patch("src.main.os._exit", side_effect=lambda code: exit_called.set()):
+        with patch("src.main.os._exit", side_effect=lambda code: exit_called.set()), \
+             patch("src.main.os.kill"):
             t = threading.Thread(
                 target=_watchdog_thread, args=(heartbeat, 0.3), daemon=True
             )
@@ -41,6 +42,7 @@ class TestWatchdog:
             raise _WatchdogFired
 
         with patch("src.main.os._exit", side_effect=mock_exit), \
+             patch("src.main.os.kill"), \
              patch("src.main.time.sleep", return_value=None):
             try:
                 _watchdog_thread(heartbeat, timeout=0.1)

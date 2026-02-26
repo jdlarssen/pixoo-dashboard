@@ -58,8 +58,8 @@ class TestCountdownCalculation:
         mock_dt.now.return_value = now
         mock_dt.fromisoformat = datetime.fromisoformat
 
-        dep1 = now + timedelta(minutes=5, seconds=30)  # 5.5 min -> 5
-        dep2 = now + timedelta(minutes=12, seconds=10)  # 12.17 min -> 12
+        dep1 = now + timedelta(minutes=5, seconds=30)  # 5.5 min -> ceil -> 6
+        dep2 = now + timedelta(minutes=12, seconds=10)  # 12.17 min -> ceil -> 13
 
         mock_response = MagicMock()
         mock_response.json.return_value = _make_entur_response(
@@ -71,8 +71,8 @@ class TestCountdownCalculation:
         result = fetch_departures("NSR:Quay:73154", num_departures=2)
 
         assert len(result) == 2
-        assert result[0].minutes == 5
-        assert result[1].minutes == 12
+        assert result[0].minutes == 6
+        assert result[1].minutes == 13
 
     @patch("src.providers.bus.requests.post")
     @patch("src.providers.bus.datetime")
@@ -98,13 +98,13 @@ class TestCountdownCalculation:
 
     @patch("src.providers.bus.requests.post")
     @patch("src.providers.bus.datetime")
-    def test_zero_countdown_for_imminent_departure(self, mock_dt, mock_post):
-        """A departure 30 seconds from now shows 0 minutes."""
+    def test_one_minute_countdown_for_imminent_departure(self, mock_dt, mock_post):
+        """A departure 30 seconds from now shows 1 minute (ceil)."""
         now = datetime(2026, 2, 20, 14, 0, 0, tzinfo=timezone.utc)
         mock_dt.now.return_value = now
         mock_dt.fromisoformat = datetime.fromisoformat
 
-        imminent = now + timedelta(seconds=30)  # 0.5 min -> 0
+        imminent = now + timedelta(seconds=30)  # 0.5 min -> ceil -> 1
 
         mock_response = MagicMock()
         mock_response.json.return_value = _make_entur_response(
@@ -115,7 +115,7 @@ class TestCountdownCalculation:
 
         result = fetch_departures("NSR:Quay:73154", num_departures=1)
 
-        assert result[0].minutes == 0
+        assert result[0].minutes == 1
 
 
 # --- Cancellation filtering tests ---
