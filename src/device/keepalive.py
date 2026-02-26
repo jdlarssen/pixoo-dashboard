@@ -74,8 +74,9 @@ class DeviceKeepAlive:
                     DEVICE_REBOOT_RECOVERY_WAIT,
                 )
             else:
-                logger.warning("Reboot command failed (device may be fully offline)")
-            self.consecutive_failures = 0  # reset to avoid reboot spam
+                logger.warning("Reboot command failed, backing off for %ds", DEVICE_REBOOT_RECOVERY_WAIT * 2)
+                self._reboot_wait_until = time.monotonic() + DEVICE_REBOOT_RECOVERY_WAIT * 2
+            self.consecutive_failures = 0
             return
 
         # Keep-alive ping when no recent device success

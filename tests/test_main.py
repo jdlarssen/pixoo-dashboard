@@ -368,6 +368,7 @@ class TestWatchdogThread:
             raise _WatchdogFired
 
         with patch("src.main.os._exit", side_effect=capture_exit), \
+             patch("src.main.os.kill"), \
              patch("src.main.time.sleep", return_value=None):
             try:
                 _watchdog_thread(heartbeat, timeout=1.0)
@@ -394,6 +395,7 @@ class TestWatchdogThread:
             original_sleep(0.01)
 
         with patch("src.main.os._exit", side_effect=lambda c: exit_called.set()), \
+             patch("src.main.os.kill"), \
              patch("src.main.time.sleep", side_effect=counting_sleep):
             try:
                 _watchdog_thread(heartbeat, timeout=10.0)
@@ -419,6 +421,7 @@ class TestWatchdogThread:
 
         # time.monotonic returns base_time + 200 (so elapsed = 200)
         with patch("src.main.os._exit", side_effect=capture_exit), \
+             patch("src.main.os.kill"), \
              patch("src.main.time.sleep", return_value=None), \
              patch("src.main.time.monotonic", return_value=base_time + 200):
             try:

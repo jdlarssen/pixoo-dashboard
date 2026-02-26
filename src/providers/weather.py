@@ -60,6 +60,8 @@ def _parse_current(timeseries: list[dict]) -> dict:
     Returns:
         Dictionary with temperature, symbol_code, precipitation_mm, is_day.
     """
+    if not timeseries:
+        raise ValueError("Empty timeseries in weather response")
     entry = timeseries[0]
     instant = entry.get("data", {}).get("instant", {}).get("details", {})
     temp = instant.get("air_temperature")

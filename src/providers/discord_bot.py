@@ -205,12 +205,24 @@ def start_discord_bot(
     if not token or not channel_id:
         return None
 
+    try:
+        parsed_channel_id = int(channel_id)
+    except ValueError:
+        logger.error("DISCORD_CHANNEL_ID is not a valid integer: %r", channel_id)
+        return None
+
+    monitor_id = None
+    if monitor_channel_id:
+        try:
+            monitor_id = int(monitor_channel_id)
+        except ValueError:
+            logger.warning("DISCORD_MONITOR_CHANNEL_ID is not a valid integer: %r, ignoring", monitor_channel_id)
+
     bridge = MessageBridge()
     bot_dead_event = threading.Event()
-    monitor_id = int(monitor_channel_id) if monitor_channel_id else None
     thread = threading.Thread(
         target=run_discord_bot,
-        args=(bridge, token, int(channel_id)),
+        args=(bridge, token, parsed_channel_id),
         kwargs={
             "monitor_channel_id": monitor_id,
             "health_tracker": health_tracker,

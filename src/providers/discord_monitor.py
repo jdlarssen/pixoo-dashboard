@@ -246,7 +246,7 @@ class MonitorBridge:
             if not fut.cancelled():
                 fut.result()
         except Exception:
-            logger.debug("Failed to deliver embed to Discord")
+            logger.warning("Failed to deliver embed to Discord", exc_info=True)
 
     def send_embed(self, embed) -> bool:
         """Send an embed to the monitoring channel (fire-and-forget).

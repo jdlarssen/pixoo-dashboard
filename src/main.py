@@ -11,6 +11,7 @@ Usage:
 import argparse
 import logging
 import os
+import signal
 import sys
 import threading
 import time
@@ -74,10 +75,13 @@ def _watchdog_thread(heartbeat_ref: list[float], timeout: float = WATCHDOG_TIMEO
         elapsed = time.monotonic() - heartbeat_ref[0]
         if elapsed > timeout:
             logger.critical(
-                "Watchdog: main loop hung for %.0fs (threshold %ds), forcing exit",
+                "Watchdog: main loop hung for %.0fs (threshold %ds), sending SIGTERM",
                 elapsed,
                 timeout,
             )
+            os.kill(os.getpid(), signal.SIGTERM)
+            time.sleep(10)
+            logger.critical("Watchdog: still alive after SIGTERM grace period, forcing exit")
             os._exit(1)
 
 
