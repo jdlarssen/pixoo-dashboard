@@ -6,6 +6,7 @@ to respect MET API terms of service.
 """
 
 import logging
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 # Module-level cache for API responses (If-Modified-Since pattern)
 _cached_data: dict | None = None
 _last_modified: str | None = None
+_cache_lock = threading.Lock()
 
 
 @dataclass
@@ -59,13 +61,18 @@ def _parse_current(timeseries: list[dict]) -> dict:
         Dictionary with temperature, symbol_code, precipitation_mm, is_day.
     """
     entry = timeseries[0]
-    instant = entry["data"]["instant"]["details"]
-    next_1h = entry["data"].get("next_1_hours", {})
+    instant = entry.get("data", {}).get("instant", {}).get("details", {})
+    temp = instant.get("air_temperature")
+    if temp is None:
+        raise ValueError(
+            "Missing 'air_temperature' in weather response instant details"
+        )
 
+    next_1h = entry.get("data", {}).get("next_1_hours", {})
     symbol_code = next_1h.get("summary", {}).get("symbol_code", "cloudy")
 
     return {
-        "temperature": instant["air_temperature"],
+        "temperature": temp,
         "symbol_code": symbol_code,
         "precipitation_mm": next_1h.get("details", {}).get("precipitation_amount", 0.0),
         "is_day": _parse_is_day(symbol_code),
@@ -90,14 +97,28 @@ def _parse_high_low(timeseries: list[dict]) -> tuple[float, float]:
     today_str = datetime.now(timezone.utc).date().isoformat()
     temps = []
     for entry in timeseries:
-        if entry["time"].startswith(today_str):
-            temps.append(entry["data"]["instant"]["details"]["air_temperature"])
+        time_val = entry.get("time", "")
+        if not time_val.startswith(today_str):
+            continue
+        temp = (
+            entry.get("data", {})
+            .get("instant", {})
+            .get("details", {})
+            .get("air_temperature")
+        )
+        if temp is None:
+            logger.warning(
+                "Skipping timeseries entry at %s: missing air_temperature",
+                time_val,
+            )
+            continue
+        temps.append(temp)
 
     if temps:
         return (max(temps), min(temps))
 
     # Fallback: use next_6_hours from first entry
-    first = timeseries[0]["data"]
+    first = timeseries[0].get("data", {}) if timeseries else {}
     n6h = first.get("next_6_hours", {}).get("details", {})
     return (
         n6h.get("air_temperature_max", 0.0),
@@ -124,9 +145,14 @@ def fetch_weather(lat: float, lon: float) -> WeatherData:
     """
     global _cached_data, _last_modified
 
+    # Read cache under lock
+    with _cache_lock:
+        local_cached_data = _cached_data
+        local_last_modified = _last_modified
+
     headers: dict[str, str] = {"User-Agent": WEATHER_USER_AGENT}
-    if _last_modified and _cached_data:
-        headers["If-Modified-Since"] = _last_modified
+    if local_last_modified and local_cached_data:
+        headers["If-Modified-Since"] = local_last_modified
 
     response = requests.get(
         WEATHER_API_URL,
@@ -135,14 +161,16 @@ def fetch_weather(lat: float, lon: float) -> WeatherData:
         timeout=10,
     )
 
-    if response.status_code == 304 and _cached_data:
+    if response.status_code == 304 and local_cached_data:
         # Data unchanged, parse from cache
-        data = _cached_data
+        data = local_cached_data
     else:
         response.raise_for_status()
         data = response.json()
-        _cached_data = data
-        _last_modified = response.headers.get("Last-Modified")
+        # Write cache under lock
+        with _cache_lock:
+            _cached_data = data
+            _last_modified = response.headers.get("Last-Modified")
 
     timeseries = data["properties"]["timeseries"]
     current = _parse_current(timeseries)

@@ -28,6 +28,32 @@ MAX_BRIGHTNESS = 90  # cap at 90% -- full brightness can crash device
 BRIGHTNESS_NIGHT = 20     # 20% -- within user's 15-25% range, readable without lighting room
 BRIGHTNESS_DAY = 100      # 100% -- PixooClient caps at MAX_BRIGHTNESS (90%)
 
+# --- Staleness thresholds (seconds) ---
+BUS_STALE_THRESHOLD = 180          # 3 minutes -- bus data is aging
+BUS_TOO_OLD_THRESHOLD = 600        # 10 minutes -- bus data is too old, show dashes
+WEATHER_STALE_THRESHOLD = 1800     # 30 minutes -- weather data is aging
+WEATHER_TOO_OLD_THRESHOLD = 3600   # 1 hour -- weather data is too old, show dashes
+
+# --- Device recovery ---
+DEVICE_PING_INTERVAL = 30          # seconds between keep-alive pings
+DEVICE_REBOOT_THRESHOLD = 5        # consecutive failures before reboot
+DEVICE_REBOOT_RECOVERY_WAIT = 30   # seconds to wait after reboot for device to reconnect
+WATCHDOG_TIMEOUT = 120             # seconds before watchdog force-kills a hung process
+
+# --- Device communication ---
+DEVICE_HTTP_TIMEOUT = 5            # seconds for HTTP requests to device
+DEVICE_MIN_PUSH_INTERVAL = 1.0     # minimum seconds between frame pushes
+DEVICE_ERROR_COOLDOWN_BASE = 3.0   # initial cooldown after first failure (seconds)
+DEVICE_ERROR_COOLDOWN_MAX = 60.0   # maximum cooldown cap (seconds)
+
+# --- Health tracker debounce ---
+HEALTH_DEBOUNCE = {
+    "bus_api": {"failures_before_alert": 3, "repeat_interval": 900},
+    "weather_api": {"failures_before_alert": 2, "repeat_interval": 1800},
+    "device": {"failures_before_alert": 5, "repeat_interval": 300},
+}
+HEALTH_DEBOUNCE_DEFAULT = {"failures_before_alert": 3, "repeat_interval": 600}
+
 
 def get_target_brightness(dt: datetime, lat: float, lon: float) -> int:
     """Return target brightness based on astronomical darkness.

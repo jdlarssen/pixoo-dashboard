@@ -17,24 +17,22 @@ import requests as _requests_module
 from PIL import Image
 from requests.exceptions import RequestException
 
-from src.config import DISPLAY_SIZE, MAX_BRIGHTNESS
+from src.config import (
+    DEVICE_ERROR_COOLDOWN_BASE,
+    DEVICE_ERROR_COOLDOWN_MAX,
+    DEVICE_HTTP_TIMEOUT,
+    DEVICE_MIN_PUSH_INTERVAL,
+    DISPLAY_SIZE,
+    MAX_BRIGHTNESS,
+)
 
 logger = logging.getLogger(__name__)
 
-# Device HTTP timeout -- the pixoo library's requests.post() calls have no
-# timeout, so a hung device blocks the main loop indefinitely.  We monkey-patch
-# the module-level requests.post used by the pixoo library to inject one.
-_DEVICE_TIMEOUT = 5  # seconds
-
-# Minimum interval between frame pushes (seconds).  The Pixoo 64 documentation
-# says "do not call push() more than once per second".  We enforce 1.0s.
-_MIN_PUSH_INTERVAL = 1.0
-
-# After a device communication error, pause before retrying to let the
-# device's embedded HTTP server recover.  Cooldown doubles on each
-# consecutive failure (exponential backoff) and resets on success.
-_ERROR_COOLDOWN_BASE = 3.0   # initial cooldown after first failure
-_ERROR_COOLDOWN_MAX = 60.0   # maximum cooldown cap
+# Backward-compatible aliases for tests and internal use
+_DEVICE_TIMEOUT = DEVICE_HTTP_TIMEOUT
+_MIN_PUSH_INTERVAL = DEVICE_MIN_PUSH_INTERVAL
+_ERROR_COOLDOWN_BASE = DEVICE_ERROR_COOLDOWN_BASE
+_ERROR_COOLDOWN_MAX = DEVICE_ERROR_COOLDOWN_MAX
 
 
 def _patch_requests_post(original_post):

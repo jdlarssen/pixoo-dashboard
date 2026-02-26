@@ -5,6 +5,7 @@ location and date. Caches results per-day since sun times only change
 once per calendar day.
 """
 
+import threading
 from datetime import date, datetime, timezone
 
 from astral import Observer
@@ -14,6 +15,7 @@ from astral.sun import dawn, dusk, sunrise, sunset
 # Cache: (lat, lon, date) -> sun times dict
 _cache_key: tuple[float, float, date] | None = None
 _cache_value: dict[str, datetime] | None = None
+_cache_lock = threading.Lock()
 
 
 def get_sun_times(lat: float, lon: float, d: date) -> dict[str, datetime]:
@@ -34,9 +36,13 @@ def get_sun_times(lat: float, lon: float, d: date) -> dict[str, datetime]:
     global _cache_key, _cache_value
 
     key = (lat, lon, d)
-    if _cache_key == key and _cache_value is not None:
-        return _cache_value
 
+    # Read cache under lock
+    with _cache_lock:
+        if _cache_key == key and _cache_value is not None:
+            return _cache_value
+
+    # Compute outside lock
     observer = Observer(latitude=lat, longitude=lon)
     times = {
         "dawn": dawn(observer, date=d, tzinfo=timezone.utc),
@@ -44,8 +50,12 @@ def get_sun_times(lat: float, lon: float, d: date) -> dict[str, datetime]:
         "sunset": sunset(observer, date=d, tzinfo=timezone.utc),
         "dusk": dusk(observer, date=d, tzinfo=timezone.utc),
     }
-    _cache_key = key
-    _cache_value = times
+
+    # Write cache under lock
+    with _cache_lock:
+        _cache_key = key
+        _cache_value = times
+
     return times
 
 

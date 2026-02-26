@@ -442,8 +442,8 @@ class ThunderAnimation(WeatherAnimation):
         bg, fg = self._rain.tick()
         self._tick_count += 1
 
-        # Trigger new lightning every ~12 ticks (~4 seconds at 3 FPS)
-        if self._tick_count % 12 == 0:
+        # Trigger new lightning every ~4 ticks (~4 seconds at 1 FPS)
+        if self._tick_count % 4 == 0:
             self._flash_remaining = 3
             self._bolt_x = random.randint(10, self.width - 10)
 
