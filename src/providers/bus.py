@@ -69,7 +69,7 @@ def fetch_departures(
 
     Raises:
         requests.HTTPError: If the API returns a non-2xx status.
-        KeyError: If the response structure is unexpected.
+        KeyError: If the top-level response structure is unexpected.
     """
     # Request extra departures to compensate for cancelled ones being filtered out
     response = requests.post(
@@ -94,16 +94,20 @@ def fetch_departures(
     for call in calls:
         if call.get("cancellation", False):
             continue  # Skip cancelled departures
-        dep_time = datetime.fromisoformat(call["expectedDepartureTime"])
-        minutes = int((dep_time - now).total_seconds() / 60)
-        departures.append(
-            BusDeparture(
-                minutes=max(0, minutes),
-                is_realtime=call["realtime"],
-                destination=call["destinationDisplay"]["frontText"],
-                line=call["serviceJourney"]["line"]["publicCode"],
+        try:
+            dep_time = datetime.fromisoformat(call["expectedDepartureTime"])
+            minutes = int((dep_time - now).total_seconds() / 60)
+            departures.append(
+                BusDeparture(
+                    minutes=max(0, minutes),
+                    is_realtime=call["realtime"],
+                    destination=call["destinationDisplay"]["frontText"],
+                    line=call["serviceJourney"]["line"]["publicCode"],
+                )
             )
-        )
+        except (KeyError, ValueError, TypeError) as e:
+            logger.warning("Skipping malformed departure entry: %s", e)
+            continue
 
     return departures[:num_departures]
 

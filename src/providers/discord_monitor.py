@@ -11,16 +11,20 @@ Provides three components:
 
 Thread safety: MonitorBridge uses asyncio.run_coroutine_threadsafe() to safely
 schedule async Discord sends from the synchronous main thread. HealthTracker
-is designed for single-threaded use from the main loop.
+uses a threading.Lock to allow safe access from multiple threads (e.g. main
+loop and Discord bot thread).
 
 All timing uses time.monotonic() for duration accuracy. Human-readable
 timestamps use datetime.now(timezone.utc).
 """
 
 import logging
+import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+
+from src.config import HEALTH_DEBOUNCE, HEALTH_DEBOUNCE_DEFAULT
 
 logger = logging.getLogger(__name__)
 
@@ -231,21 +235,37 @@ class MonitorBridge:
         self._client = client
         self._channel_id = channel_id
 
-    def send_embed(self, embed) -> bool:
-        """Send an embed to the monitoring channel.
+    @staticmethod
+    def _log_embed_error(fut):
+        """Done-callback for fire-and-forget embed sends.
 
-        Thread-safe and non-blocking (up to 5s timeout). Returns True on
-        success, False on any failure. NEVER propagates exceptions to the
-        caller -- monitoring must not crash the main loop.
+        Consumes the future result so exceptions don't go unobserved,
+        and logs failures at debug level (monitoring embeds are best-effort).
+        """
+        try:
+            if not fut.cancelled():
+                fut.result()
+        except Exception:
+            logger.debug("Failed to deliver embed to Discord")
+
+    def send_embed(self, embed) -> bool:
+        """Send an embed to the monitoring channel (fire-and-forget).
+
+        Thread-safe and non-blocking. Returns True if the send was
+        successfully **scheduled**, False if scheduling itself failed.
+        NEVER propagates exceptions to the caller -- monitoring must not
+        crash the main loop.
 
         When called from the event loop thread (e.g. from on_ready), schedules
-        the send as a task instead of blocking, to avoid deadlocking the loop.
+        the send as a task. When called cross-thread, schedules via
+        run_coroutine_threadsafe. In both cases the method returns immediately
+        without waiting for delivery.
 
         Args:
             embed: discord.Embed to send.
 
         Returns:
-            True if embed was delivered (or scheduled), False otherwise.
+            True if embed was successfully scheduled, False otherwise.
         """
         import asyncio
 
@@ -258,9 +278,7 @@ class MonitorBridge:
                 return False
             coro = channel.send(embed=embed)
 
-            # Detect if we're on the event loop thread. Blocking here with
-            # fut.result() would deadlock because the coroutine needs the
-            # loop to run, but we'd be blocking the loop waiting for it.
+            # Detect if we're on the event loop thread.
             try:
                 running_loop = asyncio.get_running_loop()
             except RuntimeError:
@@ -268,12 +286,13 @@ class MonitorBridge:
 
             if running_loop is self._client.loop:
                 # On the event loop — schedule as a task (fire-and-forget).
-                running_loop.create_task(coro)
+                task = running_loop.create_task(coro)
+                task.add_done_callback(self._log_embed_error)
                 return True
 
-            # Cross-thread — block until delivered or timeout.
+            # Cross-thread — schedule fire-and-forget, don't block on result.
             fut = asyncio.run_coroutine_threadsafe(coro, self._client.loop)
-            fut.result(timeout=5.0)
+            fut.add_done_callback(self._log_embed_error)
             return True
         except Exception:
             logger.exception("Failed to send monitoring embed")
@@ -316,15 +335,11 @@ class HealthTracker:
         tracker.record_success("bus_api")
     """
 
-    # Debounce configuration per component:
+    # Debounce configuration per component (imported from config):
     #   failures_before_alert: consecutive failures required before first alert
     #   repeat_interval: seconds between repeat alerts for ongoing failure
-    DEBOUNCE = {
-        "bus_api": {"failures_before_alert": 3, "repeat_interval": 900},
-        "weather_api": {"failures_before_alert": 2, "repeat_interval": 1800},
-        "device": {"failures_before_alert": 5, "repeat_interval": 300},
-    }
-    _DEFAULT_DEBOUNCE = {"failures_before_alert": 3, "repeat_interval": 600}
+    DEBOUNCE = HEALTH_DEBOUNCE
+    _DEFAULT_DEBOUNCE = HEALTH_DEBOUNCE_DEFAULT
 
     def __init__(self, monitor: MonitorBridge | None):
         """Initialize the health tracker.
@@ -332,18 +347,21 @@ class HealthTracker:
         Args:
             monitor: MonitorBridge for sending embeds, or None to disable sends.
         """
+        self._lock = threading.Lock()
         self._monitor = monitor
         self._components: dict[str, ComponentState] = {}
         self._created_at = time.monotonic()
 
     def set_monitor(self, monitor) -> None:
         """Set or replace the monitoring bridge (allows deferred initialization)."""
-        self._monitor = monitor
+        with self._lock:
+            self._monitor = monitor
 
     @property
     def uptime_s(self) -> float:
         """Seconds since this HealthTracker was created."""
-        return time.monotonic() - self._created_at
+        with self._lock:
+            return time.monotonic() - self._created_at
 
     def _get_debounce(self, component: str) -> dict:
         """Get debounce config for a component, with defaults for unknown."""
@@ -365,38 +383,46 @@ class HealthTracker:
         Args:
             component: Name of the component that succeeded.
         """
-        state = self._components.get(component)
-        if state is None:
-            # First time seeing this component -- just record success
-            self._components[component] = ComponentState(
-                name=component,
-                last_success_time=time.monotonic(),
-                last_success_str=datetime.now(timezone.utc).strftime(
-                    "%Y-%m-%d %H:%M UTC"
-                ),
-            )
-            return
+        embed_to_send = None
+        monitor = None
 
-        if state.is_alerting:
-            # Was alerting -- send recovery embed
-            downtime = time.monotonic() - state.first_failure_time
-            try:
+        with self._lock:
+            state = self._components.get(component)
+            if state is None:
+                # First time seeing this component -- just record success
+                self._components[component] = ComponentState(
+                    name=component,
+                    last_success_time=time.monotonic(),
+                    last_success_str=datetime.now(timezone.utc).strftime(
+                        "%Y-%m-%d %H:%M UTC"
+                    ),
+                )
+                return
+
+            if state.is_alerting:
+                # Was alerting -- prepare recovery embed (send outside lock)
+                downtime = time.monotonic() - state.first_failure_time
                 if self._monitor is not None:
-                    embed = recovery_embed(component, downtime)
-                    self._monitor.send_embed(embed)
+                    embed_to_send = recovery_embed(component, downtime)
+                    monitor = self._monitor
+
+            # Reset failure state
+            state.failure_count = 0
+            state.is_alerting = False
+            state.first_failure_time = 0.0
+            state.last_success_time = time.monotonic()
+            state.last_success_str = datetime.now(timezone.utc).strftime(
+                "%Y-%m-%d %H:%M UTC"
+            )
+
+        # Send embed outside the lock to avoid deadlocks
+        if embed_to_send is not None:
+            try:
+                monitor.send_embed(embed_to_send)
             except Exception:
                 logger.exception(
                     "Failed to send recovery embed for %s", component
                 )
-
-        # Reset failure state
-        state.failure_count = 0
-        state.is_alerting = False
-        state.first_failure_time = 0.0
-        state.last_success_time = time.monotonic()
-        state.last_success_str = datetime.now(timezone.utc).strftime(
-            "%Y-%m-%d %H:%M UTC"
-        )
 
     def record_failure(self, component: str, error_info: str) -> None:
         """Record a failed operation for a component.
@@ -410,32 +436,35 @@ class HealthTracker:
             component: Name of the component that failed.
             error_info: Human-readable error description.
         """
-        state = self._get_or_create_state(component)
-        now = time.monotonic()
-        debounce = self._get_debounce(component)
+        embed_to_send = None
+        monitor = None
 
-        if state.failure_count == 0:
-            state.first_failure_time = now
+        with self._lock:
+            state = self._get_or_create_state(component)
+            now = time.monotonic()
+            debounce = self._get_debounce(component)
 
-        state.failure_count += 1
+            if state.failure_count == 0:
+                state.first_failure_time = now
 
-        threshold = debounce["failures_before_alert"]
-        repeat_interval = debounce["repeat_interval"]
+            state.failure_count += 1
 
-        should_alert = False
-        if state.failure_count >= threshold:
-            if not state.is_alerting:
-                # First alert for this failure sequence
-                should_alert = True
-            elif (now - state.last_alert_time) >= repeat_interval:
-                # Repeat alert after interval elapsed
-                should_alert = True
+            threshold = debounce["failures_before_alert"]
+            repeat_interval = debounce["repeat_interval"]
 
-        if should_alert:
-            duration = now - state.first_failure_time
-            try:
+            should_alert = False
+            if state.failure_count >= threshold:
+                if not state.is_alerting:
+                    # First alert for this failure sequence
+                    should_alert = True
+                elif (now - state.last_alert_time) >= repeat_interval:
+                    # Repeat alert after interval elapsed
+                    should_alert = True
+
+            if should_alert:
+                duration = now - state.first_failure_time
                 if self._monitor is not None:
-                    embed = error_embed(
+                    embed_to_send = error_embed(
                         component=component,
                         error_type=error_info.split(":")[0]
                         if ":" in error_info
@@ -444,13 +473,18 @@ class HealthTracker:
                         duration_s=duration,
                         last_success_str=state.last_success_str,
                     )
-                    self._monitor.send_embed(embed)
+                    monitor = self._monitor
+                state.is_alerting = True
+                state.last_alert_time = now
+
+        # Send embed outside the lock to avoid deadlocks
+        if embed_to_send is not None:
+            try:
+                monitor.send_embed(embed_to_send)
             except Exception:
                 logger.exception(
                     "Failed to send error embed for %s", component
                 )
-            state.is_alerting = True
-            state.last_alert_time = now
 
     def get_status(self) -> dict[str, dict]:
         """Get per-component health status for the status command.
@@ -462,15 +496,16 @@ class HealthTracker:
                 downtime_s: float (only if down)
                 last_success: str (human-readable timestamp)
         """
-        result = {}
-        now = time.monotonic()
-        for name, state in self._components.items():
-            entry: dict = {
-                "status": "down" if state.is_alerting else "ok",
-                "failure_count": state.failure_count,
-                "last_success": state.last_success_str,
-            }
-            if state.is_alerting and state.first_failure_time > 0:
-                entry["downtime_s"] = now - state.first_failure_time
-            result[name] = entry
-        return result
+        with self._lock:
+            result = {}
+            now = time.monotonic()
+            for name, state in self._components.items():
+                entry: dict = {
+                    "status": "down" if state.is_alerting else "ok",
+                    "failure_count": state.failure_count,
+                    "last_success": state.last_success_str,
+                }
+                if state.is_alerting and state.first_failure_time > 0:
+                    entry["downtime_s"] = now - state.first_failure_time
+                result[name] = entry
+            return result

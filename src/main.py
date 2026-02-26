@@ -33,12 +33,16 @@ from src.config import (
     FONT_DIR,
     FONT_SMALL,
     FONT_TINY,
+    WATCHDOG_TIMEOUT,
     WEATHER_LAT,
     WEATHER_LON,
     WEATHER_REFRESH_INTERVAL,
     get_target_brightness,
     validate_config,
 )
+from src.device.keepalive import DeviceKeepAlive
+from src.device.pixoo_client import PixooClient
+from src.display.fonts import load_fonts
 from src.display.renderer import render_frame
 from src.display.state import DisplayState
 from src.display.weather_anim import WeatherAnimation, get_animation
@@ -48,14 +52,7 @@ from src.providers.discord_bot import MessageBridge, start_discord_bot
 from src.providers.discord_monitor import HealthTracker, MonitorBridge, startup_embed, shutdown_embed
 from src.providers.sun import is_dark
 from src.providers.weather import WeatherData, fetch_weather_safe
-from src.device.pixoo_client import PixooClient
-from src.display.fonts import load_fonts
-
-# Keep-alive: ping device every 30s to prevent WiFi power-save disconnection
-_PING_INTERVAL = 30  # seconds between keep-alive pings
-_REBOOT_THRESHOLD = 5  # consecutive device failures before attempting reboot
-_REBOOT_RECOVERY_WAIT = 30  # seconds to wait after reboot for device to reconnect
-_WATCHDOG_TIMEOUT = 120  # seconds before watchdog force-kills a hung process
+from src.staleness import StalenessTracker
 
 logging.basicConfig(
     level=logging.INFO,
@@ -64,7 +61,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def _watchdog_thread(heartbeat_ref: list[float], timeout: float = _WATCHDOG_TIMEOUT) -> None:
+def _watchdog_thread(heartbeat_ref: list[float], timeout: float = WATCHDOG_TIMEOUT) -> None:
     """Monitor main loop heartbeat; force-kill if stale.
 
     Runs as a daemon thread. Checks every 30s whether the main loop
@@ -124,6 +121,79 @@ def _wind_category(speed: float) -> str:
     return "strong"
 
 
+def _should_swap_animation(
+    new_group: str,
+    is_night: bool,
+    precip_mm: float,
+    wind_speed: float,
+    last_group: str | None,
+    last_night: bool | None,
+    last_precip_mm: float,
+    last_wind_speed: float,
+) -> bool:
+    """Check if weather animation needs to be swapped.
+
+    Returns True when any of the four tracked dimensions (weather group,
+    day/night, precipitation category, wind category) has changed.
+    """
+    if new_group != last_group:
+        return True
+    if is_night != last_night:
+        return True
+    if _precip_category(precip_mm) != _precip_category(last_precip_mm):
+        return True
+    if _wind_category(wind_speed) != _wind_category(last_wind_speed):
+        return True
+    return False
+
+
+def _select_animation(
+    weather_data: WeatherData,
+    now_utc: datetime,
+    last_weather_group: str | None,
+    last_weather_night: bool | None,
+    last_precip_mm: float,
+    last_wind_speed: float,
+) -> tuple[WeatherAnimation | None, str, bool, float, float]:
+    """Decide whether to swap the weather animation and return the new one.
+
+    Compares the current weather conditions against the last-known state.
+    If the weather group, day/night status, precipitation category, or
+    wind category has changed, creates and returns a new animation.
+
+    Args:
+        weather_data: Current weather data.
+        now_utc: Current UTC time (for day/night check).
+        last_weather_group: Previous weather group (or None on first call).
+        last_weather_night: Previous night flag (or None on first call).
+        last_precip_mm: Previous precipitation in mm.
+        last_wind_speed: Previous wind speed in m/s.
+
+    Returns:
+        Tuple of (new_animation_or_None, group, is_night, precip_mm, wind_speed).
+        new_animation_or_None is a WeatherAnimation if conditions changed, else None.
+    """
+    new_group = symbol_to_group(weather_data.symbol_code)
+    is_night = is_dark(now_utc, WEATHER_LAT, WEATHER_LON)
+    precip = weather_data.precipitation_mm
+    wind = weather_data.wind_speed
+
+    if _should_swap_animation(
+        new_group, is_night, precip, wind,
+        last_weather_group, last_weather_night, last_precip_mm, last_wind_speed,
+    ):
+        anim = get_animation(
+            new_group,
+            is_night=is_night,
+            precipitation_mm=precip,
+            wind_speed=wind,
+            wind_direction=weather_data.wind_from_direction,
+        )
+        return anim, new_group, is_night, precip, wind
+
+    return None, new_group, is_night, precip, wind
+
+
 def build_font_map(font_dir: str) -> dict:
     """Load fonts and map them to logical names used by the renderer.
 
@@ -147,6 +217,7 @@ def main_loop(
     save_frame: bool = False,
     message_bridge: MessageBridge | None = None,
     health_tracker: HealthTracker | None = None,
+    bot_dead_event: threading.Event | None = None,
 ) -> None:
     """Run the dashboard main loop.
 
@@ -164,6 +235,7 @@ def main_loop(
         save_frame: If True, save each rendered frame to debug_frame.png.
         message_bridge: Optional MessageBridge from Discord bot for message override.
         health_tracker: Optional HealthTracker for monitoring integration.
+        bot_dead_event: Optional threading.Event set when Discord bot thread dies.
     """
     # --- TEST MODE: hardcode weather for visual testing ---
     # Set TEST_WEATHER env var to: clear, rain, snow, fog (cycles on restart)
@@ -178,7 +250,7 @@ def main_loop(
         "thunder": WeatherData(temperature=30, symbol_code="rainandthunder_day", high_temp=32, low_temp=22, precipitation_mm=8.0, is_day=True, wind_speed=12.0, wind_from_direction=250.0),
     }
     if test_weather_mode:
-        logger.info("TEST MODE: weather=%s, temp=30°C, daytime", test_weather_mode)
+        logger.info("TEST MODE: weather=%s, temp=30\u00b0C, daytime", test_weather_mode)
     # --- END TEST MODE ---
 
     last_state = None
@@ -197,31 +269,28 @@ def main_loop(
     heartbeat = [time.monotonic()]
     watchdog = threading.Thread(target=_watchdog_thread, args=(heartbeat,), daemon=True)
     watchdog.start()
-    logger.info("Watchdog started (timeout=%ds)", _WATCHDOG_TIMEOUT)
+    logger.info("Watchdog started (timeout=%ds)", WATCHDOG_TIMEOUT)
 
-    # Device keep-alive tracking
-    last_device_success: float = 0.0  # monotonic time of last successful push or ping
-    consecutive_device_failures: int = 0
-    reboot_wait_until: float = 0.0  # monotonic time when reboot recovery wait ends
-
-    # Staleness tracking -- preserve last-good data through API failures
-    last_good_bus: tuple[list[int] | None, list[int] | None] = (None, None)
-    last_good_bus_time: float = 0.0  # monotonic time of last successful bus fetch
-    last_good_weather: WeatherData | None = None
-    last_good_weather_time: float = 0.0  # monotonic time of last successful weather fetch
+    # Delegate device keep-alive and staleness tracking to dedicated classes
+    keepalive = DeviceKeepAlive()
+    staleness = StalenessTracker()
 
     # Brightness tracking -- only send brightness when target changes
     last_brightness: int = -1
 
-    # Staleness thresholds (seconds)
-    BUS_STALE_THRESHOLD = 180     # 3 minutes -- bus data is aging
-    BUS_TOO_OLD_THRESHOLD = 600   # 10 minutes -- bus data is too old, show dashes
-    WEATHER_STALE_THRESHOLD = 1800   # 30 minutes -- weather data is aging
-    WEATHER_TOO_OLD_THRESHOLD = 3600  # 1 hour -- weather data is too old, show dashes
+    # Discord bot death detection -- log once, clear stale message
+    bot_dead_logged = False
 
     while True:
         now_mono = time.monotonic()
         now_utc = datetime.now(timezone.utc)
+
+        # Detect Discord bot thread death -- log once, clear stale message
+        if bot_dead_event is not None and bot_dead_event.is_set() and not bot_dead_logged:
+            logger.warning("Discord bot thread has died -- clearing stale message")
+            if message_bridge is not None:
+                message_bridge.set_message(None)
+            bot_dead_logged = True
 
         # Independent 60-second bus data refresh
         if now_mono - last_bus_fetch >= BUS_REFRESH_INTERVAL:
@@ -230,15 +299,14 @@ def main_loop(
             # Preserve last-good data on failure
             if fresh_bus != (None, None):
                 bus_data = fresh_bus
-                last_good_bus = fresh_bus
-                last_good_bus_time = now_mono
+                staleness.update_bus(fresh_bus)
                 logger.info("Bus data refreshed: dir1=%s dir2=%s", bus_data[0], bus_data[1])
                 if health_tracker:
                     health_tracker.record_success("bus_api")
             else:
                 # API failed -- keep using last-good data
-                bus_data = last_good_bus
-                logger.warning("Bus fetch failed, using last-good data (age=%.0fs)", now_mono - last_good_bus_time if last_good_bus_time > 0 else 0)
+                bus_data = staleness.last_good_bus
+                logger.warning("Bus fetch failed, using last-good data (age=%.0fs)", staleness.bus_data_age)
                 if health_tracker:
                     health_tracker.record_failure("bus_api", "Bus API returned no data")
 
@@ -247,73 +315,64 @@ def main_loop(
             # TEST MODE: use hardcoded weather, skip API
             if weather_data is None:
                 weather_data = test_weather_map[test_weather_mode]
-                last_good_weather = weather_data
-                last_good_weather_time = now_mono
-                new_group = symbol_to_group(weather_data.symbol_code)
-                is_night = is_dark(now_utc, WEATHER_LAT, WEATHER_LON)
-                precip = weather_data.precipitation_mm
-                if new_group != last_weather_group or is_night != last_weather_night:
-                    weather_anim = get_animation(
-                        new_group, is_night=is_night, precipitation_mm=precip,
-                        wind_speed=weather_data.wind_speed,
-                        wind_direction=weather_data.wind_from_direction,
+                staleness.update_weather(weather_data)
+                result = _select_animation(
+                    weather_data, now_utc,
+                    last_weather_group, last_weather_night,
+                    last_precip_mm, last_wind_speed,
+                )
+                new_anim, last_weather_group, last_weather_night, last_precip_mm, last_wind_speed = result
+                if new_anim is not None:
+                    weather_anim = new_anim
+                    logger.info(
+                        "TEST: weather animation: %s (night=%s, precip=%.1fmm, wind=%.1fm/s)",
+                        last_weather_group, last_weather_night, last_precip_mm, last_wind_speed,
                     )
-                    last_weather_group = new_group
-                    last_weather_night = is_night
-                    last_precip_mm = precip
-                    last_wind_speed = weather_data.wind_speed
-                    logger.info("TEST: weather animation: %s (night=%s, precip=%.1fmm, wind=%.1fm/s)", new_group, is_night, precip, weather_data.wind_speed)
         elif now_mono - last_weather_fetch >= WEATHER_REFRESH_INTERVAL:
             fresh_weather = fetch_weather_safe(WEATHER_LAT, WEATHER_LON)
             last_weather_fetch = now_mono
             if fresh_weather:
                 weather_data = fresh_weather
-                last_good_weather = fresh_weather
-                last_good_weather_time = now_mono
+                staleness.update_weather(fresh_weather)
                 if health_tracker:
                     health_tracker.record_success("weather_api")
                 logger.info(
-                    "Weather refreshed: %.1f°C %s precip=%.1fmm",
+                    "Weather refreshed: %.1f\u00b0C %s precip=%.1fmm",
                     weather_data.temperature,
                     weather_data.symbol_code,
                     weather_data.precipitation_mm,
                 )
                 # Swap animation if weather group, day/night, or rain intensity changed
-                new_group = symbol_to_group(weather_data.symbol_code)
-                is_night = is_dark(now_utc, WEATHER_LAT, WEATHER_LON)
-                precip = weather_data.precipitation_mm
-                precip_changed = _precip_category(precip) != _precip_category(last_precip_mm)
-                wind_changed = _wind_category(weather_data.wind_speed) != _wind_category(last_wind_speed)
-                if new_group != last_weather_group or is_night != last_weather_night or precip_changed or wind_changed:
-                    weather_anim = get_animation(
-                        new_group, is_night=is_night, precipitation_mm=precip,
-                        wind_speed=weather_data.wind_speed,
-                        wind_direction=weather_data.wind_from_direction,
+                result = _select_animation(
+                    weather_data, now_utc,
+                    last_weather_group, last_weather_night,
+                    last_precip_mm, last_wind_speed,
+                )
+                new_anim, last_weather_group, last_weather_night, last_precip_mm, last_wind_speed = result
+                if new_anim is not None:
+                    weather_anim = new_anim
+                    logger.info(
+                        "Weather animation: %s (night=%s, precip=%.1fmm, wind=%.1fm/s)",
+                        last_weather_group, last_weather_night, last_precip_mm, last_wind_speed,
                     )
-                    last_weather_group = new_group
-                    last_weather_night = is_night
-                    last_precip_mm = precip
-                    last_wind_speed = weather_data.wind_speed
-                    logger.info("Weather animation: %s (night=%s, precip=%.1fmm, wind=%.1fm/s)", new_group, is_night, precip, weather_data.wind_speed)
             else:
                 # API failed -- keep using last-good data
-                weather_data = last_good_weather
-                logger.warning("Weather fetch failed, using last-good data (age=%.0fs)", now_mono - last_good_weather_time if last_good_weather_time > 0 else 0)
+                weather_data = staleness.last_good_weather
+                logger.warning("Weather fetch failed, using last-good data (age=%.0fs)", staleness.weather_data_age)
                 if health_tracker:
                     health_tracker.record_failure("weather_api", "Weather API returned no data")
 
-        # Calculate staleness flags
-        bus_age = now_mono - last_good_bus_time if last_good_bus_time > 0 else 0
-        weather_age = now_mono - last_good_weather_time if last_good_weather_time > 0 else 0
+        # Calculate staleness flags and effective data from the tracker
+        effective_bus, bus_stale, bus_too_old = staleness.get_effective_bus()
+        effective_weather, weather_stale, weather_too_old = staleness.get_effective_weather()
 
-        bus_stale = bus_age > BUS_STALE_THRESHOLD and last_good_bus_time > 0
-        bus_too_old = bus_age > BUS_TOO_OLD_THRESHOLD and last_good_bus_time > 0
-        weather_stale = weather_age > WEATHER_STALE_THRESHOLD and last_good_weather_time > 0
-        weather_too_old = weather_age > WEATHER_TOO_OLD_THRESHOLD and last_good_weather_time > 0
-
-        # When data is too old, pass None to show dash placeholders
-        effective_bus = (None, None) if bus_too_old else bus_data
-        effective_weather = None if weather_too_old else weather_data
+        # When bus/weather data is not too old, prefer the fresh fetch result
+        # (which may differ from last_good if we just fetched and got a failure
+        # -- in that case bus_data/weather_data already fell back to last_good).
+        if not bus_too_old:
+            effective_bus = bus_data
+        if not weather_too_old:
+            effective_weather = weather_data
 
         now = datetime.now()
 
@@ -359,46 +418,20 @@ def main_loop(
 
             push_result = client.push_frame(frame)
             if push_result is True:
-                last_device_success = time.monotonic()
-                consecutive_device_failures = 0
+                keepalive.record_success()
                 if health_tracker:
                     health_tracker.record_success("device")
                 if state_changed:
                     logger.info("Pushed frame: %s %s", current_state.time_str, current_state.date_str)
             elif push_result is False:
-                consecutive_device_failures += 1
+                keepalive.record_failure()
                 if health_tracker:
                     health_tracker.record_failure("device", "Device unreachable")
             # push_result is None means skipped (rate limit / cooldown) -- no health action
             needs_push = False
 
-        # --- Device keep-alive ping + auto-reboot recovery ---
-        if now_mono > reboot_wait_until:
-            # Check if we should attempt a reboot
-            if consecutive_device_failures >= _REBOOT_THRESHOLD:
-                logger.warning(
-                    "Device has %d consecutive failures, attempting reboot",
-                    consecutive_device_failures,
-                )
-                if client.reboot():
-                    reboot_wait_until = time.monotonic() + _REBOOT_RECOVERY_WAIT
-                    logger.info("Waiting %ds for device to recover after reboot", _REBOOT_RECOVERY_WAIT)
-                else:
-                    logger.warning("Reboot command failed (device may be fully offline)")
-                consecutive_device_failures = 0  # reset to avoid reboot spam
-
-            # Keep-alive ping when no recent device success
-            elif (now_mono - last_device_success) >= _PING_INTERVAL and last_device_success > 0:
-                ping_result = client.ping()
-                if ping_result is True:
-                    last_device_success = time.monotonic()
-                    consecutive_device_failures = 0
-                    if health_tracker:
-                        health_tracker.record_success("device")
-                elif ping_result is False:
-                    consecutive_device_failures += 1
-                    if health_tracker:
-                        health_tracker.record_failure("device", "Device ping failed")
+        # Device keep-alive ping + auto-reboot recovery
+        keepalive.tick(client, now_mono, health_tracker=health_tracker)
 
         # Sleep 1s always.  The Pixoo 64 can handle ~1 push/second max.
         # Animation particles advance one step per tick, producing gentle
@@ -470,8 +503,9 @@ def main() -> None:
                 logger.exception("Failed to send startup embed")
 
     # Start Discord bot in background thread (optional)
+    bot_dead_event = None
     if DISCORD_MONITOR_CHANNEL_ID:
-        message_bridge = start_discord_bot(
+        result = start_discord_bot(
             DISCORD_BOT_TOKEN,
             DISCORD_CHANNEL_ID,
             monitor_channel_id=DISCORD_MONITOR_CHANNEL_ID,
@@ -479,17 +513,26 @@ def main() -> None:
             on_ready_callback=on_ready_callback,
         )
     else:
-        message_bridge = start_discord_bot(DISCORD_BOT_TOKEN, DISCORD_CHANNEL_ID)
+        result = start_discord_bot(DISCORD_BOT_TOKEN, DISCORD_CHANNEL_ID)
         logger.info("Discord monitoring not configured (no DISCORD_MONITOR_CHANNEL_ID)")
 
-    if message_bridge:
+    if result:
+        message_bridge, bot_dead_event = result
         logger.info("Discord bot started for message override")
     else:
+        message_bridge = None
         logger.info("Discord bot not configured (no DISCORD_BOT_TOKEN/DISCORD_CHANNEL_ID)")
 
     logger.info("Starting dashboard main loop (Ctrl+C to stop)")
     try:
-        main_loop(client, fonts, save_frame=args.save_frame, message_bridge=message_bridge, health_tracker=health_tracker)
+        main_loop(
+            client,
+            fonts,
+            save_frame=args.save_frame,
+            message_bridge=message_bridge,
+            health_tracker=health_tracker,
+            bot_dead_event=bot_dead_event,
+        )
     except KeyboardInterrupt:
         logger.info("Shutting down")
         # Best-effort shutdown embed (2-second timeout)

@@ -86,6 +86,7 @@ def run_discord_bot(
     monitor_channel_id: int | None = None,
     health_tracker=None,
     on_ready_callback=None,
+    bot_dead_event: threading.Event | None = None,
 ) -> None:
     """Run the Discord bot (blocking). Designed for background thread.
 
@@ -103,6 +104,7 @@ def run_discord_bot(
         monitor_channel_id: Optional monitoring channel ID for health alerts.
         health_tracker: Optional HealthTracker for status command responses.
         on_ready_callback: Optional callable(client) invoked when bot is ready.
+        bot_dead_event: Optional threading.Event set when the bot thread exits.
     """
     import discord
 
@@ -163,8 +165,13 @@ def run_discord_bot(
 
     try:
         client.run(token, log_handler=None)  # Suppress discord.py's own logging setup
+        # client.run() returned normally -- bot disconnected
+        logger.warning("Discord bot disconnected (client.run returned)")
     except Exception:
         logger.exception("Discord bot crashed")
+    finally:
+        if bot_dead_event is not None:
+            bot_dead_event.set()
 
 
 def start_discord_bot(
@@ -174,8 +181,8 @@ def start_discord_bot(
     monitor_channel_id: str | None = None,
     health_tracker=None,
     on_ready_callback=None,
-) -> MessageBridge | None:
-    """Start Discord bot in background thread. Returns MessageBridge or None.
+) -> tuple[MessageBridge, threading.Event] | None:
+    """Start Discord bot in background thread. Returns (MessageBridge, Event) or None.
 
     If token or channel_id is not provided, returns None (bot not started).
     The bot thread is a daemon -- it dies when the main process exits.
@@ -191,12 +198,15 @@ def start_discord_bot(
         on_ready_callback: Optional callable(client) for bot ready event.
 
     Returns:
-        MessageBridge instance if bot started, None if config missing.
+        Tuple of (MessageBridge, bot_dead_event) if bot started, None if
+        config missing. The bot_dead_event is set when the bot thread exits
+        (crash or normal disconnect).
     """
     if not token or not channel_id:
         return None
 
     bridge = MessageBridge()
+    bot_dead_event = threading.Event()
     monitor_id = int(monitor_channel_id) if monitor_channel_id else None
     thread = threading.Thread(
         target=run_discord_bot,
@@ -205,9 +215,10 @@ def start_discord_bot(
             "monitor_channel_id": monitor_id,
             "health_tracker": health_tracker,
             "on_ready_callback": on_ready_callback,
+            "bot_dead_event": bot_dead_event,
         },
         daemon=True,
         name="discord-bot",
     )
     thread.start()
-    return bridge
+    return bridge, bot_dead_event
