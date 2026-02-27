@@ -134,8 +134,8 @@ def fetch_departures_safe(
     try:
         departures = fetch_departures(quay_id, num_departures)
         return [d.minutes for d in departures]
-    except Exception:
-        logger.exception("Failed to fetch departures for %s", quay_id)
+    except (requests.RequestException, OSError, KeyError, ValueError) as exc:
+        logger.warning("Failed to fetch departures for %s: %s", quay_id, exc)
         return None
 
 
@@ -161,8 +161,8 @@ def fetch_quay_name(quay_id: str) -> str | None:
         )
         response.raise_for_status()
         return response.json()["data"]["quay"]["name"]
-    except Exception:
-        logger.exception("Failed to fetch quay name for %s", quay_id)
+    except (requests.RequestException, KeyError, ValueError) as exc:
+        logger.warning("Failed to fetch quay name for %s: %s", quay_id, exc)
         return None
 
 

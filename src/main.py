@@ -82,6 +82,7 @@ def _watchdog_thread(heartbeat_ref: list[float], timeout: float = WATCHDOG_TIMEO
             os.kill(os.getpid(), signal.SIGTERM)
             time.sleep(10)
             logger.critical("Watchdog: still alive after SIGTERM grace period, forcing exit")
+            logging.shutdown()  # flush all handlers before hard exit
             os._exit(1)
 
 
@@ -508,8 +509,8 @@ def main() -> None:
                     logger.info("Monitoring active -- startup embed sent to channel %s", DISCORD_MONITOR_CHANNEL_ID)
                 else:
                     logger.warning("Monitoring active -- startup embed failed for channel %s", DISCORD_MONITOR_CHANNEL_ID)
-            except Exception:
-                logger.exception("Failed to send startup embed")
+            except (OSError, ValueError) as exc:
+                logger.warning("Failed to send startup embed: %s", exc)
 
     # Start Discord bot in background thread (optional)
     bot_dead_event = None

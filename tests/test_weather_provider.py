@@ -4,6 +4,7 @@ from datetime import date, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 
 from src.providers.weather import (
     WeatherData,
@@ -166,7 +167,7 @@ class TestFetchWeatherSafe:
     def test_returns_none_on_http_error(self, mock_get):
         mock_response = MagicMock()
         mock_response.status_code = 500
-        mock_response.raise_for_status.side_effect = Exception("Server error")
+        mock_response.raise_for_status.side_effect = requests.HTTPError("Server error")
         mock_get.return_value = mock_response
         result = fetch_weather_safe(63.0, 10.0)
         assert result is None

@@ -9,16 +9,22 @@ import logging
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+import time
 
 import requests
 
 from src.config import WEATHER_API_URL, WEATHER_USER_AGENT
+
+_CACHE_MAX_AGE = 3600  # discard If-Modified-Since after 1 hour
 
 logger = logging.getLogger(__name__)
 
 # Module-level cache for API responses (If-Modified-Since pattern)
 _cached_data: dict | None = None
 _last_modified: str | None = None
+_cache_time: float = 0.0  # monotonic time when cache was last updated
 _cache_lock = threading.Lock()
 
 
@@ -96,7 +102,7 @@ def _parse_high_low(timeseries: list[dict]) -> tuple[float, float]:
     Returns:
         Tuple of (high_temp, low_temp) in Celsius.
     """
-    today_str = datetime.now(timezone.utc).date().isoformat()
+    today_str = datetime.now(ZoneInfo("Europe/Oslo")).date().isoformat()
     temps = []
     for entry in timeseries:
         time_val = entry.get("time", "")
@@ -154,15 +160,17 @@ def fetch_weather(lat: float, lon: float) -> WeatherData:
         requests.HTTPError: If the API returns an error status.
         KeyError: If the response structure is unexpected.
     """
-    global _cached_data, _last_modified
+    global _cached_data, _last_modified, _cache_time
 
     # Read cache under lock
     with _cache_lock:
         local_cached_data = _cached_data
         local_last_modified = _last_modified
+        local_cache_time = _cache_time
 
     headers: dict[str, str] = {"User-Agent": WEATHER_USER_AGENT}
-    if local_last_modified and local_cached_data:
+    # Only use If-Modified-Since if cache is less than 1 hour old
+    if local_last_modified and local_cached_data and (time.monotonic() - local_cache_time) < _CACHE_MAX_AGE:
         headers["If-Modified-Since"] = local_last_modified
 
     response = requests.get(
@@ -182,6 +190,7 @@ def fetch_weather(lat: float, lon: float) -> WeatherData:
         with _cache_lock:
             _cached_data = data
             _last_modified = response.headers.get("Last-Modified")
+            _cache_time = time.monotonic()
 
     timeseries = data["properties"]["timeseries"]
     current = _parse_current(timeseries)
@@ -214,6 +223,6 @@ def fetch_weather_safe(lat: float, lon: float) -> WeatherData | None:
     """
     try:
         return fetch_weather(lat, lon)
-    except Exception:
-        logger.exception("Failed to fetch weather for lat=%s lon=%s", lat, lon)
+    except (requests.RequestException, OSError, KeyError, ValueError) as exc:
+        logger.warning("Failed to fetch weather for lat=%s lon=%s: %s", lat, lon, exc)
         return None
