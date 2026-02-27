@@ -167,7 +167,7 @@ def render_weather_zone(
     temp_value = state.weather_temp
     if temp_value < 0:
         temp_color = COLOR_WEATHER_TEMP_NEG
-        temp_text = str(abs(temp_value))
+        temp_text = f"-{abs(temp_value)}"
     else:
         temp_color = COLOR_WEATHER_TEMP
         temp_text = str(temp_value)

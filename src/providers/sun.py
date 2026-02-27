@@ -5,11 +5,14 @@ location and date. Caches results per-day since sun times only change
 once per calendar day.
 """
 
+import logging
 import threading
 from datetime import date, datetime, timezone
 
 from astral import Observer
 from astral.sun import dawn, dusk, sunrise, sunset
+
+logger = logging.getLogger(__name__)
 
 
 # Cache: (lat, lon, date) -> sun times dict
@@ -44,12 +47,37 @@ def get_sun_times(lat: float, lon: float, d: date) -> dict[str, datetime]:
 
     # Compute outside lock
     observer = Observer(latitude=lat, longitude=lon)
-    times = {
-        "dawn": dawn(observer, date=d, tzinfo=timezone.utc),
-        "sunrise": sunrise(observer, date=d, tzinfo=timezone.utc),
-        "sunset": sunset(observer, date=d, tzinfo=timezone.utc),
-        "dusk": dusk(observer, date=d, tzinfo=timezone.utc),
-    }
+    try:
+        times = {
+            "dawn": dawn(observer, date=d, tzinfo=timezone.utc),
+            "sunrise": sunrise(observer, date=d, tzinfo=timezone.utc),
+            "sunset": sunset(observer, date=d, tzinfo=timezone.utc),
+            "dusk": dusk(observer, date=d, tzinfo=timezone.utc),
+        }
+    except ValueError:
+        # Polar night or midnight sun — astral can't compute dawn/dusk.
+        # Detect which case: try noon sun elevation.
+        from astral.sun import elevation
+        noon = datetime(d.year, d.month, d.day, 12, 0, tzinfo=timezone.utc)
+        elev = elevation(observer, noon)
+        if elev > 0:
+            # Midnight sun — sun never sets, always light
+            logger.debug("Midnight sun at %.1f,%.1f on %s — treating as always light", lat, lon, d)
+            times = {
+                "dawn": datetime(d.year, d.month, d.day, 0, 0, tzinfo=timezone.utc),
+                "sunrise": datetime(d.year, d.month, d.day, 0, 0, tzinfo=timezone.utc),
+                "sunset": datetime(d.year, d.month, d.day, 23, 59, 59, tzinfo=timezone.utc),
+                "dusk": datetime(d.year, d.month, d.day, 23, 59, 59, tzinfo=timezone.utc),
+            }
+        else:
+            # Polar night — sun never rises, always dark
+            logger.debug("Polar night at %.1f,%.1f on %s — treating as always dark", lat, lon, d)
+            times = {
+                "dawn": datetime(d.year, d.month, d.day, 12, 0, tzinfo=timezone.utc),
+                "sunrise": datetime(d.year, d.month, d.day, 12, 0, tzinfo=timezone.utc),
+                "sunset": datetime(d.year, d.month, d.day, 12, 0, tzinfo=timezone.utc),
+                "dusk": datetime(d.year, d.month, d.day, 12, 0, tzinfo=timezone.utc),
+            }
 
     # Write cache under lock
     with _cache_lock:

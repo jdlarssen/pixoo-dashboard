@@ -88,8 +88,8 @@ class DisplayState:
         return cls(
             time_str=format_time(dt),
             date_str=format_date_norwegian(dt),
-            bus_direction1=tuple(bus_data[0]) if bus_data[0] else None,
-            bus_direction2=tuple(bus_data[1]) if bus_data[1] else None,
+            bus_direction1=tuple(bus_data[0]) if bus_data[0] is not None else None,
+            bus_direction2=tuple(bus_data[1]) if bus_data[1] is not None else None,
             message_text=message_text,
             is_birthday=is_birthday,
             bus_stale=bus_stale,

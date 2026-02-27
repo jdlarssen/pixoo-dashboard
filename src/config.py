@@ -120,6 +120,8 @@ for _d in BIRTHDAY_DATES_RAW.split(","):
 def validate_config() -> None:
     """Check that required config values are set. Exits with error if not."""
     missing = []
+    if not os.environ.get("DIVOOM_IP"):
+        missing.append("DIVOOM_IP")
     if not BUS_QUAY_DIRECTION1:
         missing.append("BUS_QUAY_DIR1")
     if not BUS_QUAY_DIRECTION2:

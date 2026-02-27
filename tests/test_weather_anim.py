@@ -865,8 +865,11 @@ class TestAnimationCombos:
 
     def test_heavy_rain_fog_with_wind_wraps_composite(self):
         anim = get_animation("rain", precipitation_mm=6.0, wind_speed=8.0, wind_direction=270.0)
-        assert isinstance(anim, WindEffect)
-        assert isinstance(anim.inner, CompositeAnimation)
+        # Wind is applied to rain BEFORE fog composite wrapping
+        assert isinstance(anim, CompositeAnimation)
+        # First child should be WindEffect wrapping RainAnimation
+        assert isinstance(anim.animations[0], WindEffect)
+        assert isinstance(anim.animations[0].inner, RainAnimation)
 
     def test_thunder_with_wind(self):
         anim = get_animation("thunder", precipitation_mm=5.0, wind_speed=8.0, wind_direction=270.0)
