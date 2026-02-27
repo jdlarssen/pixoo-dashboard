@@ -122,10 +122,19 @@ def _parse_high_low(timeseries: list[dict]) -> tuple[float, float]:
     # Fallback: use next_6_hours from first entry
     first = timeseries[0].get("data", {}) if timeseries else {}
     n6h = first.get("next_6_hours", {}).get("details", {})
-    return (
-        n6h.get("air_temperature_max", 0.0),
-        n6h.get("air_temperature_min", 0.0),
+    high = n6h.get("air_temperature_max")
+    low = n6h.get("air_temperature_min")
+    if high is not None and low is not None:
+        return (high, low)
+
+    # Last resort: use current temperature as both high and low
+    current_temp = (
+        first.get("instant", {}).get("details", {}).get("air_temperature")
     )
+    if current_temp is not None:
+        return (current_temp, current_temp)
+
+    return (0.0, 0.0)
 
 
 def fetch_weather(lat: float, lon: float) -> WeatherData:

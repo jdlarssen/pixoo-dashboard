@@ -413,7 +413,7 @@ class ThunderAnimation(WeatherAnimation):
 
     Lightning strikes every ~4 seconds, lasts 3 frames:
     - Frame 1: bright white flash + jagged bolt
-    - Frame 2: bolt afterglow
+    - Frame 2: bolt afterglow (same shape)
     - Frame 3: dim fade
     """
 
@@ -423,20 +423,27 @@ class ThunderAnimation(WeatherAnimation):
         self._tick_count = 0
         self._flash_remaining = 0
         self._bolt_x = 0
+        self._bolt_segments: list[tuple[int, int, int, int]] = []
 
-    def _draw_bolt(self, draw: ImageDraw.Draw, start_x: int, alpha: int) -> None:
-        """Draw a jagged lightning bolt from top to bottom."""
-        color = (255, 255, 200, alpha)
+    def _generate_bolt(self, start_x: int) -> list[tuple[int, int, int, int]]:
+        """Generate jagged lightning bolt segments from top to bottom."""
+        segments = []
         x = start_x
         y = 0
         while y < self.height - 2:
-            # Jagged segments: go down 2-4px with random horizontal jag
             seg_len = random.randint(2, 4)
             next_y = min(y + seg_len, self.height - 1)
             jag = random.choice([-3, -2, -1, 1, 2, 3])
             next_x = max(0, min(x + jag, self.width - 1))
-            draw.line([(x, y), (next_x, next_y)], fill=color, width=1)
+            segments.append((x, y, next_x, next_y))
             x, y = next_x, next_y
+        return segments
+
+    def _draw_bolt(self, draw: ImageDraw.Draw, segments: list[tuple[int, int, int, int]], alpha: int) -> None:
+        """Draw a pre-generated lightning bolt."""
+        color = (255, 255, 200, alpha)
+        for x1, y1, x2, y2 in segments:
+            draw.line([(x1, y1), (x2, y2)], fill=color, width=1)
 
     def tick(self) -> tuple[Image.Image, Image.Image]:
         bg, fg = self._rain.tick()
@@ -446,6 +453,7 @@ class ThunderAnimation(WeatherAnimation):
         if self._tick_count % 4 == 0:
             self._flash_remaining = 3
             self._bolt_x = random.randint(10, self.width - 10)
+            self._bolt_segments = self._generate_bolt(self._bolt_x)
 
         if self._flash_remaining > 0:
             fg_draw = ImageDraw.Draw(fg)
@@ -457,10 +465,10 @@ class ThunderAnimation(WeatherAnimation):
                     [0, 0, self.width - 1, self.height - 1],
                     fill=(255, 255, 180, 120),
                 )
-                self._draw_bolt(fg_draw, self._bolt_x, 220)
+                self._draw_bolt(fg_draw, self._bolt_segments, 220)
             elif self._flash_remaining == 2:
-                # Bolt afterglow
-                self._draw_bolt(fg_draw, self._bolt_x, 150)
+                # Bolt afterglow (same shape)
+                self._draw_bolt(fg_draw, self._bolt_segments, 150)
             else:
                 # Dim fade
                 bg_draw.rectangle(
@@ -476,6 +484,7 @@ class ThunderAnimation(WeatherAnimation):
         self._rain.reset()
         self._tick_count = 0
         self._flash_remaining = 0
+        self._bolt_segments = []
 
 
 class FogAnimation(WeatherAnimation):
@@ -849,8 +858,14 @@ def get_animation(
     cls = _ANIMATION_MAP.get(weather_group, CloudAnimation)
 
     # Build the base animation
+    wind_applied = False
     if cls is RainAnimation:
         base = RainAnimation(precipitation_mm=precipitation_mm)
+        # Apply wind to rain BEFORE wrapping in CompositeAnimation
+        wind_applicable = wind_speed > 0 and wind_speed > _WIND_THRESHOLD_RAIN
+        if wind_applicable:
+            base = WindEffect(base, wind_speed=wind_speed, wind_direction=wind_direction)
+            wind_applied = True
         # Heavy rain gets fog overlay
         if precipitation_mm > _FOG_OVERLAY_PRECIP:
             base = CompositeAnimation([base, FogAnimation()])
@@ -861,11 +876,12 @@ def get_animation(
     else:
         base = cls()
 
-    # Apply wind effect to particle-based animations
-    wind_applicable = cls in (RainAnimation, SnowAnimation, ThunderAnimation)
-    if wind_applicable and wind_speed > 0:
-        threshold = _WIND_THRESHOLD_SNOW if cls is SnowAnimation else _WIND_THRESHOLD_RAIN
-        if wind_speed > threshold:
-            base = WindEffect(base, wind_speed=wind_speed, wind_direction=wind_direction)
+    # Apply wind effect to particle-based animations (if not already applied)
+    if not wind_applied:
+        wind_applicable = cls in (RainAnimation, SnowAnimation, ThunderAnimation)
+        if wind_applicable and wind_speed > 0:
+            threshold = _WIND_THRESHOLD_SNOW if cls is SnowAnimation else _WIND_THRESHOLD_RAIN
+            if wind_speed > threshold:
+                base = WindEffect(base, wind_speed=wind_speed, wind_direction=wind_direction)
 
     return base

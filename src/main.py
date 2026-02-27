@@ -449,6 +449,11 @@ def main_loop(
 def main() -> None:
     """Parse arguments and start the dashboard."""
     validate_config()
+
+    def _sigterm_handler(signum, frame):
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGTERM, _sigterm_handler)
+
     parser = argparse.ArgumentParser(description="Pixoo Dashboard - Pixoo 64 Dashboard")
     parser.add_argument(
         "--ip",
@@ -477,14 +482,14 @@ def main() -> None:
     client = PixooClient(ip=args.ip, simulated=args.simulated)
 
     # Set up monitoring (optional -- requires DISCORD_MONITOR_CHANNEL_ID)
-    monitor_bridge = None
+    monitor_bridge_ref: list[MonitorBridge | None] = [None]
     health_tracker = HealthTracker(monitor=None)
 
     def on_ready_callback(bot_client):
-        nonlocal monitor_bridge
         if DISCORD_MONITOR_CHANNEL_ID:
-            monitor_bridge = MonitorBridge(bot_client, int(DISCORD_MONITOR_CHANNEL_ID))
-            health_tracker.set_monitor(monitor_bridge)
+            bridge = MonitorBridge(bot_client, int(DISCORD_MONITOR_CHANNEL_ID))
+            monitor_bridge_ref[0] = bridge
+            health_tracker.set_monitor(bridge)
             try:
                 bus_name1 = fetch_quay_name(BUS_QUAY_DIRECTION1)
                 bus_name2 = fetch_quay_name(BUS_QUAY_DIRECTION2)
@@ -499,7 +504,7 @@ def main() -> None:
                     bus_name_dir2=bus_name2,
                     weather_location=weather_location,
                 )
-                if monitor_bridge.send_embed(embed):
+                if bridge.send_embed(embed):
                     logger.info("Monitoring active -- startup embed sent to channel %s", DISCORD_MONITOR_CHANNEL_ID)
                 else:
                     logger.warning("Monitoring active -- startup embed failed for channel %s", DISCORD_MONITOR_CHANNEL_ID)
@@ -539,11 +544,12 @@ def main() -> None:
         )
     except KeyboardInterrupt:
         logger.info("Shutting down")
-        # Best-effort shutdown embed (2-second timeout)
-        if monitor_bridge:
+        # Best-effort shutdown embed — wait briefly for delivery
+        if monitor_bridge_ref[0]:
             try:
                 embed = shutdown_embed()
-                monitor_bridge.send_embed(embed)
+                monitor_bridge_ref[0].send_embed(embed)
+                time.sleep(2)  # allow Discord client to deliver before daemon thread dies
                 logger.info("Shutdown embed sent")
             except Exception:
                 logger.debug("Could not send shutdown embed (expected on forced kill)")
