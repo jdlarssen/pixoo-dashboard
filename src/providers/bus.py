@@ -4,8 +4,10 @@ Fetches real-time bus departures from specific quay IDs and calculates
 countdown minutes until each departure.
 """
 
+import atexit
 import logging
 import math
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -86,6 +88,12 @@ def fetch_departures(
         headers={"ET-Client-Name": ET_CLIENT_NAME},
         timeout=10,
     )
+    if response.status_code == 429:
+        retry_after = int(response.headers.get("Retry-After", 5))
+        logger.warning("Rate-limited by API, backing off %ds", retry_after)
+        time.sleep(min(retry_after, 30))  # Cap at 30s to avoid excessive waits
+        return []
+
     response.raise_for_status()
 
     data = response.json()
@@ -160,6 +168,12 @@ def fetch_quay_name(quay_id: str) -> str | None:
             headers={"ET-Client-Name": ET_CLIENT_NAME},
             timeout=10,
         )
+        if response.status_code == 429:
+            retry_after = int(response.headers.get("Retry-After", 5))
+            logger.warning("Rate-limited by API, backing off %ds", retry_after)
+            time.sleep(min(retry_after, 30))  # Cap at 30s to avoid excessive waits
+            return None
+
         response.raise_for_status()
         return response.json()["data"]["quay"]["name"]
     except (requests.RequestException, KeyError, ValueError) as exc:
@@ -168,6 +182,15 @@ def fetch_quay_name(quay_id: str) -> str | None:
 
 
 _bus_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="bus-fetch")
+atexit.register(_bus_executor.shutdown, wait=False)
+
+
+def _safe_result(fut, timeout=12):
+    """Return the future's result, or None on any failure/timeout."""
+    try:
+        return fut.result(timeout=timeout)
+    except Exception:
+        return None
 
 
 def fetch_bus_data() -> tuple[list[int] | None, list[int] | None]:
@@ -179,10 +202,6 @@ def fetch_bus_data() -> tuple[list[int] | None, list[int] | None]:
     """
     fut1 = _bus_executor.submit(fetch_departures_safe, BUS_QUAY_DIRECTION1, BUS_NUM_DEPARTURES)
     fut2 = _bus_executor.submit(fetch_departures_safe, BUS_QUAY_DIRECTION2, BUS_NUM_DEPARTURES)
-    try:
-        dir1 = fut1.result(timeout=12)
-        dir2 = fut2.result(timeout=12)
-    except Exception:
-        dir1 = fut1.result() if fut1.done() else None
-        dir2 = fut2.result() if fut2.done() else None
+    dir1 = _safe_result(fut1, timeout=12)
+    dir2 = _safe_result(fut2, timeout=12)
     return (dir1, dir2)

@@ -1,6 +1,6 @@
 [project]
 name = "pixoo-dashboard"
-version = "1.0.0"
+version = "1.2.0"
 description = "Always-on Pixoo 64 dashboard: clock, bus departures, and weather at a glance"
 requires-python = ">=3.10"
 dependencies = [
