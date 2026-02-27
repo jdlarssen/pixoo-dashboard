@@ -6,6 +6,7 @@ countdown minutes until each departure.
 
 import logging
 import math
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -166,6 +167,9 @@ def fetch_quay_name(quay_id: str) -> str | None:
         return None
 
 
+_bus_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="bus-fetch")
+
+
 def fetch_bus_data() -> tuple[list[int] | None, list[int] | None]:
     """Fetch departure data for both directions at the configured stop.
 
@@ -173,6 +177,12 @@ def fetch_bus_data() -> tuple[list[int] | None, list[int] | None]:
         Tuple of (direction1_minutes, direction2_minutes).
         Each element is a list of countdown minutes or None on failure.
     """
-    dir1 = fetch_departures_safe(BUS_QUAY_DIRECTION1, BUS_NUM_DEPARTURES)
-    dir2 = fetch_departures_safe(BUS_QUAY_DIRECTION2, BUS_NUM_DEPARTURES)
+    fut1 = _bus_executor.submit(fetch_departures_safe, BUS_QUAY_DIRECTION1, BUS_NUM_DEPARTURES)
+    fut2 = _bus_executor.submit(fetch_departures_safe, BUS_QUAY_DIRECTION2, BUS_NUM_DEPARTURES)
+    try:
+        dir1 = fut1.result(timeout=12)
+        dir2 = fut2.result(timeout=12)
+    except Exception:
+        dir1 = fut1.result() if fut1.done() else None
+        dir2 = fut2.result() if fut2.done() else None
     return (dir1, dir2)

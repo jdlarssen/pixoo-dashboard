@@ -23,7 +23,9 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
+from src.circuit_breaker import CircuitBreaker
 from src.config import (
+    BIRTHDAY_DATES,
     BUS_QUAY_DIRECTION1,
     BUS_QUAY_DIRECTION2,
     BUS_REFRESH_INTERVAL,
@@ -62,7 +64,27 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def _watchdog_thread(heartbeat_ref: list[float], timeout: float = WATCHDOG_TIMEOUT) -> None:
+# ---------------------------------------------------------------------------
+# Heartbeat (Issue 14 -- replaces mutable list hack)
+# ---------------------------------------------------------------------------
+
+class Heartbeat:
+    """Thread-safe monotonic timestamp for watchdog heartbeat."""
+
+    def __init__(self) -> None:
+        self._timestamp = time.monotonic()
+
+    def beat(self) -> None:
+        """Record a heartbeat from the main loop."""
+        self._timestamp = time.monotonic()
+
+    @property
+    def elapsed(self) -> float:
+        """Seconds since last heartbeat."""
+        return time.monotonic() - self._timestamp
+
+
+def _watchdog_thread(heartbeat: Heartbeat, timeout: float = WATCHDOG_TIMEOUT) -> None:
     """Monitor main loop heartbeat; force-kill if stale.
 
     Runs as a daemon thread. Checks every 30s whether the main loop
@@ -72,7 +94,7 @@ def _watchdog_thread(heartbeat_ref: list[float], timeout: float = WATCHDOG_TIMEO
     """
     while True:
         time.sleep(30)
-        elapsed = time.monotonic() - heartbeat_ref[0]
+        elapsed = heartbeat.elapsed
         if elapsed > timeout:
             logger.critical(
                 "Watchdog: main loop hung for %.0fs (threshold %ds), sending SIGTERM",
@@ -85,6 +107,154 @@ def _watchdog_thread(heartbeat_ref: list[float], timeout: float = WATCHDOG_TIMEO
             logging.shutdown()  # flush all handlers before hard exit
             os._exit(1)
 
+
+# ---------------------------------------------------------------------------
+# DashboardState (Issue 01 -- encapsulates mutable loop state)
+# ---------------------------------------------------------------------------
+
+class DashboardState:
+    """Encapsulates the mutable state of the main dashboard loop.
+
+    Centralizes bus/weather data, animation tracking, brightness, and
+    Discord bot death detection into a single object instead of 8+
+    loose local variables.
+    """
+
+    def __init__(self) -> None:
+        self.last_state: DisplayState | None = None
+        self.last_bus_fetch: float = 0.0
+        self.last_weather_fetch: float = 0.0
+        self.weather_anim: WeatherAnimation | None = None
+        self.last_weather_group: str | None = None
+        self.last_weather_night: bool | None = None
+        self.last_precip_mm: float = 0.0
+        self.last_wind_speed: float = 0.0
+        self.last_brightness: int = -1
+        self.needs_push: bool = False
+        self.bot_dead_logged: bool = False
+
+    def refresh_bus(
+        self,
+        now_mono: float,
+        staleness: StalenessTracker,
+        health_tracker: HealthTracker | None,
+        bus_breaker: CircuitBreaker,
+    ) -> None:
+        """Fetch bus data and update staleness tracker."""
+        if now_mono - self.last_bus_fetch < BUS_REFRESH_INTERVAL:
+            return
+        if not bus_breaker.should_attempt():
+            self.last_bus_fetch = now_mono
+            return
+        fresh_bus = fetch_bus_data()
+        self.last_bus_fetch = now_mono
+        if fresh_bus != (None, None):
+            staleness.update_bus(fresh_bus)
+            bus_breaker.record_success()
+            logger.info("Bus data refreshed: dir1=%s dir2=%s", fresh_bus[0], fresh_bus[1])
+            if health_tracker:
+                health_tracker.record_success("bus_api")
+        else:
+            bus_breaker.record_failure()
+            logger.warning(
+                "Bus fetch failed, using last-good data (age=%.0fs)",
+                staleness.bus_data_age,
+            )
+            if health_tracker:
+                health_tracker.record_failure("bus_api", "Bus API returned no data")
+
+    def refresh_weather(
+        self,
+        now_mono: float,
+        now_utc: datetime,
+        staleness: StalenessTracker,
+        health_tracker: HealthTracker | None,
+        weather_breaker: CircuitBreaker,
+        *,
+        test_weather_data: WeatherData | None = None,
+    ) -> None:
+        """Fetch weather data and swap animation if needed."""
+        if test_weather_data is not None:
+            # TEST MODE: use hardcoded weather, skip API
+            if staleness.last_good_weather is None:
+                staleness.update_weather(test_weather_data)
+                self._maybe_swap_animation(test_weather_data, now_utc)
+                logger.info(
+                    "TEST: weather animation: %s (night=%s, precip=%.1fmm, wind=%.1fm/s)",
+                    self.last_weather_group, self.last_weather_night,
+                    self.last_precip_mm, self.last_wind_speed,
+                )
+            return
+
+        if now_mono - self.last_weather_fetch < WEATHER_REFRESH_INTERVAL:
+            return
+        if not weather_breaker.should_attempt():
+            self.last_weather_fetch = now_mono
+            return
+        fresh_weather = fetch_weather_safe(WEATHER_LAT, WEATHER_LON)
+        self.last_weather_fetch = now_mono
+        if fresh_weather:
+            staleness.update_weather(fresh_weather)
+            weather_breaker.record_success()
+            if health_tracker:
+                health_tracker.record_success("weather_api")
+            logger.info(
+                "Weather refreshed: %.1f\u00b0C %s precip=%.1fmm",
+                fresh_weather.temperature,
+                fresh_weather.symbol_code,
+                fresh_weather.precipitation_mm,
+            )
+            self._maybe_swap_animation(fresh_weather, now_utc)
+        else:
+            weather_breaker.record_failure()
+            logger.warning(
+                "Weather fetch failed, using last-good data (age=%.0fs)",
+                staleness.weather_data_age,
+            )
+            if health_tracker:
+                health_tracker.record_failure("weather_api", "Weather API returned no data")
+
+    def _maybe_swap_animation(self, weather_data: WeatherData, now_utc: datetime) -> None:
+        """Swap animation if weather conditions changed."""
+        result = _select_animation(
+            weather_data, now_utc,
+            self.last_weather_group, self.last_weather_night,
+            self.last_precip_mm, self.last_wind_speed,
+        )
+        new_anim, self.last_weather_group, self.last_weather_night, \
+            self.last_precip_mm, self.last_wind_speed = result
+        if new_anim is not None:
+            self.weather_anim = new_anim
+            logger.info(
+                "Weather animation: %s (night=%s, precip=%.1fmm, wind=%.1fm/s)",
+                self.last_weather_group, self.last_weather_night,
+                self.last_precip_mm, self.last_wind_speed,
+            )
+
+    def update_brightness(self, client: PixooClient, now_utc: datetime) -> None:
+        """Adjust brightness based on astronomical darkness (only when target changes)."""
+        target_brightness = get_target_brightness(now_utc, WEATHER_LAT, WEATHER_LON)
+        if target_brightness != self.last_brightness:
+            client.set_brightness(target_brightness)
+            self.last_brightness = target_brightness
+            logger.info("Brightness set to %d%%", target_brightness)
+
+    def detect_bot_death(
+        self,
+        bot_dead_event: threading.Event | None,
+        message_bridge: MessageBridge | None,
+    ) -> None:
+        """Detect Discord bot thread death -- log once, clear stale message."""
+        if bot_dead_event is not None and bot_dead_event.is_set() and not self.bot_dead_logged:
+            logger.warning("Discord bot thread has died -- clearing stale message")
+            if message_bridge is not None:
+                message_bridge.set_message(None)
+            self.bot_dead_logged = True
+
+
+# ---------------------------------------------------------------------------
+# Helper functions
+# ---------------------------------------------------------------------------
 
 def _reverse_geocode(lat: float, lon: float) -> str | None:
     """Resolve lat/lon to a city name via OpenStreetMap Nominatim."""
@@ -115,6 +285,11 @@ def _precip_category(mm: float) -> str:
     elif mm <= 3.0:
         return "moderate"
     return "heavy"
+
+
+def _is_birthday(dt: datetime) -> bool:
+    """Check if the given date is a configured birthday."""
+    return any(dt.month == m and dt.day == d for m, d in BIRTHDAY_DATES)
 
 
 def _wind_category(speed: float) -> str:
@@ -209,6 +384,13 @@ def build_font_map(font_dir: str) -> dict:
         Dictionary with keys "small", "tiny" mapping to PIL fonts.
     """
     raw_fonts = load_fonts(font_dir)
+    required = [FONT_SMALL, FONT_TINY]
+    missing = [f for f in required if f not in raw_fonts]
+    if missing:
+        raise RuntimeError(
+            f"Required fonts missing: {missing}. "
+            f"Expected .bdf files in {font_dir}: {', '.join(f + '.bdf' for f in missing)}"
+        )
     return {
         "small": raw_fonts[FONT_SMALL],
         "tiny": raw_fonts[FONT_TINY],
@@ -258,20 +440,11 @@ def main_loop(
         logger.info("TEST MODE: weather=%s, temp=30\u00b0C, daytime", test_weather_mode)
     # --- END TEST MODE ---
 
-    last_state = None
-    last_bus_fetch = 0.0  # monotonic() is always > 60 on a running system
-    last_weather_fetch = 0.0
-    bus_data: tuple[list[int] | None, list[int] | None] = (None, None)
-    weather_data: WeatherData | None = None
-    weather_anim: WeatherAnimation | None = None
-    last_weather_group: str | None = None
-    last_weather_night: bool | None = None
-    last_precip_mm: float = 0.0
-    last_wind_speed: float = 0.0
-    needs_push = False
+    # Encapsulated dashboard state (Issue 01)
+    ds = DashboardState()
 
     # Watchdog: detect hung main loop and force-exit for launchd restart
-    heartbeat = [time.monotonic()]
+    heartbeat = Heartbeat()
     watchdog = threading.Thread(target=_watchdog_thread, args=(heartbeat,), daemon=True)
     watchdog.start()
     logger.info("Watchdog started (timeout=%ds)", WATCHDOG_TIMEOUT)
@@ -280,113 +453,34 @@ def main_loop(
     keepalive = DeviceKeepAlive()
     staleness = StalenessTracker()
 
-    # Brightness tracking -- only send brightness when target changes
-    last_brightness: int = -1
-
-    # Discord bot death detection -- log once, clear stale message
-    bot_dead_logged = False
+    # Circuit breakers for external APIs (Issue 07)
+    bus_breaker = CircuitBreaker("Bus API", failure_threshold=3, reset_timeout=300)
+    weather_breaker = CircuitBreaker("Weather API", failure_threshold=3, reset_timeout=300)
 
     while True:
         now_mono = time.monotonic()
         now_utc = datetime.now(timezone.utc)
 
-        # Detect Discord bot thread death -- log once, clear stale message
-        if bot_dead_event is not None and bot_dead_event.is_set() and not bot_dead_logged:
-            logger.warning("Discord bot thread has died -- clearing stale message")
-            if message_bridge is not None:
-                message_bridge.set_message(None)
-            bot_dead_logged = True
+        # Detect Discord bot thread death
+        ds.detect_bot_death(bot_dead_event, message_bridge)
 
-        # Independent 60-second bus data refresh
-        if now_mono - last_bus_fetch >= BUS_REFRESH_INTERVAL:
-            fresh_bus = fetch_bus_data()
-            last_bus_fetch = now_mono
-            # Preserve last-good data on failure
-            if fresh_bus != (None, None):
-                bus_data = fresh_bus
-                staleness.update_bus(fresh_bus)
-                logger.info("Bus data refreshed: dir1=%s dir2=%s", bus_data[0], bus_data[1])
-                if health_tracker:
-                    health_tracker.record_success("bus_api")
-            else:
-                # API failed -- keep using last-good data
-                bus_data = staleness.last_good_bus
-                logger.warning("Bus fetch failed, using last-good data (age=%.0fs)", staleness.bus_data_age)
-                if health_tracker:
-                    health_tracker.record_failure("bus_api", "Bus API returned no data")
+        # Independent data refresh cycles with circuit breakers
+        ds.refresh_bus(now_mono, staleness, health_tracker, bus_breaker)
 
-        # Independent 600-second weather data refresh
-        if test_weather_mode and test_weather_mode in test_weather_map:
-            # TEST MODE: use hardcoded weather, skip API
-            if weather_data is None:
-                weather_data = test_weather_map[test_weather_mode]
-                staleness.update_weather(weather_data)
-                result = _select_animation(
-                    weather_data, now_utc,
-                    last_weather_group, last_weather_night,
-                    last_precip_mm, last_wind_speed,
-                )
-                new_anim, last_weather_group, last_weather_night, last_precip_mm, last_wind_speed = result
-                if new_anim is not None:
-                    weather_anim = new_anim
-                    logger.info(
-                        "TEST: weather animation: %s (night=%s, precip=%.1fmm, wind=%.1fm/s)",
-                        last_weather_group, last_weather_night, last_precip_mm, last_wind_speed,
-                    )
-        elif now_mono - last_weather_fetch >= WEATHER_REFRESH_INTERVAL:
-            fresh_weather = fetch_weather_safe(WEATHER_LAT, WEATHER_LON)
-            last_weather_fetch = now_mono
-            if fresh_weather:
-                weather_data = fresh_weather
-                staleness.update_weather(fresh_weather)
-                if health_tracker:
-                    health_tracker.record_success("weather_api")
-                logger.info(
-                    "Weather refreshed: %.1f\u00b0C %s precip=%.1fmm",
-                    weather_data.temperature,
-                    weather_data.symbol_code,
-                    weather_data.precipitation_mm,
-                )
-                # Swap animation if weather group, day/night, or rain intensity changed
-                result = _select_animation(
-                    weather_data, now_utc,
-                    last_weather_group, last_weather_night,
-                    last_precip_mm, last_wind_speed,
-                )
-                new_anim, last_weather_group, last_weather_night, last_precip_mm, last_wind_speed = result
-                if new_anim is not None:
-                    weather_anim = new_anim
-                    logger.info(
-                        "Weather animation: %s (night=%s, precip=%.1fmm, wind=%.1fm/s)",
-                        last_weather_group, last_weather_night, last_precip_mm, last_wind_speed,
-                    )
-            else:
-                # API failed -- keep using last-good data
-                weather_data = staleness.last_good_weather
-                logger.warning("Weather fetch failed, using last-good data (age=%.0fs)", staleness.weather_data_age)
-                if health_tracker:
-                    health_tracker.record_failure("weather_api", "Weather API returned no data")
+        test_wd = test_weather_map.get(test_weather_mode) if test_weather_mode else None
+        ds.refresh_weather(
+            now_mono, now_utc, staleness, health_tracker, weather_breaker,
+            test_weather_data=test_wd,
+        )
 
-        # Calculate staleness flags and effective data from the tracker
+        # Get effective data from staleness tracker (single source of truth -- Issue 10)
         effective_bus, bus_stale, bus_too_old = staleness.get_effective_bus()
         effective_weather, weather_stale, weather_too_old = staleness.get_effective_weather()
 
-        # When bus/weather data is not too old, prefer the fresh fetch result
-        # (which may differ from last_good if we just fetched and got a failure
-        # -- in that case bus_data/weather_data already fell back to last_good).
-        if not bus_too_old:
-            effective_bus = bus_data
-        if not weather_too_old:
-            effective_weather = weather_data
-
         now = datetime.now()
 
-        # Auto-brightness: adjust based on astronomical darkness (only when target changes)
-        target_brightness = get_target_brightness(now_utc, WEATHER_LAT, WEATHER_LON)
-        if target_brightness != last_brightness:
-            client.set_brightness(target_brightness)
-            last_brightness = target_brightness
-            logger.info("Brightness set to %d%%", target_brightness)
+        # Auto-brightness
+        ds.update_brightness(client, now_utc)
 
         # Read current message from Discord bot (thread-safe)
         current_message = message_bridge.current_message if message_bridge else None
@@ -395,6 +489,7 @@ def main_loop(
             now,
             bus_data=effective_bus,
             weather_data=effective_weather,
+            is_birthday=_is_birthday(now),
             message_text=current_message,
             bus_stale=bus_stale,
             bus_too_old=bus_too_old,
@@ -403,18 +498,18 @@ def main_loop(
         )
 
         # Check if state changed (minute change, bus update, weather update)
-        state_changed = current_state != last_state
+        state_changed = current_state != ds.last_state
         if state_changed:
-            needs_push = True
-            last_state = current_state
+            ds.needs_push = True
+            ds.last_state = current_state
 
         # Tick animation -- always produces a new frame when active
         anim_frame = None
-        if weather_anim is not None:
-            anim_frame = weather_anim.tick()
-            needs_push = True  # animation always triggers a re-render
+        if ds.weather_anim is not None:
+            anim_frame = ds.weather_anim.tick()
+            ds.needs_push = True  # animation always triggers a re-render
 
-        if needs_push:
+        if ds.needs_push:
             frame = render_frame(current_state, fonts, anim_frame=anim_frame)
 
             if save_frame:
@@ -433,7 +528,7 @@ def main_loop(
                 if health_tracker:
                     health_tracker.record_failure("device", "Device unreachable")
             # push_result is None means skipped (rate limit / cooldown) -- no health action
-            needs_push = False
+            ds.needs_push = False
 
         # Device keep-alive ping + auto-reboot recovery
         keepalive.tick(client, now_mono, health_tracker=health_tracker)
@@ -444,7 +539,7 @@ def main_loop(
         time.sleep(1.0)
 
         # Update watchdog heartbeat after each successful iteration
-        heartbeat[0] = time.monotonic()
+        heartbeat.beat()
 
 
 def main() -> None:
@@ -545,7 +640,7 @@ def main() -> None:
         )
     except KeyboardInterrupt:
         logger.info("Shutting down")
-        # Best-effort shutdown embed — wait briefly for delivery
+        # Best-effort shutdown embed -- wait briefly for delivery
         if monitor_bridge_ref[0]:
             try:
                 embed = shutdown_embed()

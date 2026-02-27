@@ -21,10 +21,39 @@ _CACHE_MAX_AGE = 3600  # discard If-Modified-Since after 1 hour
 
 logger = logging.getLogger(__name__)
 
-# Module-level cache for API responses (If-Modified-Since pattern)
-_cached_data: dict | None = None
-_last_modified: str | None = None
-_cache_time: float = 0.0  # monotonic time when cache was last updated
+
+class WeatherCache:
+    """Thread-safe cache for MET API responses using If-Modified-Since."""
+
+    def __init__(self, max_age: float = _CACHE_MAX_AGE) -> None:
+        self._data: dict | None = None
+        self._last_modified: str | None = None
+        self._cache_time: float = 0.0
+        self._lock = threading.Lock()
+        self._max_age = max_age
+
+    def get(self) -> tuple[dict | None, str | None]:
+        """Return (cached_data, last_modified) if cache is fresh, else (None, None)."""
+        with self._lock:
+            if self._data and (time.monotonic() - self._cache_time) < self._max_age:
+                return self._data, self._last_modified
+            return None, None
+
+    def set(self, data: dict, last_modified: str | None) -> None:
+        """Store response data and last-modified header."""
+        with self._lock:
+            self._data = data
+            self._last_modified = last_modified
+            self._cache_time = time.monotonic()
+
+
+# Module-level default instance for backward compat
+_default_cache = WeatherCache()
+
+# Backward-compatible module-level references (used by tests that patch these)
+_cached_data = None
+_last_modified = None
+_cache_time = 0.0
 _cache_lock = threading.Lock()
 
 
@@ -143,7 +172,9 @@ def _parse_high_low(timeseries: list[dict]) -> tuple[float, float]:
     return (0.0, 0.0)
 
 
-def fetch_weather(lat: float, lon: float) -> WeatherData:
+def fetch_weather(
+    lat: float, lon: float, cache: WeatherCache | None = None,
+) -> WeatherData:
     """Fetch current weather from MET Locationforecast 2.0.
 
     Uses If-Modified-Since caching to avoid redundant downloads.
@@ -152,6 +183,7 @@ def fetch_weather(lat: float, lon: float) -> WeatherData:
     Args:
         lat: Latitude (decimal degrees).
         lon: Longitude (decimal degrees).
+        cache: Optional WeatherCache instance. Uses module-level default if None.
 
     Returns:
         WeatherData with current conditions and today's forecast.
@@ -160,18 +192,12 @@ def fetch_weather(lat: float, lon: float) -> WeatherData:
         requests.HTTPError: If the API returns an error status.
         KeyError: If the response structure is unexpected.
     """
-    global _cached_data, _last_modified, _cache_time
-
-    # Read cache under lock
-    with _cache_lock:
-        local_cached_data = _cached_data
-        local_last_modified = _last_modified
-        local_cache_time = _cache_time
+    cache = cache or _default_cache
+    cached_data, last_modified = cache.get()
 
     headers: dict[str, str] = {"User-Agent": WEATHER_USER_AGENT}
-    # Only use If-Modified-Since if cache is less than 1 hour old
-    if local_last_modified and local_cached_data and (time.monotonic() - local_cache_time) < _CACHE_MAX_AGE:
-        headers["If-Modified-Since"] = local_last_modified
+    if last_modified and cached_data:
+        headers["If-Modified-Since"] = last_modified
 
     response = requests.get(
         WEATHER_API_URL,
@@ -180,17 +206,13 @@ def fetch_weather(lat: float, lon: float) -> WeatherData:
         timeout=10,
     )
 
-    if response.status_code == 304 and local_cached_data:
+    if response.status_code == 304 and cached_data:
         # Data unchanged, parse from cache
-        data = local_cached_data
+        data = cached_data
     else:
         response.raise_for_status()
         data = response.json()
-        # Write cache under lock
-        with _cache_lock:
-            _cached_data = data
-            _last_modified = response.headers.get("Last-Modified")
-            _cache_time = time.monotonic()
+        cache.set(data, response.headers.get("Last-Modified"))
 
     timeseries = data["properties"]["timeseries"]
     current = _parse_current(timeseries)

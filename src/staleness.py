@@ -60,11 +60,12 @@ class StalenessTracker:
     @property
     def bus_data_age(self) -> float:
         """Return age in seconds of the oldest per-direction data, or 0 if never fetched."""
+        now = time.monotonic()
         ages = []
         if self._last_good_bus_dir1_time > 0:
-            ages.append(time.monotonic() - self._last_good_bus_dir1_time)
+            ages.append(now - self._last_good_bus_dir1_time)
         if self._last_good_bus_dir2_time > 0:
-            ages.append(time.monotonic() - self._last_good_bus_dir2_time)
+            ages.append(now - self._last_good_bus_dir2_time)
         return max(ages) if ages else 0.0
 
     def get_effective_bus(self) -> tuple[BusData, bool, bool]:

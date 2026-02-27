@@ -178,12 +178,10 @@ class TestFetchWeatherSafe:
 # ---------------------------------------------------------------------------
 
 class TestCaching:
-    @patch("src.providers.weather._cached_data", None)
-    @patch("src.providers.weather._last_modified", None)
     @patch("src.providers.weather.requests.get")
     def test_304_returns_cached_data(self, mock_get):
         """When API returns 304, parse from cached data."""
-        import src.providers.weather as weather_mod
+        from src.providers.weather import WeatherCache
 
         today = _today_str()
         cached_json = {
@@ -193,23 +191,21 @@ class TestCaching:
                 ]
             }
         }
-        weather_mod._cached_data = cached_json
-        weather_mod._last_modified = "Thu, 20 Feb 2026 12:00:00 GMT"
+        cache = WeatherCache()
+        cache.set(cached_json, "Thu, 20 Feb 2026 12:00:00 GMT")
 
         mock_response = MagicMock()
         mock_response.status_code = 304
         mock_get.return_value = mock_response
 
-        result = fetch_weather(63.0, 10.0)
+        result = fetch_weather(63.0, 10.0, cache=cache)
         assert result.temperature == 7.0
         assert result.symbol_code == "fair_day"
 
-    @patch("src.providers.weather._cached_data", None)
-    @patch("src.providers.weather._last_modified", None)
     @patch("src.providers.weather.requests.get")
     def test_200_updates_cache(self, mock_get):
         """When API returns 200, update cache and parse."""
-        import src.providers.weather as weather_mod
+        from src.providers.weather import WeatherCache
 
         today = _today_str()
         response_json = {
@@ -219,6 +215,8 @@ class TestCaching:
                 ]
             }
         }
+        cache = WeatherCache()
+
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = response_json
@@ -226,10 +224,11 @@ class TestCaching:
         mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
 
-        result = fetch_weather(63.0, 10.0)
+        result = fetch_weather(63.0, 10.0, cache=cache)
         assert result.temperature == 3.5
         assert result.precipitation_mm == 1.2
-        assert weather_mod._last_modified == "Thu, 20 Feb 2026 13:00:00 GMT"
+        cached_data, last_mod = cache.get()
+        assert last_mod == "Thu, 20 Feb 2026 13:00:00 GMT"
 
 
 # ---------------------------------------------------------------------------

@@ -1,9 +1,12 @@
 """BDF-to-PIL font conversion and font registry."""
 
+import logging
 import os
 from pathlib import Path
 
 from PIL import BdfFontFile, ImageFont
+
+logger = logging.getLogger(__name__)
 
 
 def convert_bdf_to_pil(bdf_path: str, output_dir: str | None = None) -> str:
@@ -44,6 +47,9 @@ def load_fonts(font_dir: str | Path) -> dict[str, ImageFont.ImageFont]:
         Dictionary mapping font names to loaded PIL ImageFont objects.
     """
     font_dir = str(font_dir)
+    if not os.path.isdir(font_dir):
+        raise FileNotFoundError(f"Font directory not found: {font_dir}")
+
     fonts: dict[str, ImageFont.ImageFont] = {}
 
     for filename in sorted(os.listdir(font_dir)):
@@ -54,10 +60,11 @@ def load_fonts(font_dir: str | Path) -> dict[str, ImageFont.ImageFont]:
         bdf_path = os.path.join(font_dir, filename)
         pil_path = os.path.join(font_dir, font_name + ".pil")
 
-        # Convert if .pil file doesn't exist yet
-        if not os.path.exists(pil_path):
-            convert_bdf_to_pil(bdf_path, font_dir)
-
-        fonts[font_name] = ImageFont.load(pil_path)
+        try:
+            if not os.path.exists(pil_path):
+                convert_bdf_to_pil(bdf_path, font_dir)
+            fonts[font_name] = ImageFont.load(pil_path)
+        except (OSError, SyntaxError) as exc:
+            logger.error("Failed to load font %s: %s", font_name, exc)
 
     return fonts

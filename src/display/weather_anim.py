@@ -18,6 +18,49 @@ import random
 
 from PIL import Image, ImageDraw
 
+# --- Rain particle configuration ---
+RAIN_FAR_ALPHA = 140
+RAIN_NEAR_ALPHA = 230
+RAIN_FAR_COLOR = (30, 80, 220)
+RAIN_NEAR_COLOR = (50, 120, 255)
+
+# Particle counts by intensity: (far, near)
+RAIN_COUNTS: dict[str, tuple[int, int]] = {
+    "light": (8, 4),
+    "moderate": (14, 8),
+    "heavy": (22, 14),
+    "extreme": (30, 18),
+}
+
+# --- Snow particle configuration ---
+SNOW_FAR_ALPHA = 130
+SNOW_FAR_SECONDARY_ALPHA = 100
+SNOW_NEAR_ALPHA = 210
+SNOW_FAR_COLOR = (220, 230, 255)
+
+# Particle counts by intensity: (far, near)
+SNOW_COUNTS: dict[str, tuple[int, int]] = {
+    "light": (6, 3),
+    "moderate": (10, 6),
+    "heavy": (16, 10),
+}
+
+# --- Sun ray configuration ---
+SUN_FAR_RAY_COUNT = 9
+SUN_NEAR_RAY_COUNT = 5
+SUN_FAR_RAY_SPEED = (0.3, 0.6)
+SUN_NEAR_RAY_SPEED = (0.5, 1.0)
+SUN_FAR_RAY_MAX_DIST = (20.0, 30.0)
+SUN_NEAR_RAY_MAX_DIST = (15.0, 25.0)
+SUN_FAR_RAY_ALPHA = (90, 130)
+SUN_NEAR_RAY_ALPHA = (150, 210)
+SUN_FAR_RAY_COLOR = (240, 200, 40)
+SUN_NEAR_RAY_COLOR = (255, 240, 60)
+
+# --- Clear night star configuration ---
+NIGHT_FAR_STAR_COUNT = 14
+NIGHT_NEAR_STAR_COUNT = 6
+
 
 class WeatherAnimation:
     """Base class for weather zone animations with depth layers.
@@ -67,13 +110,13 @@ class RainAnimation(WeatherAnimation):
     def _particle_counts(precipitation_mm: float) -> tuple[int, int]:
         """Return (far_count, near_count) based on precipitation intensity."""
         if precipitation_mm < 1.0:
-            return 8, 4
+            return RAIN_COUNTS["light"]
         elif precipitation_mm <= 3.0:
-            return 14, 8
+            return RAIN_COUNTS["moderate"]
         elif precipitation_mm <= 5.0:
-            return 22, 14
+            return RAIN_COUNTS["heavy"]
         else:
-            return 30, 18
+            return RAIN_COUNTS["extreme"]
 
     def _spawn_far(self, count: int) -> None:
         for _ in range(count):
@@ -99,7 +142,10 @@ class RainAnimation(WeatherAnimation):
         for drop in self.far_drops:
             x, y = drop[0], drop[1]
             if 0 <= x < self.width and 0 <= y < self.height:
-                bg_draw.line([(x, y), (x, min(y + 1, self.height - 1))], fill=(30, 80, 220, 140))
+                bg_draw.line(
+                    [(x, y), (x, min(y + 1, self.height - 1))],
+                    fill=(*RAIN_FAR_COLOR, RAIN_FAR_ALPHA),
+                )
             drop[1] += 1
             drop[0] += random.choice([-1, 0, 0, 0])
             if drop[1] >= self.height:
@@ -113,7 +159,10 @@ class RainAnimation(WeatherAnimation):
             x, y = drop[0], drop[1]
             streak = 3 if heavy else 2
             if 0 <= x < self.width and 0 <= y < self.height:
-                fg_draw.line([(x, y), (x, min(y + streak, self.height - 1))], fill=(50, 120, 255, 230))
+                fg_draw.line(
+                    [(x, y), (x, min(y + streak, self.height - 1))],
+                    fill=(*RAIN_NEAR_COLOR, RAIN_NEAR_ALPHA),
+                )
             drop[1] += random.randint(2, 4) if heavy else random.randint(2, 3)
             drop[0] += random.choice([-1, 0, 0, 0])
             if drop[1] >= self.height:
@@ -154,11 +203,11 @@ class SnowAnimation(WeatherAnimation):
     def _particle_counts(precipitation_mm: float) -> tuple[int, int]:
         """Return (far_count, near_count) based on precipitation intensity."""
         if precipitation_mm < 1.0:
-            return 6, 3
+            return SNOW_COUNTS["light"]
         elif precipitation_mm <= 3.0:
-            return 10, 6
+            return SNOW_COUNTS["moderate"]
         else:
-            return 16, 10
+            return SNOW_COUNTS["heavy"]
 
     def _spawn_far(self, count: int) -> None:
         for _ in range(count):
@@ -198,9 +247,9 @@ class SnowAnimation(WeatherAnimation):
         for flake in self.far_flakes:
             x, y = flake[0], flake[1]
             if 0 <= x < self.width and 0 <= y < self.height:
-                bg_draw.point((x, y), fill=(220, 230, 255, 130))
+                bg_draw.point((x, y), fill=(*SNOW_FAR_COLOR, SNOW_FAR_ALPHA))
                 if x + 1 < self.width:
-                    bg_draw.point((x + 1, y), fill=(220, 230, 255, 100))
+                    bg_draw.point((x + 1, y), fill=(*SNOW_FAR_COLOR, SNOW_FAR_SECONDARY_ALPHA))
             flake[1] += random.choice([0, 0, 1])
             flake[0] += random.choice([-1, 0, 0, 1])
             flake[0] = max(0, min(flake[0], self.width - 1))
@@ -211,7 +260,7 @@ class SnowAnimation(WeatherAnimation):
         # Near flakes -- in front of text, + crystal, bright
         for flake in self.near_flakes:
             x, y = flake[0], flake[1]
-            self._draw_crystal(fg_draw, x, y, 210)
+            self._draw_crystal(fg_draw, x, y, SNOW_NEAR_ALPHA)
             flake[1] += random.randint(0, 1)
             flake[0] += random.choice([-1, 0, 0, 1])
             flake[0] = max(1, min(flake[0], self.width - 2))
@@ -299,24 +348,24 @@ class SunAnimation(WeatherAnimation):
         super().__init__(width, height)
         self.far_rays: list[list[float]] = []
         self.near_rays: list[list[float]] = []
-        self._spawn_far(9)
-        self._spawn_near(5)
+        self._spawn_far(SUN_FAR_RAY_COUNT)
+        self._spawn_near(SUN_NEAR_RAY_COUNT)
 
     def _spawn_far(self, count: int) -> None:
         for _ in range(count):
             angle = random.uniform(self._FAN_MIN_DEG, self._FAN_MAX_DEG)
-            speed = random.uniform(0.3, 0.6)
-            max_dist = random.uniform(20.0, 30.0)
-            base_alpha = random.randint(90, 130)
+            speed = random.uniform(*SUN_FAR_RAY_SPEED)
+            max_dist = random.uniform(*SUN_FAR_RAY_MAX_DIST)
+            base_alpha = random.randint(*SUN_FAR_RAY_ALPHA)
             distance = random.uniform(0, max_dist)  # staggered start (ANIM-07)
             self.far_rays.append([angle, distance, speed, max_dist, float(base_alpha)])
 
     def _spawn_near(self, count: int) -> None:
         for _ in range(count):
             angle = random.uniform(self._FAN_MIN_DEG, self._FAN_MAX_DEG)
-            speed = random.uniform(0.5, 1.0)
-            max_dist = random.uniform(15.0, 25.0)
-            base_alpha = random.randint(150, 210)
+            speed = random.uniform(*SUN_NEAR_RAY_SPEED)
+            max_dist = random.uniform(*SUN_NEAR_RAY_MAX_DIST)
+            base_alpha = random.randint(*SUN_NEAR_RAY_ALPHA)
             distance = random.uniform(0, max_dist)  # staggered start (ANIM-07)
             self.near_rays.append([angle, distance, speed, max_dist, float(base_alpha)])
 
@@ -337,9 +386,10 @@ class SunAnimation(WeatherAnimation):
             # Reset distance and re-randomize for organic variety (Pitfall 5)
             ray[0] = random.uniform(self._FAN_MIN_DEG, self._FAN_MAX_DEG)
             ray[1] = 0.0
-            ray[2] = random.uniform(0.3, 0.6) if base_alpha < 140 else random.uniform(0.5, 1.0)
-            ray[3] = random.uniform(20.0, 30.0) if base_alpha < 140 else random.uniform(15.0, 25.0)
-            ray[4] = float(random.randint(90, 130) if base_alpha < 140 else random.randint(150, 210))
+            is_far = base_alpha < 140
+            ray[2] = random.uniform(*SUN_FAR_RAY_SPEED) if is_far else random.uniform(*SUN_NEAR_RAY_SPEED)
+            ray[3] = random.uniform(*SUN_FAR_RAY_MAX_DIST) if is_far else random.uniform(*SUN_NEAR_RAY_MAX_DIST)
+            ray[4] = float(random.randint(*SUN_FAR_RAY_ALPHA) if is_far else random.randint(*SUN_NEAR_RAY_ALPHA))
             return
 
         # Distance-based alpha fade (ANIM-04)
@@ -390,22 +440,22 @@ class SunAnimation(WeatherAnimation):
 
         # Far rays on bg layer (behind text) -- ANIM-06
         for ray in self.far_rays:
-            self._draw_ray(bg_draw, ray, (240, 200, 40))
+            self._draw_ray(bg_draw, ray, SUN_FAR_RAY_COLOR)
 
         # Sun body drawn after far rays so body pixels are not overwritten
         self._draw_sun_body(bg_draw)
 
         # Near rays on fg layer (in front of text) -- ANIM-06
         for ray in self.near_rays:
-            self._draw_ray(fg_draw, ray, (255, 240, 60))
+            self._draw_ray(fg_draw, ray, SUN_NEAR_RAY_COLOR)
 
         return bg, fg
 
     def reset(self) -> None:
         self.far_rays.clear()
         self.near_rays.clear()
-        self._spawn_far(9)
-        self._spawn_near(5)
+        self._spawn_far(SUN_FAR_RAY_COUNT)
+        self._spawn_near(SUN_NEAR_RAY_COUNT)
 
 
 class ThunderAnimation(WeatherAnimation):
@@ -585,8 +635,8 @@ class ClearNightAnimation(WeatherAnimation):
         super().__init__(width, height)
         self.far_stars: list[dict] = []
         self.near_stars: list[dict] = []
-        self._spawn_far(14)
-        self._spawn_near(6)
+        self._spawn_far(NIGHT_FAR_STAR_COUNT)
+        self._spawn_near(NIGHT_NEAR_STAR_COUNT)
 
     def _new_star(self, *, is_near: bool) -> dict:
         """Create a single star with random position and twinkle parameters."""
@@ -728,8 +778,8 @@ class ClearNightAnimation(WeatherAnimation):
     def reset(self) -> None:
         self.far_stars.clear()
         self.near_stars.clear()
-        self._spawn_far(14)
-        self._spawn_near(6)
+        self._spawn_far(NIGHT_FAR_STAR_COUNT)
+        self._spawn_near(NIGHT_NEAR_STAR_COUNT)
 
 
 class CompositeAnimation(WeatherAnimation):
@@ -786,11 +836,7 @@ class WindEffect(WeatherAnimation):
             particles = getattr(self.inner, attr, None)
             if particles:
                 for p in particles:
-                    p[0] += drift
-                    if p[0] >= self.width:
-                        p[0] -= self.width
-                    elif p[0] < 0:
-                        p[0] += self.width
+                    p[0] = int((p[0] + drift) % self.width)
         return self.inner.tick()
 
     def reset(self) -> None:

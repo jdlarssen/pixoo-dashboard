@@ -13,6 +13,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.main import (
+    DashboardState,
+    Heartbeat,
     _precip_category,
     _reverse_geocode,
     _should_swap_animation,
@@ -357,7 +359,8 @@ class TestWatchdogThread:
 
     def test_stale_heartbeat_calls_os_exit_with_code_1(self):
         """Watchdog calls os._exit(1) when heartbeat exceeds timeout."""
-        heartbeat = [time.monotonic() - 200]  # already stale
+        heartbeat = Heartbeat()
+        heartbeat._timestamp = time.monotonic() - 200  # already stale
         exit_codes = []
 
         class _WatchdogFired(Exception):
@@ -379,7 +382,7 @@ class TestWatchdogThread:
 
     def test_fresh_heartbeat_no_exit(self):
         """Watchdog does not fire when heartbeat is fresh."""
-        heartbeat = [time.monotonic()]
+        heartbeat = Heartbeat()
         exit_called = threading.Event()
         iterations = [0]
 
@@ -388,7 +391,7 @@ class TestWatchdogThread:
         def counting_sleep(seconds):
             iterations[0] += 1
             # Keep heartbeat fresh
-            heartbeat[0] = time.monotonic()
+            heartbeat.beat()
             if iterations[0] >= 3:
                 raise StopIteration("End test after 3 iterations")
             # Actually sleep a tiny bit to let the thread run
@@ -407,8 +410,9 @@ class TestWatchdogThread:
     def test_watchdog_uses_monotonic_for_elapsed(self):
         """Watchdog computes elapsed time using time.monotonic()."""
         # Set heartbeat to a known monotonic value
+        heartbeat = Heartbeat()
         base_time = 1000.0
-        heartbeat = [base_time]
+        heartbeat._timestamp = base_time
 
         exit_codes = []
 

@@ -1,5 +1,7 @@
 """PIL compositor that renders DisplayState into a 64x64 dashboard image."""
 
+import hashlib
+
 from PIL import Image, ImageDraw
 
 from src.config import BUS_NUM_DEPARTURES
@@ -352,7 +354,7 @@ def _draw_birthday_sparkles(draw: ImageDraw.ImageDraw, date_str: str) -> None:
         draw: PIL ImageDraw instance.
         date_str: Current date string (used for deterministic position hash).
     """
-    h = hash(date_str)
+    h = int(hashlib.md5(date_str.encode()).hexdigest(), 16)
     sparkle_positions = [
         (abs(h) % 20 + 35, 0),        # top area, right of center
         (abs(h >> 4) % 15 + 2, 10),    # bottom of clock zone
