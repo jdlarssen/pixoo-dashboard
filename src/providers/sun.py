@@ -6,8 +6,8 @@ once per calendar day.
 """
 
 import logging
-import threading
 from datetime import date, datetime, timezone
+from functools import lru_cache
 
 from astral import Observer
 from astral.sun import dawn, dusk, sunrise, sunset
@@ -15,17 +15,12 @@ from astral.sun import dawn, dusk, sunrise, sunset
 logger = logging.getLogger(__name__)
 
 
-# Cache: (lat, lon, date) -> sun times dict
-_cache_key: tuple[float, float, date] | None = None
-_cache_value: dict[str, datetime] | None = None
-_cache_lock = threading.Lock()
-
-
+@lru_cache(maxsize=4)
 def get_sun_times(lat: float, lon: float, d: date) -> dict[str, datetime]:
     """Compute sunrise, sunset, dawn, and dusk for a location and date.
 
     Results are cached per (lat, lon, date) tuple since sun times only
-    change once per calendar day.
+    change once per calendar day. Thread-safe via CPython's GIL.
 
     Args:
         lat: Latitude in decimal degrees (positive = north).
@@ -36,16 +31,6 @@ def get_sun_times(lat: float, lon: float, d: date) -> dict[str, datetime]:
         Dictionary with keys "dawn", "sunrise", "sunset", "dusk",
         each mapping to a timezone-aware UTC datetime.
     """
-    global _cache_key, _cache_value
-
-    key = (lat, lon, d)
-
-    # Read cache under lock
-    with _cache_lock:
-        if _cache_key == key and _cache_value is not None:
-            return _cache_value
-
-    # Compute outside lock
     observer = Observer(latitude=lat, longitude=lon)
     try:
         times = {
@@ -78,11 +63,6 @@ def get_sun_times(lat: float, lon: float, d: date) -> dict[str, datetime]:
                 "sunset": datetime(d.year, d.month, d.day, 12, 0, tzinfo=timezone.utc),
                 "dusk": datetime(d.year, d.month, d.day, 12, 0, tzinfo=timezone.utc),
             }
-
-    # Write cache under lock
-    with _cache_lock:
-        _cache_key = key
-        _cache_value = times
 
     return times
 

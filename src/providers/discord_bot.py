@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 import re
 import threading
 import time
@@ -195,6 +196,8 @@ def _run_discord_bot_with_retry(
     (no exception) is not retried.
     """
     backoff = 5
+    max_retries = 20
+    retries = 0
     while True:
         # Clear the dead event before each attempt so the main loop sees it fresh
         dead_event = kwargs.get("bot_dead_event")
@@ -203,10 +206,37 @@ def _run_discord_bot_with_retry(
         try:
             run_discord_bot(bridge, token, channel_id, **kwargs)
             break  # clean disconnect, don't retry
+        except (OSError, ConnectionError) as exc:
+            retries += 1
+            if retries >= max_retries:
+                logger.critical(
+                    "Discord bot failed %d times, giving up: %s", retries, exc
+                )
+                break
+            jitter = random.uniform(0, backoff * 0.3)
+            sleep_time = backoff + jitter
+            logger.warning(
+                "Discord bot crashed, retrying in %.0fs (attempt %d/%d)",
+                sleep_time, retries, max_retries,
+            )
+            time.sleep(sleep_time)
+            backoff = min(backoff * 2, 300)
         except Exception:
-            logger.warning("Discord bot crashed, retrying in %ds", backoff)
-            time.sleep(backoff)
-            backoff = min(backoff * 2, 300)  # max 5 min
+            retries += 1
+            if retries >= max_retries:
+                logger.critical(
+                    "Discord bot failed %d times with unexpected error, giving up",
+                    retries,
+                )
+                break
+            jitter = random.uniform(0, backoff * 0.3)
+            sleep_time = backoff + jitter
+            logger.warning(
+                "Discord bot crashed (unexpected), retrying in %.0fs (attempt %d/%d)",
+                sleep_time, retries, max_retries,
+            )
+            time.sleep(sleep_time)
+            backoff = min(backoff * 2, 300)
 
 
 def start_discord_bot(

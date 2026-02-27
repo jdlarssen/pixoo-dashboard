@@ -48,6 +48,7 @@ class DisplayState:
         bus_data: tuple[list[int] | None, list[int] | None] = (None, None),
         weather_data: WeatherData | None = None,
         *,
+        is_birthday: bool = False,
         message_text: str | None = None,
         bus_stale: bool = False,
         bus_too_old: bool = False,
@@ -80,10 +81,6 @@ class DisplayState:
                 "weather_precip_mm": weather_data.precipitation_mm,
                 "weather_is_day": weather_data.is_day,
             }
-
-        # Birthday easter egg: configurable dates from BIRTHDAY_DATES env var
-        from src.config import BIRTHDAY_DATES
-        is_birthday = any(dt.month == m and dt.day == d for m, d in BIRTHDAY_DATES)
 
         return cls(
             time_str=format_time(dt),

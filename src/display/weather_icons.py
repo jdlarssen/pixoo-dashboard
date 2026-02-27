@@ -5,6 +5,7 @@ Icons are placed next to the clock digits in the clock zone.
 """
 
 import math
+from functools import lru_cache
 
 from PIL import Image, ImageDraw
 
@@ -243,8 +244,12 @@ def _draw_partcloud_night(size: int) -> Image.Image:
 # Public API
 # ---------------------------------------------------------------------------
 
+@lru_cache(maxsize=16)
 def get_weather_icon(symbol_code: str, size: int = 10) -> Image.Image:
     """Get a pixel art weather icon for the given MET symbol_code.
+
+    Cached by (symbol_code, size) -- safe because callers only read the
+    returned image, never modify it.
 
     Args:
         symbol_code: MET weather symbol code (e.g. "clearsky_day", "rain").

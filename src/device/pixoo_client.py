@@ -101,13 +101,18 @@ class PixooClient:
             size: Display size in pixels (64 for Pixoo 64).
             simulated: If True, use the pixoo library's Tkinter simulator.
         """
-        # Monkey-patch requests.post BEFORE importing pixoo so that all
+        # Patch requests.post on the pixoo module only (not globally) so that
         # device HTTP calls from the pixoo library get a timeout.
         import pixoo.objects.pixoo as _pixoo_module
         with _patch_lock:
-            if not getattr(_requests_module.post, "_patched_with_timeout", False):
-                _requests_module.post = _patch_requests_post(_requests_module.post)
-                _requests_module.post._patched_with_timeout = True  # type: ignore[attr-defined]
+            if not getattr(
+                getattr(_pixoo_module, "requests", _requests_module).post,
+                "_patched_with_timeout",
+                False,
+            ):
+                _target = getattr(_pixoo_module, "requests", _requests_module)
+                _target.post = _patch_requests_post(_target.post)
+                _target.post._patched_with_timeout = True  # type: ignore[attr-defined]
 
         from pixoo import Pixoo
 
@@ -242,13 +247,18 @@ class PixooClient:
     def test_connection(self) -> bool:
         """Push a solid dark blue test frame to verify device connectivity.
 
+        Bypasses rate limiting since this is a diagnostic operation, not a
+        regular frame push.
+
         Returns:
             True if the frame was pushed without error, False otherwise.
         """
         try:
             test_image = Image.new("RGB", (self._size, self._size), color=(0, 0, 40))
-            result = self.push_frame(test_image)
-            return result is True
+            self._pixoo.draw_image(test_image)
+            self._pixoo.push()
+            self._last_push_time = time.monotonic()
+            return True
         except (RequestException, OSError) as exc:
             logger.warning("Device connection test failed: %s", exc)
             return False
