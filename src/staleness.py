@@ -81,7 +81,7 @@ class StalenessTracker:
 
         def _dir_flags(t: float) -> tuple[bool, bool]:
             if t <= 0:
-                return False, False
+                return True, True
             age = now - t
             return age > BUS_STALE_THRESHOLD, age > BUS_TOO_OLD_THRESHOLD
 

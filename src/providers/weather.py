@@ -8,7 +8,7 @@ to respect MET API terms of service.
 import logging
 import threading
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import time
@@ -49,12 +49,6 @@ class WeatherCache:
 
 # Module-level default instance for backward compat
 _default_cache = WeatherCache()
-
-# Backward-compatible module-level references (used by tests that patch these)
-_cached_data = None
-_last_modified = None
-_cache_time = 0.0
-_cache_lock = threading.Lock()
 
 
 @dataclass
@@ -174,7 +168,7 @@ def _parse_high_low(timeseries: list[dict]) -> tuple[float, float]:
 
 def fetch_weather(
     lat: float, lon: float, cache: WeatherCache | None = None,
-) -> WeatherData:
+) -> WeatherData | None:
     """Fetch current weather from MET Locationforecast 2.0.
 
     Uses If-Modified-Since caching to avoid redundant downloads.
@@ -205,6 +199,12 @@ def fetch_weather(
         headers=headers,
         timeout=10,
     )
+
+    if response.status_code == 429:
+        retry_after = int(response.headers.get("Retry-After", 5))
+        logger.warning("Rate-limited by API, backing off %ds", retry_after)
+        time.sleep(min(retry_after, 30))  # Cap at 30s to avoid excessive waits
+        return None
 
     if response.status_code == 304 and cached_data:
         # Data unchanged, parse from cache

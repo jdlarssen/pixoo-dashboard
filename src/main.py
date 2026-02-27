@@ -588,8 +588,20 @@ def main() -> None:
             health_tracker.set_monitor(bridge)
             try:
                 bus_name1 = fetch_quay_name(BUS_QUAY_DIRECTION1)
+            except Exception:
+                bus_name1 = None
+            try:
                 bus_name2 = fetch_quay_name(BUS_QUAY_DIRECTION2)
+            except Exception:
+                bus_name2 = None
+            try:
                 weather_location = _reverse_geocode(WEATHER_LAT, WEATHER_LON)
+            except Exception:
+                weather_location = None
+            bus_name1 = bus_name1 or f"Quay {BUS_QUAY_DIRECTION1}"
+            bus_name2 = bus_name2 or f"Quay {BUS_QUAY_DIRECTION2}"
+            weather_location = weather_location or f"{WEATHER_LAT}, {WEATHER_LON}"
+            try:
                 embed = startup_embed(
                     pixoo_ip=args.ip,
                     bus_quay_dir1=BUS_QUAY_DIRECTION1,

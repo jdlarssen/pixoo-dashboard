@@ -195,6 +195,8 @@ def _run_discord_bot_with_retry(
     retries with exponential backoff up to 5 minutes. A clean disconnect
     (no exception) is not retried.
     """
+    import discord
+
     backoff = 5
     max_retries = 20
     retries = 0
@@ -221,22 +223,25 @@ def _run_discord_bot_with_retry(
             )
             time.sleep(sleep_time)
             backoff = min(backoff * 2, 300)
-        except Exception:
+        except (discord.HTTPException, discord.GatewayNotFound, discord.ConnectionClosed, RuntimeError) as exc:
             retries += 1
             if retries >= max_retries:
                 logger.critical(
-                    "Discord bot failed %d times with unexpected error, giving up",
-                    retries,
+                    "Discord bot failed %d times with retryable error, giving up: %s",
+                    retries, exc,
                 )
                 break
             jitter = random.uniform(0, backoff * 0.3)
             sleep_time = backoff + jitter
             logger.warning(
-                "Discord bot crashed (unexpected), retrying in %.0fs (attempt %d/%d)",
-                sleep_time, retries, max_retries,
+                "Discord bot crashed (%s), retrying in %.0fs (attempt %d/%d)",
+                exc, sleep_time, retries, max_retries,
             )
             time.sleep(sleep_time)
             backoff = min(backoff * 2, 300)
+        except Exception:
+            logger.critical("Discord bot hit unexpected error, not retrying", exc_info=True)
+            break
 
 
 def start_discord_bot(
