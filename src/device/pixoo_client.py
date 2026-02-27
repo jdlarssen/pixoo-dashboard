@@ -37,19 +37,44 @@ _ERROR_COOLDOWN_MAX = DEVICE_ERROR_COOLDOWN_MAX
 _patch_lock = threading.Lock()
 
 
+def _is_local_device_url(url: str) -> bool:
+    """Check if a URL targets an RFC 1918 private IP address.
+
+    Matches 10.x.x.x, 172.16-31.x.x, and 192.168.x.x ranges.
+    """
+    if not isinstance(url, str) or not url.startswith("http://"):
+        return False
+    # Extract host portion: "http://10.0.0.1/post" -> "10.0.0.1"
+    host = url[7:].split("/", 1)[0].split(":")[0]
+    if host.startswith("10."):
+        return True
+    if host.startswith("192.168."):
+        return True
+    if host.startswith("172."):
+        parts = host.split(".")
+        if len(parts) >= 2:
+            try:
+                second_octet = int(parts[1])
+                if 16 <= second_octet <= 31:
+                    return True
+            except ValueError:
+                pass
+    return False
+
+
 def _patch_requests_post(original_post):
     """Wrap requests.post to inject a default timeout when calling the device.
 
     The pixoo library calls ``requests.post(url, payload)`` with no timeout,
     meaning a hung device blocks the caller indefinitely. This wrapper adds
-    a timeout to any POST that targets a local device IP (``http://192.*``).
+    a timeout to any POST that targets an RFC 1918 private IP address.
     Non-device calls (e.g., to external APIs) are left untouched.
     """
     @functools.wraps(original_post)
     def _post_with_timeout(*args, **kwargs):
         url = args[0] if args else kwargs.get("url", "")
         # Only inject timeout for device calls (local HTTP), not external APIs
-        if "timeout" not in kwargs and isinstance(url, str) and url.startswith("http://192."):
+        if "timeout" not in kwargs and _is_local_device_url(url):
             kwargs["timeout"] = _DEVICE_TIMEOUT
         return original_post(*args, **kwargs)
     return _post_with_timeout
@@ -224,6 +249,6 @@ class PixooClient:
             test_image = Image.new("RGB", (self._size, self._size), color=(0, 0, 40))
             result = self.push_frame(test_image)
             return result is True
-        except Exception:
-            logger.exception("Device connection test failed")
+        except (RequestException, OSError) as exc:
+            logger.warning("Device connection test failed: %s", exc)
             return False

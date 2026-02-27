@@ -245,8 +245,8 @@ class MonitorBridge:
         try:
             if not fut.cancelled():
                 fut.result()
-        except Exception:
-            logger.warning("Failed to deliver embed to Discord", exc_info=True)
+        except (OSError, RuntimeError) as exc:
+            logger.warning("Failed to deliver embed to Discord: %s", exc)
 
     def send_embed(self, embed) -> bool:
         """Send an embed to the monitoring channel (fire-and-forget).
@@ -294,8 +294,8 @@ class MonitorBridge:
             fut = asyncio.run_coroutine_threadsafe(coro, self._client.loop)
             fut.add_done_callback(self._log_embed_error)
             return True
-        except Exception:
-            logger.exception("Failed to send monitoring embed")
+        except (OSError, RuntimeError) as exc:
+            logger.warning("Failed to send monitoring embed: %s", exc)
             return False
 
 
@@ -352,7 +352,7 @@ class HealthTracker:
         self._components: dict[str, ComponentState] = {}
         self._created_at = time.monotonic()
 
-    def set_monitor(self, monitor) -> None:
+    def set_monitor(self, monitor: MonitorBridge | None) -> None:
         """Set or replace the monitoring bridge (allows deferred initialization)."""
         with self._lock:
             self._monitor = monitor
@@ -419,9 +419,9 @@ class HealthTracker:
         if embed_to_send is not None:
             try:
                 monitor.send_embed(embed_to_send)
-            except Exception:
-                logger.exception(
-                    "Failed to send recovery embed for %s", component
+            except (OSError, RuntimeError) as exc:
+                logger.warning(
+                    "Failed to send recovery embed for %s: %s", component, exc
                 )
 
     def record_failure(self, component: str, error_info: str) -> None:
@@ -481,9 +481,9 @@ class HealthTracker:
         if embed_to_send is not None:
             try:
                 monitor.send_embed(embed_to_send)
-            except Exception:
-                logger.exception(
-                    "Failed to send error embed for %s", component
+            except (OSError, RuntimeError) as exc:
+                logger.warning(
+                    "Failed to send error embed for %s: %s", component, exc
                 )
 
     def get_status(self) -> dict[str, dict]:

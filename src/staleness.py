@@ -31,8 +31,10 @@ class StalenessTracker:
     """
 
     def __init__(self) -> None:
-        self._last_good_bus: BusData = (None, None)
-        self._last_good_bus_time: float = 0.0
+        self._last_good_bus_dir1: list[int] | None = None
+        self._last_good_bus_dir1_time: float = 0.0
+        self._last_good_bus_dir2: list[int] | None = None
+        self._last_good_bus_dir2_time: float = 0.0
 
         self._last_good_weather: WeatherData | None = None
         self._last_good_weather_time: float = 0.0
@@ -40,36 +42,58 @@ class StalenessTracker:
     # -- Bus ------------------------------------------------------------------
 
     def update_bus(self, data: BusData) -> None:
-        """Record a successful bus fetch."""
-        self._last_good_bus = data
-        self._last_good_bus_time = time.monotonic()
+        """Record a successful bus fetch, updating per-direction timestamps."""
+        dir1, dir2 = data
+        now = time.monotonic()
+        if dir1 is not None:
+            self._last_good_bus_dir1 = dir1
+            self._last_good_bus_dir1_time = now
+        if dir2 is not None:
+            self._last_good_bus_dir2 = dir2
+            self._last_good_bus_dir2_time = now
 
     @property
     def last_good_bus(self) -> BusData:
         """Return the most recent successful bus data (may be stale)."""
-        return self._last_good_bus
+        return (self._last_good_bus_dir1, self._last_good_bus_dir2)
 
     @property
     def bus_data_age(self) -> float:
-        """Return age in seconds of last good bus data, or 0 if never fetched."""
-        if self._last_good_bus_time > 0:
-            return time.monotonic() - self._last_good_bus_time
-        return 0.0
+        """Return age in seconds of the oldest per-direction data, or 0 if never fetched."""
+        ages = []
+        if self._last_good_bus_dir1_time > 0:
+            ages.append(time.monotonic() - self._last_good_bus_dir1_time)
+        if self._last_good_bus_dir2_time > 0:
+            ages.append(time.monotonic() - self._last_good_bus_dir2_time)
+        return max(ages) if ages else 0.0
 
     def get_effective_bus(self) -> tuple[BusData, bool, bool]:
         """Return ``(data, is_stale, is_too_old)`` for bus data.
 
-        * *is_stale*: data exists but exceeds the stale threshold.
-        * *is_too_old*: data exceeds the too-old threshold -- caller should
-          show dash placeholders instead.
+        Evaluates staleness per-direction and returns the worst case.
+
+        * *is_stale*: any direction's data exceeds the stale threshold.
+        * *is_too_old*: any direction's data exceeds the too-old threshold --
+          caller should show dash placeholders for that direction.
         """
-        age = self.bus_data_age
+        now = time.monotonic()
 
-        is_stale = age > BUS_STALE_THRESHOLD and self._last_good_bus_time > 0
-        is_too_old = age > BUS_TOO_OLD_THRESHOLD and self._last_good_bus_time > 0
+        def _dir_flags(t: float) -> tuple[bool, bool]:
+            if t <= 0:
+                return False, False
+            age = now - t
+            return age > BUS_STALE_THRESHOLD, age > BUS_TOO_OLD_THRESHOLD
 
-        effective = (None, None) if is_too_old else self._last_good_bus
-        return effective, is_stale, is_too_old
+        stale1, too_old1 = _dir_flags(self._last_good_bus_dir1_time)
+        stale2, too_old2 = _dir_flags(self._last_good_bus_dir2_time)
+
+        dir1 = None if too_old1 else self._last_good_bus_dir1
+        dir2 = None if too_old2 else self._last_good_bus_dir2
+
+        is_stale = stale1 or stale2
+        is_too_old = too_old1 or too_old2
+
+        return (dir1, dir2), is_stale, is_too_old
 
     # -- Weather --------------------------------------------------------------
 

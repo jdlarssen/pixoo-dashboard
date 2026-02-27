@@ -13,10 +13,17 @@ Thread safety: MessageBridge uses a threading.Lock to safely pass messages
 from the async Discord bot thread to the synchronous main rendering loop.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import re
 import threading
+import time
+from typing import TYPE_CHECKING, Any, Callable
+
+if TYPE_CHECKING:
+    from src.providers.discord_monitor import HealthTracker
 
 logger = logging.getLogger(__name__)
 
@@ -84,8 +91,8 @@ def run_discord_bot(
     channel_id: int,
     *,
     monitor_channel_id: int | None = None,
-    health_tracker=None,
-    on_ready_callback=None,
+    health_tracker: HealthTracker | None = None,
+    on_ready_callback: Callable[[Any], None] | None = None,
     bot_dead_event: threading.Event | None = None,
 ) -> None:
     """Run the Discord bot (blocking). Designed for background thread.
@@ -118,8 +125,8 @@ def run_discord_bot(
         if on_ready_callback is not None:
             try:
                 await asyncio.get_event_loop().run_in_executor(None, on_ready_callback, client)
-            except Exception:
-                logger.exception("on_ready_callback failed")
+            except (discord.HTTPException, OSError, ValueError) as exc:
+                logger.warning("on_ready_callback failed: %s", exc)
 
     @client.event
     async def on_message(message):
@@ -140,7 +147,7 @@ def run_discord_bot(
             # React to confirm receipt
             try:
                 await message.add_reaction("\u2713")
-            except Exception:
+            except discord.HTTPException:
                 logger.debug("Could not add reaction to message %s", message.id)
 
         # Monitoring channel -- status command
@@ -154,24 +161,52 @@ def run_discord_bot(
                         health_tracker.get_status(), health_tracker.uptime_s
                     )
                     await message.channel.send(embed=embed)
-                except Exception:
-                    logger.exception("Failed to send status embed")
+                except discord.HTTPException:
+                    logger.warning("Failed to send status embed")
 
                 # React to confirm receipt
                 try:
                     await message.add_reaction("\u2713")
-                except Exception:
+                except discord.HTTPException:
                     logger.debug("Could not add reaction to message %s", message.id)
 
     try:
         client.run(token, log_handler=None)  # Suppress discord.py's own logging setup
         # client.run() returned normally -- bot disconnected
         logger.warning("Discord bot disconnected (client.run returned)")
-    except Exception:
-        logger.exception("Discord bot crashed")
+    except (OSError, discord.ConnectionClosed, discord.HTTPException) as exc:
+        logger.warning("Discord bot crashed: %s", exc)
+        raise  # re-raise so the retry wrapper can catch it
     finally:
         if bot_dead_event is not None:
             bot_dead_event.set()
+
+
+def _run_discord_bot_with_retry(
+    bridge: MessageBridge,
+    token: str,
+    channel_id: int,
+    **kwargs,
+) -> None:
+    """Wrap run_discord_bot with retry logic and exponential backoff.
+
+    If run_discord_bot crashes (e.g. token revocation, extended outage),
+    retries with exponential backoff up to 5 minutes. A clean disconnect
+    (no exception) is not retried.
+    """
+    backoff = 5
+    while True:
+        # Clear the dead event before each attempt so the main loop sees it fresh
+        dead_event = kwargs.get("bot_dead_event")
+        if dead_event is not None:
+            dead_event.clear()
+        try:
+            run_discord_bot(bridge, token, channel_id, **kwargs)
+            break  # clean disconnect, don't retry
+        except Exception:
+            logger.warning("Discord bot crashed, retrying in %ds", backoff)
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 300)  # max 5 min
 
 
 def start_discord_bot(
@@ -179,8 +214,8 @@ def start_discord_bot(
     channel_id: str | None,
     *,
     monitor_channel_id: str | None = None,
-    health_tracker=None,
-    on_ready_callback=None,
+    health_tracker: HealthTracker | None = None,
+    on_ready_callback: Callable[[Any], None] | None = None,
 ) -> tuple[MessageBridge, threading.Event] | None:
     """Start Discord bot in background thread. Returns (MessageBridge, Event) or None.
 
@@ -221,7 +256,7 @@ def start_discord_bot(
     bridge = MessageBridge()
     bot_dead_event = threading.Event()
     thread = threading.Thread(
-        target=run_discord_bot,
+        target=_run_discord_bot_with_retry,
         args=(bridge, token, parsed_channel_id),
         kwargs={
             "monitor_channel_id": monitor_id,
