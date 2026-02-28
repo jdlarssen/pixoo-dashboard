@@ -383,3 +383,58 @@ class TestWindData:
         )
         assert wd.wind_speed == 0.0
         assert wd.wind_from_direction == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Tests: WeatherCache.get_or_claim() (TOCTOU fix)
+# ---------------------------------------------------------------------------
+
+
+class TestGetOrClaim:
+    """Verify atomic get_or_claim() eliminates the TOCTOU race."""
+
+    def test_fresh_cache_returns_fresh(self):
+        """Cache within max_age returns FRESH outcome with data."""
+        from src.providers.weather import CacheOutcome, WeatherCache
+
+        cache = WeatherCache()
+        cache.set({"test": "data"}, "Thu, 01 Jan 2026 00:00:00 GMT")
+
+        result = cache.get_or_claim()
+        assert result.outcome is CacheOutcome.FRESH
+        assert result.data == {"test": "data"}
+        assert result.last_modified == "Thu, 01 Jan 2026 00:00:00 GMT"
+
+    def test_stale_cache_returns_claimed_with_last_modified(self):
+        """Stale cache returns CLAIMED with last_modified for If-Modified-Since."""
+        import time
+
+        from src.providers.weather import CacheOutcome, WeatherCache
+
+        cache = WeatherCache(max_age=0.01)  # expire almost immediately
+        cache.set({"old": "data"}, "Thu, 01 Jan 2026 00:00:00 GMT")
+        time.sleep(0.02)  # ensure cache expires
+
+        result = cache.get_or_claim()
+        assert result.outcome is CacheOutcome.CLAIMED
+        assert result.last_modified == "Thu, 01 Jan 2026 00:00:00 GMT"
+        assert result.data == {"old": "data"}
+
+    def test_concurrent_claim_returns_busy(self):
+        """Second caller gets BUSY when first has already claimed."""
+        import time
+
+        from src.providers.weather import CacheOutcome, WeatherCache
+
+        cache = WeatherCache(max_age=0.01)
+        cache.set({"stale": "data"}, "last-mod-header")
+        time.sleep(0.02)
+
+        # First caller claims
+        first = cache.get_or_claim()
+        assert first.outcome is CacheOutcome.CLAIMED
+
+        # Second caller gets BUSY with stale data
+        second = cache.get_or_claim()
+        assert second.outcome is CacheOutcome.BUSY
+        assert second.data == {"stale": "data"}

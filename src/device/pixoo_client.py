@@ -9,13 +9,13 @@ This wrapper enforces safe timing, adds timeouts to all device HTTP calls
 prevent cascading failures when the device is in a degraded state.
 """
 
-import functools
+import enum
 import logging
-import threading
 import time
 
 import requests as _requests_module
 from PIL import Image
+from requests.adapters import HTTPAdapter
 from requests.exceptions import RequestException
 
 from src.config import (
@@ -29,57 +29,55 @@ from src.config import (
 
 logger = logging.getLogger(__name__)
 
+
+class PushResult(enum.Enum):
+    """Outcome of a device communication attempt (push or ping)."""
+
+    SUCCESS = "success"
+    ERROR = "error"
+    SKIPPED = "skipped"
+
+
 # Backward-compatible aliases for tests and internal use
 _DEVICE_TIMEOUT = DEVICE_HTTP_TIMEOUT
 _MIN_PUSH_INTERVAL = DEVICE_MIN_PUSH_INTERVAL
 _ERROR_COOLDOWN_BASE = DEVICE_ERROR_COOLDOWN_BASE
 _ERROR_COOLDOWN_MAX = DEVICE_ERROR_COOLDOWN_MAX
-_patch_lock = threading.Lock()
 
 
-def _is_local_device_url(url: str) -> bool:
-    """Check if a URL targets an RFC 1918 private IP address.
+class _TimeoutHTTPAdapter(HTTPAdapter):
+    """HTTPAdapter that injects a default timeout on every request."""
 
-    Matches 10.x.x.x, 172.16-31.x.x, and 192.168.x.x ranges.
-    """
-    if not isinstance(url, str) or not url.startswith("http://"):
-        return False
-    # Extract host portion: "http://10.0.0.1/post" -> "10.0.0.1"
-    host = url[7:].split("/", 1)[0].split(":")[0]
-    if host.startswith("10."):
-        return True
-    if host.startswith("192.168."):
-        return True
-    if host.startswith("172."):
-        parts = host.split(".")
-        if len(parts) >= 2:
-            try:
-                second_octet = int(parts[1])
-                if 16 <= second_octet <= 31:
-                    return True
-            except ValueError:
-                pass
-    return False
+    def __init__(self, timeout: float = _DEVICE_TIMEOUT, **kwargs):
+        self._timeout = timeout
+        super().__init__(**kwargs)
+
+    def send(self, request, *, timeout=None, **kwargs):
+        if timeout is None:
+            timeout = self._timeout
+        return super().send(request, timeout=timeout, **kwargs)
 
 
-def _patch_requests_post(original_post):
-    """Wrap requests.post to inject a default timeout when calling the device.
+class _RequestsShim:
+    """Drop-in replacement for the ``requests`` module used by pixoo.
 
-    The pixoo library calls ``requests.post(url, payload)`` with no timeout,
-    meaning a hung device blocks the caller indefinitely. This wrapper adds
-    a timeout to any POST that targets an RFC 1918 private IP address.
-    Non-device calls (e.g., to external APIs) are left untouched.
+    Routes ``post()`` through a :class:`requests.Session` configured with
+    :class:`_TimeoutHTTPAdapter`, ensuring all device HTTP calls have a
+    default timeout without monkey-patching ``requests.post``.
     """
 
-    @functools.wraps(original_post)
-    def _post_with_timeout(*args, **kwargs):
-        url = args[0] if args else kwargs.get("url", "")
-        # Only inject timeout for device calls (local HTTP), not external APIs
-        if "timeout" not in kwargs and _is_local_device_url(url):
-            kwargs["timeout"] = _DEVICE_TIMEOUT
-        return original_post(*args, **kwargs)
+    def __init__(self, timeout: float = _DEVICE_TIMEOUT):
+        self._session = _requests_module.Session()
+        adapter = _TimeoutHTTPAdapter(timeout=timeout)
+        self._session.mount("http://", adapter)
+        self._session.mount("https://", adapter)
 
-    return _post_with_timeout
+    def post(self, url, *args, **kwargs):
+        return self._session.post(url, *args, **kwargs)
+
+    def __getattr__(self, name):
+        # Fall through to the real requests module for anything else
+        return getattr(_requests_module, name)
 
 
 class PixooClient:
@@ -103,19 +101,11 @@ class PixooClient:
             size: Display size in pixels (64 for Pixoo 64).
             simulated: If True, use the pixoo library's Tkinter simulator.
         """
-        # Patch requests.post on the pixoo module only (not globally) so that
-        # device HTTP calls from the pixoo library get a timeout.
+        # Inject a Session-based shim into the pixoo module so that all
+        # device HTTP calls go through _TimeoutHTTPAdapter (default timeout).
         import pixoo.objects.pixoo as _pixoo_module
 
-        with _patch_lock:
-            if not getattr(
-                getattr(_pixoo_module, "requests", _requests_module).post,
-                "_patched_with_timeout",
-                False,
-            ):
-                _target = getattr(_pixoo_module, "requests", _requests_module)
-                _target.post = _patch_requests_post(_target.post)
-                _target.post._patched_with_timeout = True  # type: ignore[attr-defined]
+        _pixoo_module.requests = _RequestsShim(timeout=_DEVICE_TIMEOUT)
 
         from pixoo import Pixoo
 
@@ -139,7 +129,7 @@ class PixooClient:
         self._ip = ip
         self._current_cooldown: float = _ERROR_COOLDOWN_BASE
 
-    def push_frame(self, image: Image.Image) -> bool | None:
+    def push_frame(self, image: Image.Image) -> PushResult:
         """Push a PIL Image frame to the device.
 
         Enforces a minimum 1.0-second interval between pushes. The Pixoo 64
@@ -156,20 +146,20 @@ class PixooClient:
             image: A PIL RGB Image (should be 64x64 for Pixoo 64).
 
         Returns:
-            True if the frame was delivered to the device.
-            False if a communication error occurred (device unreachable).
-            None if the push was skipped (rate limit or error cooldown).
+            PushResult.SUCCESS if the frame was delivered to the device.
+            PushResult.ERROR if a communication error occurred (device unreachable).
+            PushResult.SKIPPED if the push was skipped (rate limit or error cooldown).
         """
         now = time.monotonic()
 
         # Respect error cooldown
         if now < self._error_until:
-            return None
+            return PushResult.SKIPPED
 
         # Rate limit: enforce minimum interval
         elapsed = now - self._last_push_time
         if self._last_push_time > 0 and elapsed < _MIN_PUSH_INTERVAL:
-            return None
+            return PushResult.SKIPPED
 
         try:
             self._pixoo.draw_image(image)
@@ -182,34 +172,34 @@ class PixooClient:
                 self._current_cooldown,
             )
             self._current_cooldown = min(self._current_cooldown * 2, _ERROR_COOLDOWN_MAX)
-            return False
+            return PushResult.ERROR
         self._current_cooldown = _ERROR_COOLDOWN_BASE
         self._last_push_time = time.monotonic()
-        return True
+        return PushResult.SUCCESS
 
-    def ping(self) -> bool | None:
+    def ping(self) -> PushResult:
         """Send a lightweight health-check to keep the device WiFi alive.
 
         Uses Channel/GetAllConf which returns device config without any
         visual side-effect. Respects error cooldown.
 
         Returns:
-            True if device responded, False on communication error,
-            None if skipped (error cooldown active).
+            PushResult.SUCCESS if device responded, PushResult.ERROR on
+            communication error, PushResult.SKIPPED if skipped (cooldown).
         """
         now = time.monotonic()
         if now < self._error_until:
-            return None
+            return PushResult.SKIPPED
 
         try:
             self._pixoo.validate_connection()
             self._current_cooldown = _ERROR_COOLDOWN_BASE
-            return True
+            return PushResult.SUCCESS
         except (RequestException, OSError) as exc:
             logger.warning("Device ping failed: %s", exc)
             self._error_until = time.monotonic() + self._current_cooldown
             self._current_cooldown = min(self._current_cooldown * 2, _ERROR_COOLDOWN_MAX)
-            return False
+            return PushResult.ERROR
 
     def reboot(self) -> bool:
         """Send Device/SysReboot command to force the device to restart.

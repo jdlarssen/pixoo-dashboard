@@ -10,16 +10,17 @@ import threading
 import time
 from unittest.mock import MagicMock, patch
 
+from src.device.pixoo_client import PushResult
 from src.main import (
-    Heartbeat,
     _precip_category,
     _reverse_geocode,
     _should_swap_animation,
-    _watchdog_thread,
     _wind_category,
     build_font_map,
 )
 from src.providers.weather import WeatherData
+from src.watchdog import Heartbeat
+from src.watchdog import watchdog_thread as _watchdog_thread
 
 # ---------------------------------------------------------------------------
 # _reverse_geocode() tests
@@ -420,9 +421,9 @@ class TestWatchdogThread:
             raise _WatchdogFired
 
         with (
-            patch("src.main.os._exit", side_effect=capture_exit),
-            patch("src.main.os.kill"),
-            patch("src.main.time.sleep", return_value=None),
+            patch("src.watchdog.os._exit", side_effect=capture_exit),
+            patch("src.watchdog.os.kill"),
+            patch("src.watchdog.time.sleep", return_value=None),
         ):
             try:
                 _watchdog_thread(heartbeat, timeout=1.0)
@@ -449,9 +450,9 @@ class TestWatchdogThread:
             original_sleep(0.01)
 
         with (
-            patch("src.main.os._exit", side_effect=lambda c: exit_called.set()),
-            patch("src.main.os.kill"),
-            patch("src.main.time.sleep", side_effect=counting_sleep),
+            patch("src.watchdog.os._exit", side_effect=lambda c: exit_called.set()),
+            patch("src.watchdog.os.kill"),
+            patch("src.watchdog.time.sleep", side_effect=counting_sleep),
         ):
             try:
                 _watchdog_thread(heartbeat, timeout=10.0)
@@ -478,10 +479,10 @@ class TestWatchdogThread:
 
         # time.monotonic returns base_time + 200 (so elapsed = 200)
         with (
-            patch("src.main.os._exit", side_effect=capture_exit),
-            patch("src.main.os.kill"),
-            patch("src.main.time.sleep", return_value=None),
-            patch("src.main.time.monotonic", return_value=base_time + 200),
+            patch("src.watchdog.os._exit", side_effect=capture_exit),
+            patch("src.watchdog.os.kill"),
+            patch("src.watchdog.time.sleep", return_value=None),
+            patch("src.watchdog.time.monotonic", return_value=base_time + 200),
         ):
             try:
                 _watchdog_thread(heartbeat, timeout=120)
@@ -690,7 +691,7 @@ class TestTestWeatherMode:
     def _make_mock_client(self):
         """Create a minimal mock PixooClient."""
         client = MagicMock()
-        client.push_frame.return_value = True
+        client.push_frame.return_value = PushResult.SUCCESS
         client.set_brightness.return_value = None
         return client
 
@@ -700,12 +701,12 @@ class TestTestWeatherMode:
 
     @patch.dict(os.environ, {"TEST_WEATHER": "rain"})
     @patch("src.main.render_frame")
-    @patch("src.main.get_animation")
-    @patch("src.main.is_dark", return_value=False)
-    @patch("src.main.symbol_to_group", return_value="rain")
-    @patch("src.main.fetch_bus_data", return_value=(None, None))
-    @patch("src.main.get_target_brightness", return_value=80)
-    @patch("src.main.DisplayState.from_now")
+    @patch("src.display.animation_selector.get_animation")
+    @patch("src.display.animation_selector.is_dark", return_value=False)
+    @patch("src.display.animation_selector.symbol_to_group", return_value="rain")
+    @patch("src.dashboard_state.fetch_bus_data", return_value=(None, None))
+    @patch("src.dashboard_state.get_target_brightness", return_value=80)
+    @patch("src.display.state.DisplayState.from_now")
     def test_test_weather_rain_uses_hardcoded_data(
         self,
         mock_from_now,
@@ -756,12 +757,12 @@ class TestTestWeatherMode:
 
     @patch.dict(os.environ, {"TEST_WEATHER": "clear"})
     @patch("src.main.render_frame")
-    @patch("src.main.get_animation")
-    @patch("src.main.is_dark", return_value=False)
-    @patch("src.main.symbol_to_group", return_value="clear")
-    @patch("src.main.fetch_bus_data", return_value=(None, None))
-    @patch("src.main.get_target_brightness", return_value=80)
-    @patch("src.main.DisplayState.from_now")
+    @patch("src.display.animation_selector.get_animation")
+    @patch("src.display.animation_selector.is_dark", return_value=False)
+    @patch("src.display.animation_selector.symbol_to_group", return_value="clear")
+    @patch("src.dashboard_state.fetch_bus_data", return_value=(None, None))
+    @patch("src.dashboard_state.get_target_brightness", return_value=80)
+    @patch("src.display.state.DisplayState.from_now")
     def test_test_weather_clear_skips_api_fetch(
         self,
         mock_from_now,
@@ -797,7 +798,7 @@ class TestTestWeatherMode:
         with (
             patch("src.main.time.sleep", side_effect=break_after_one),
             patch("src.main.threading.Thread") as mock_thread,
-            patch("src.main.fetch_weather_safe") as mock_weather_api,
+            patch("src.dashboard_state.fetch_weather_safe") as mock_weather_api,
         ):
             mock_thread.return_value = MagicMock()
 

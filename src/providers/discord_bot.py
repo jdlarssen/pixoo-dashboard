@@ -18,38 +18,17 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
-import re
 import threading
 import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+from src.display.text_utils import sanitize_for_bdf
+
 if TYPE_CHECKING:
     from src.providers.discord_monitor import HealthTracker
 
 logger = logging.getLogger(__name__)
-
-
-def sanitize_for_bdf(text: str) -> str | None:
-    """Strip characters that BDF bitmap fonts cannot render.
-
-    BDF fonts only support Latin-1 (code points 0-255). Characters outside
-    this range (emoji, CJK, etc.) cause UnicodeEncodeError in PIL's
-    font.getbbox(). This function removes them before text reaches the
-    renderer.
-
-    Args:
-        text: Raw message text (may contain emoji, Unicode, etc.).
-
-    Returns:
-        Sanitized text with only Latin-1 characters, or None if nothing
-        renderable remains. Consecutive whitespace is collapsed.
-    """
-    # Remove all characters with code points > 255 (outside Latin-1)
-    cleaned = "".join(ch for ch in text if ord(ch) <= 255)
-    # Collapse any whitespace left behind by removed characters
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    return cleaned if cleaned else None
 
 
 class MessageBridge:

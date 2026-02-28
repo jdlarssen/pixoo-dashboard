@@ -5,6 +5,7 @@ precipitation data for a given location. Uses If-Modified-Since caching
 to respect MET API terms of service.
 """
 
+import enum
 import logging
 import threading
 import time
@@ -19,6 +20,23 @@ from src.config import WEATHER_API_URL, WEATHER_USER_AGENT
 _CACHE_MAX_AGE = 3600  # discard If-Modified-Since after 1 hour
 
 logger = logging.getLogger(__name__)
+
+
+class CacheOutcome(enum.Enum):
+    """Outcome of a cache lookup via get_or_claim."""
+
+    FRESH = "fresh"  # Cache is valid; use cached data directly
+    CLAIMED = "claimed"  # Stale/empty; caller should fetch and owns the lock
+    BUSY = "busy"  # Another thread is already fetching
+
+
+@dataclass
+class CacheResult:
+    """Result of WeatherCache.get_or_claim()."""
+
+    outcome: CacheOutcome
+    data: dict | None = None
+    last_modified: str | None = None
 
 
 class WeatherCache:
@@ -60,6 +78,40 @@ class WeatherCache:
             self._last_modified = last_modified
             self._cache_time = time.monotonic()
             self._fetching = False
+
+    def get_or_claim(self) -> CacheResult:
+        """Atomically check cache and claim fetch ownership if stale.
+
+        Combines get() + mark_fetching() into a single lock acquisition,
+        eliminating the TOCTOU race where last_modified could be lost.
+
+        Returns:
+            CacheResult with outcome FRESH (use data), CLAIMED (caller
+            should fetch; includes last_modified for If-Modified-Since),
+            or BUSY (another thread is fetching; stale data if available).
+        """
+        with self._lock:
+            is_fresh = self._data and (time.monotonic() - self._cache_time) < self._max_age
+            if is_fresh:
+                return CacheResult(
+                    outcome=CacheOutcome.FRESH,
+                    data=self._data,
+                    last_modified=self._last_modified,
+                )
+            if self._fetching:
+                # Another thread is fetching; return stale data if available
+                return CacheResult(
+                    outcome=CacheOutcome.BUSY,
+                    data=self._data,
+                    last_modified=self._last_modified,
+                )
+            # Claim fetch ownership
+            self._fetching = True
+            return CacheResult(
+                outcome=CacheOutcome.CLAIMED,
+                data=self._data,
+                last_modified=self._last_modified,
+            )
 
     def clear_fetching(self) -> None:
         """Clear fetching flag on error (so next caller retries)."""
@@ -200,21 +252,21 @@ def fetch_weather(
         KeyError: If the response structure is unexpected.
     """
     cache = cache or _default_cache
-    cached_data, last_modified = cache.get()
+    result = cache.get_or_claim()
 
-    if cached_data:
-        # Cache is fresh (or another thread is already fetching); use cached data
-        data = cached_data
-    else:
-        # Cache miss — try to become the fetching thread
-        if not cache.mark_fetching():
-            # Another thread won the race; no stale data available, bail out
+    if result.outcome is CacheOutcome.FRESH:
+        data = result.data
+    elif result.outcome is CacheOutcome.BUSY:
+        if result.data:
+            data = result.data
+        else:
             return None
-
+    else:
+        # CLAIMED — caller owns the fetch
         try:
             headers: dict[str, str] = {"User-Agent": WEATHER_USER_AGENT}
-            if last_modified:
-                headers["If-Modified-Since"] = last_modified
+            if result.last_modified:
+                headers["If-Modified-Since"] = result.last_modified
 
             response = requests.get(
                 WEATHER_API_URL,
@@ -230,9 +282,9 @@ def fetch_weather(
                 cache.clear_fetching()
                 return None
 
-            if response.status_code == 304 and cached_data:
+            if response.status_code == 304 and result.data:
                 # Data unchanged, parse from cache
-                data = cached_data
+                data = result.data
                 cache.clear_fetching()
             else:
                 response.raise_for_status()

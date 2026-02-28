@@ -11,7 +11,7 @@ import pytest
 from PIL import Image
 from requests.exceptions import ConnectionError
 
-from src.device.pixoo_client import _ERROR_COOLDOWN_BASE, PixooClient
+from src.device.pixoo_client import _ERROR_COOLDOWN_BASE, PixooClient, PushResult
 
 
 @pytest.fixture
@@ -52,7 +52,7 @@ class TestKeepAliveIntegration:
         # push_frame should be skipped during cooldown
         img = Image.new("RGB", (64, 64), color=(255, 0, 0))
         result = client.push_frame(img)
-        assert result is None  # skipped due to cooldown
+        assert result is PushResult.SKIPPED  # skipped due to cooldown
 
     def test_push_failure_cooldown_blocks_ping(self, client):
         """Push failure cooldown should also block ping."""
@@ -62,7 +62,7 @@ class TestKeepAliveIntegration:
 
         # Cooldown should now be active
         result = client.ping()
-        assert result is None  # skipped due to cooldown
+        assert result is PushResult.SKIPPED  # skipped due to cooldown
 
     def test_reboot_after_multiple_ping_failures(self, client):
         """After multiple ping failures, reboot should still be callable."""

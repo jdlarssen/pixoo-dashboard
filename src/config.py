@@ -8,6 +8,7 @@ import threading
 from datetime import datetime
 from pathlib import Path
 from types import MappingProxyType
+from typing import TYPE_CHECKING
 
 from dotenv import load_dotenv
 
@@ -239,6 +240,50 @@ def validate_config() -> None:
             file=sys.stderr,
         )
         sys.exit(1)
+
+
+if TYPE_CHECKING:
+    # Type stubs for all config attributes exposed via __getattr__.
+    # These have zero runtime cost and only exist for static analysis / IDE support.
+    PROJECT_ROOT: Path
+    DEVICE_IP: str
+    DISPLAY_SIZE: int
+    FONT_DIR: Path
+    FONT_SMALL: str
+    FONT_TINY: str
+    MAX_BRIGHTNESS: int
+    BRIGHTNESS_NIGHT: int
+    BRIGHTNESS_DAY: int
+    BUS_STALE_THRESHOLD: int
+    BUS_TOO_OLD_THRESHOLD: int
+    WEATHER_STALE_THRESHOLD: int
+    WEATHER_TOO_OLD_THRESHOLD: int
+    DEVICE_PING_INTERVAL: int
+    DEVICE_REBOOT_THRESHOLD: int
+    DEVICE_REBOOT_RECOVERY_WAIT: int
+    WATCHDOG_TIMEOUT: int
+    DEVICE_HTTP_TIMEOUT: int
+    DEVICE_MIN_PUSH_INTERVAL: float
+    DEVICE_ERROR_COOLDOWN_BASE: float
+    DEVICE_ERROR_COOLDOWN_MAX: float
+    HEALTH_DEBOUNCE: MappingProxyType
+    HEALTH_DEBOUNCE_DEFAULT: MappingProxyType
+    BUS_QUAY_DIRECTION1: str
+    BUS_QUAY_DIRECTION2: str
+    BUS_REFRESH_INTERVAL: int
+    BUS_NUM_DEPARTURES: int
+    ET_CLIENT_NAME: str
+    ENTUR_API_URL: str
+    WEATHER_LAT: float
+    WEATHER_LON: float
+    WEATHER_REFRESH_INTERVAL: int
+    WEATHER_API_URL: str
+    WEATHER_USER_AGENT: str
+    DISCORD_BOT_TOKEN: str | None
+    DISCORD_CHANNEL_ID: str | None
+    DISCORD_MONITOR_CHANNEL_ID: str | None
+    BIRTHDAY_DATES_RAW: str
+    BIRTHDAY_DATES: list[tuple[int, int]]
 
 
 def __getattr__(name: str):
