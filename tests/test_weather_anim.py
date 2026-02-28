@@ -90,9 +90,8 @@ class TestAnimationVisibility:
 
     def _count_non_transparent_in_layers(self, layers: tuple[Image.Image, Image.Image]) -> int:
         """Count non-transparent pixels across both layers."""
-        return (
-            self._count_non_transparent_pixels(layers[0])
-            + self._count_non_transparent_pixels(layers[1])
+        return self._count_non_transparent_pixels(layers[0]) + self._count_non_transparent_pixels(
+            layers[1]
         )
 
     def test_rain_alpha_above_minimum(self):
@@ -216,9 +215,7 @@ class TestColorIdentity:
         assert min_channel >= 180, (
             f"Snow min channel ({min_channel:.0f}) too low -- should be bright white"
         )
-        assert spread <= 50, (
-            f"Snow channel spread ({spread:.0f}) too high -- should be near-white"
-        )
+        assert spread <= 50, f"Snow channel spread ({spread:.0f}) too high -- should be near-white"
 
     def test_sun_particles_are_yellow_dominant(self):
         """Sun particles should have high R and G, low B (yellow)."""
@@ -251,9 +248,7 @@ class TestColorIdentity:
         assert len(colors) > 0, "No fog particles sampled"
         avg_r, avg_g, avg_b = self._avg_rgb(colors)
         spread = max(avg_r, avg_g, avg_b) - min(avg_r, avg_g, avg_b)
-        assert spread <= 40, (
-            f"Fog channel spread ({spread:.0f}) too high -- should be neutral grey"
-        )
+        assert spread <= 40, f"Fog channel spread ({spread:.0f}) too high -- should be neutral grey"
 
     def test_rain_text_contrasts_with_rain_particles(self):
         """Rain text color must have sufficient luminance contrast against rain particles."""
@@ -294,9 +289,7 @@ class TestColorIdentity:
         anim = ThunderAnimation()
         colors = _sample_particle_rgb(anim, num_ticks=10)
         assert len(colors) > 0, "No thunder particles sampled"
-        blue_dominant_count = sum(
-            1 for r, g, b in colors if b > r + 10 and b > g + 10
-        )
+        blue_dominant_count = sum(1 for r, g, b in colors if b > r + 10 and b > g + 10)
         proportion = blue_dominant_count / len(colors)
         assert proportion >= 0.10, (
             f"Thunder blue-dominant proportion ({proportion:.2f}) too low -- "
@@ -324,16 +317,12 @@ class TestNightAnimations:
     def test_clear_day_returns_sun_animation(self):
         """get_animation('clear') should still return SunAnimation by default."""
         anim = get_animation("clear")
-        assert isinstance(anim, SunAnimation), (
-            f"Expected SunAnimation, got {type(anim).__name__}"
-        )
+        assert isinstance(anim, SunAnimation), f"Expected SunAnimation, got {type(anim).__name__}"
 
     def test_clear_day_explicit_returns_sun_animation(self):
         """get_animation('clear', is_night=False) should return SunAnimation."""
         anim = get_animation("clear", is_night=False)
-        assert isinstance(anim, SunAnimation), (
-            f"Expected SunAnimation, got {type(anim).__name__}"
-        )
+        assert isinstance(anim, SunAnimation), f"Expected SunAnimation, got {type(anim).__name__}"
 
     def test_rain_night_same_as_day(self):
         """Rain animation should be the same class day and night."""
@@ -365,9 +354,7 @@ class TestNightAnimations:
                     if a > 0:
                         total_pixels += 1
                     max_alpha = max(max_alpha, a)
-        assert max_alpha >= 60, (
-            f"Star max alpha {max_alpha} too low for LED visibility"
-        )
+        assert max_alpha >= 60, f"Star max alpha {max_alpha} too low for LED visibility"
         assert total_pixels > 0, "No visible star pixels produced"
 
     def test_clear_night_stars_are_cool_or_warm_white(self):
@@ -380,8 +367,7 @@ class TestNightAnimations:
             max_ch = max(r, g, b)
             spread = max_ch - min_ch
             assert spread <= 80, (
-                f"Star pixel ({r}, {g}, {b}) spread {spread} too high -- "
-                f"should be white-ish"
+                f"Star pixel ({r}, {g}, {b}) spread {spread} too high -- should be white-ish"
             )
 
 
@@ -511,8 +497,7 @@ class TestStarRandomness:
         # This could theoretically fail if random produces same values, but probability
         # is extremely low given the ranges involved
         assert changed, (
-            "Star durations not re-randomized after full cycle -- "
-            "each blink should be unique"
+            "Star durations not re-randomized after full cycle -- each blink should be unique"
         )
 
 
@@ -638,10 +623,7 @@ class TestSunBody:
         bg, fg = anim.tick()
         assert bg.size == (64, 24), f"bg size {bg.size} != (64, 24)"
         # Count non-transparent pixels to verify the sun is visible
-        non_transparent = sum(
-            1 for x in range(64) for y in range(24)
-            if bg.getpixel((x, y))[3] > 0
-        )
+        non_transparent = sum(1 for x in range(64) for y in range(24) if bg.getpixel((x, y))[3] > 0)
         assert non_transparent > 30, (
             f"Sun barely visible: only {non_transparent} non-transparent pixels"
         )
@@ -710,8 +692,7 @@ class TestRadialRays:
         # After tick, ray should have respawned (distance near 0)
         # or advanced just past and been reset
         assert ray[1] < ray[2] + 0.1, (
-            f"Ray distance {ray[1]:.1f} should be near 0 after respawn "
-            f"(speed is {ray[2]:.1f})"
+            f"Ray distance {ray[1]:.1f} should be near 0 after respawn (speed is {ray[2]:.1f})"
         )
 
     def test_staggered_initial_distances(self):

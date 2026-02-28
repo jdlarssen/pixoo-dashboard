@@ -9,8 +9,18 @@ DAYS_NO = ["man", "tir", "ons", "tor", "fre", "l\u00f8r", "s\u00f8n"]
 # Norwegian month abbreviations (January=0 through December=11)
 # None of the abbreviated month names contain special characters
 MONTHS_NO = [
-    "jan", "feb", "mar", "apr", "mai", "jun",
-    "jul", "aug", "sep", "okt", "nov", "des",
+    "jan",
+    "feb",
+    "mar",
+    "apr",
+    "mai",
+    "jun",
+    "jul",
+    "aug",
+    "sep",
+    "okt",
+    "nov",
+    "des",
 ]
 
 

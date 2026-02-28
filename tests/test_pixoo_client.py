@@ -255,6 +255,7 @@ class TestPing:
     def test_ping_returns_none_during_cooldown(self, client):
         """Ping is skipped during error cooldown."""
         import time
+
         client._error_until = time.monotonic() + 60
         assert client.ping() is None
         client._pixoo.validate_connection.assert_not_called()

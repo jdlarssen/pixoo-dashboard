@@ -34,11 +34,11 @@ def test_norwegian_characters_render_visible_pixels():
     """
     fonts = load_fonts(FONT_DIR)
     test_strings = [
-        "\u00f8",           # oe (lowercase, U+00F8) -- as in "lor"
-        "\u00c5",           # Aa (uppercase, U+00C5)
-        "\u00e5",           # aa (lowercase, U+00E5)
-        "\u00e6",           # ae (lowercase, U+00E6)
-        "\u00c6",           # Ae (uppercase, U+00C6)
+        "\u00f8",  # oe (lowercase, U+00F8) -- as in "lor"
+        "\u00c5",  # Aa (uppercase, U+00C5)
+        "\u00e5",  # aa (lowercase, U+00E5)
+        "\u00e6",  # ae (lowercase, U+00E6)
+        "\u00c6",  # Ae (uppercase, U+00C6)
         "l\u00f8r 21. mar",  # Saturday with oe
         "bl\u00e5b\u00e6r",  # "blueberry" with aa and ae
     ]

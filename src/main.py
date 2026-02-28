@@ -73,6 +73,7 @@ logger = logging.getLogger(__name__)
 # Heartbeat (Issue 14 -- replaces mutable list hack)
 # ---------------------------------------------------------------------------
 
+
 class Heartbeat:
     """Thread-safe monotonic timestamp for watchdog heartbeat."""
 
@@ -116,6 +117,7 @@ def _watchdog_thread(heartbeat: Heartbeat, timeout: float = WATCHDOG_TIMEOUT) ->
 # ---------------------------------------------------------------------------
 # DashboardState (Issue 01 -- encapsulates mutable loop state)
 # ---------------------------------------------------------------------------
+
 
 class DashboardState:
     """Encapsulates the mutable state of the main dashboard loop.
@@ -186,8 +188,10 @@ class DashboardState:
                 self._maybe_swap_animation(test_weather_data, now_utc)
                 logger.info(
                     "TEST: weather animation: %s (night=%s, precip=%.1fmm, wind=%.1fm/s)",
-                    self.last_weather_group, self.last_weather_night,
-                    self.last_precip_mm, self.last_wind_speed,
+                    self.last_weather_group,
+                    self.last_weather_night,
+                    self.last_precip_mm,
+                    self.last_wind_speed,
                 )
             return
 
@@ -222,18 +226,28 @@ class DashboardState:
     def _maybe_swap_animation(self, weather_data: WeatherData, now_utc: datetime) -> None:
         """Swap animation if weather conditions changed."""
         result = _select_animation(
-            weather_data, now_utc,
-            self.last_weather_group, self.last_weather_night,
-            self.last_precip_mm, self.last_wind_speed,
+            weather_data,
+            now_utc,
+            self.last_weather_group,
+            self.last_weather_night,
+            self.last_precip_mm,
+            self.last_wind_speed,
         )
-        new_anim, self.last_weather_group, self.last_weather_night, \
-            self.last_precip_mm, self.last_wind_speed = result
+        (
+            new_anim,
+            self.last_weather_group,
+            self.last_weather_night,
+            self.last_precip_mm,
+            self.last_wind_speed,
+        ) = result
         if new_anim is not None:
             self.weather_anim = new_anim
             logger.info(
                 "Weather animation: %s (night=%s, precip=%.1fmm, wind=%.1fm/s)",
-                self.last_weather_group, self.last_weather_night,
-                self.last_precip_mm, self.last_wind_speed,
+                self.last_weather_group,
+                self.last_weather_night,
+                self.last_precip_mm,
+                self.last_wind_speed,
             )
 
     def update_brightness(self, client: PixooClient, now_utc: datetime) -> None:
@@ -261,9 +275,11 @@ class DashboardState:
 # Helper functions
 # ---------------------------------------------------------------------------
 
+
 def _reverse_geocode(lat: float, lon: float) -> str | None:
     """Resolve lat/lon to a city name via OpenStreetMap Nominatim."""
     import requests as _requests
+
     try:
         resp = _requests.get(
             "https://nominatim.openstreetmap.org/reverse",
@@ -275,8 +291,10 @@ def _reverse_geocode(lat: float, lon: float) -> str | None:
         data = resp.json()
         address = data.get("address", {})
         return (
-            address.get("city") or address.get("town")
-            or address.get("municipality") or address.get("village")
+            address.get("city")
+            or address.get("town")
+            or address.get("municipality")
+            or address.get("village")
         )
     except (_requests.RequestException, KeyError, ValueError):
         logger.debug("Reverse geocode failed for %s, %s", lat, lon)
@@ -364,8 +382,14 @@ def _select_animation(
     wind = weather_data.wind_speed
 
     if _should_swap_animation(
-        new_group, is_night, precip, wind,
-        last_weather_group, last_weather_night, last_precip_mm, last_wind_speed,
+        new_group,
+        is_night,
+        precip,
+        wind,
+        last_weather_group,
+        last_weather_night,
+        last_precip_mm,
+        last_wind_speed,
     ):
         anim = get_animation(
             new_group,
@@ -435,35 +459,46 @@ def main_loop(
     _base = dict(temperature=30, high_temp=32, low_temp=22, is_day=True)
     test_weather_map = {
         "clear": WeatherData(
-            **_base, symbol_code="clearsky_day",
-            precipitation_mm=0.0, wind_speed=2.0,
+            **_base,
+            symbol_code="clearsky_day",
+            precipitation_mm=0.0,
+            wind_speed=2.0,
             wind_from_direction=180.0,
         ),
         "rain": WeatherData(
-            **_base, symbol_code="rain_day",
-            precipitation_mm=5.0, wind_speed=8.0,
+            **_base,
+            symbol_code="rain_day",
+            precipitation_mm=5.0,
+            wind_speed=8.0,
             wind_from_direction=270.0,
         ),
         "snow": WeatherData(
-            **_base, symbol_code="snow_day",
-            precipitation_mm=2.0, wind_speed=5.0,
+            **_base,
+            symbol_code="snow_day",
+            precipitation_mm=2.0,
+            wind_speed=5.0,
             wind_from_direction=200.0,
         ),
         "fog": WeatherData(
-            **_base, symbol_code="fog",
+            **_base,
+            symbol_code="fog",
             precipitation_mm=0.0,
         ),
         "cloudy": WeatherData(
-            **_base, symbol_code="cloudy",
+            **_base,
+            symbol_code="cloudy",
             precipitation_mm=0.0,
         ),
         "sun": WeatherData(
-            **_base, symbol_code="clearsky_day",
+            **_base,
+            symbol_code="clearsky_day",
             precipitation_mm=0.0,
         ),
         "thunder": WeatherData(
-            **_base, symbol_code="rainandthunder_day",
-            precipitation_mm=8.0, wind_speed=12.0,
+            **_base,
+            symbol_code="rainandthunder_day",
+            precipitation_mm=8.0,
+            wind_speed=12.0,
             wind_from_direction=250.0,
         ),
     }
@@ -500,7 +535,11 @@ def main_loop(
 
         test_wd = test_weather_map.get(test_weather_mode) if test_weather_mode else None
         ds.refresh_weather(
-            now_mono, now_utc, staleness, health_tracker, weather_breaker,
+            now_mono,
+            now_utc,
+            staleness,
+            health_tracker,
+            weather_breaker,
             test_weather_data=test_wd,
         )
 
@@ -583,6 +622,7 @@ def main() -> None:
 
     def _sigterm_handler(signum, frame):
         raise KeyboardInterrupt
+
     signal.signal(signal.SIGTERM, _sigterm_handler)
 
     parser = argparse.ArgumentParser(description="Pixoo Dashboard - Pixoo 64 Dashboard")

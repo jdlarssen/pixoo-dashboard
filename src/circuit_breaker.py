@@ -37,7 +37,8 @@ class CircuitBreaker:
         with self._lock:
             if self.state != "closed":
                 logger.info(
-                    "%s circuit breaker CLOSED -- service recovered", self.name,
+                    "%s circuit breaker CLOSED -- service recovered",
+                    self.name,
                 )
             self.failure_count = 0
             self.state = "closed"
@@ -65,7 +66,8 @@ class CircuitBreaker:
                 if time.monotonic() - self._opened_at >= self.reset_timeout:
                     self.state = "half_open"
                     logger.info(
-                        "%s circuit breaker testing recovery...", self.name,
+                        "%s circuit breaker testing recovery...",
+                        self.name,
                     )
                     return True
                 return False

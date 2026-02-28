@@ -120,17 +120,21 @@ class RainAnimation(WeatherAnimation):
 
     def _spawn_far(self, count: int) -> None:
         for _ in range(count):
-            self.far_drops.append([
-                random.randint(0, self.width - 1),
-                random.randint(0, self.height - 1),
-            ])
+            self.far_drops.append(
+                [
+                    random.randint(0, self.width - 1),
+                    random.randint(0, self.height - 1),
+                ]
+            )
 
     def _spawn_near(self, count: int) -> None:
         for _ in range(count):
-            self.near_drops.append([
-                random.randint(0, self.width - 1),
-                random.randint(0, self.height - 1),
-            ])
+            self.near_drops.append(
+                [
+                    random.randint(0, self.width - 1),
+                    random.randint(0, self.height - 1),
+                ]
+            )
 
     def tick(self) -> tuple[Image.Image, Image.Image]:
         bg = self._empty()
@@ -211,17 +215,21 @@ class SnowAnimation(WeatherAnimation):
 
     def _spawn_far(self, count: int) -> None:
         for _ in range(count):
-            self.far_flakes.append([
-                random.randint(0, self.width - 1),
-                random.randint(0, self.height - 1),
-            ])
+            self.far_flakes.append(
+                [
+                    random.randint(0, self.width - 1),
+                    random.randint(0, self.height - 1),
+                ]
+            )
 
     def _spawn_near(self, count: int) -> None:
         for _ in range(count):
-            self.near_flakes.append([
-                random.randint(1, self.width - 2),
-                random.randint(0, self.height - 1),
-            ])
+            self.near_flakes.append(
+                [
+                    random.randint(1, self.width - 2),
+                    random.randint(0, self.height - 1),
+                ]
+            )
 
     def _draw_crystal(self, draw: ImageDraw.Draw, x: int, y: int, alpha: int) -> None:
         """Draw a 3x3 snow crystal (+ shape)."""
@@ -347,8 +355,8 @@ class SunAnimation(WeatherAnimation):
     _SUN_RADIUS = 8
 
     # Fan geometry: downward-facing arc from top-right corner
-    _FAN_MIN_DEG = 95.0    # just past straight-down
-    _FAN_MAX_DEG = 160.0   # toward bottom-left corner
+    _FAN_MIN_DEG = 95.0  # just past straight-down
+    _FAN_MAX_DEG = 160.0  # toward bottom-left corner
 
     def __init__(self, width: int = 64, height: int = 24) -> None:
         super().__init__(width, height)
@@ -570,25 +578,29 @@ class FogAnimation(WeatherAnimation):
 
     def _spawn_far(self, count: int) -> None:
         for _ in range(count):
-            self.far_blobs.append({
-                "x": float(random.randint(21, self.width + 20)),
-                "y": random.randint(4, 10),
-                "w": random.randint(6, 10),
-                "h": random.randint(3, 4),
-                "speed": random.uniform(0.05, 0.12),
-                "alpha": random.randint(65, 90),
-            })
+            self.far_blobs.append(
+                {
+                    "x": float(random.randint(21, self.width + 20)),
+                    "y": random.randint(4, 10),
+                    "w": random.randint(6, 10),
+                    "h": random.randint(3, 4),
+                    "speed": random.uniform(0.05, 0.12),
+                    "alpha": random.randint(65, 90),
+                }
+            )
 
     def _spawn_near(self, count: int) -> None:
         for _ in range(count):
-            self.near_blobs.append({
-                "x": float(random.randint(21, self.width + 20)),
-                "y": random.randint(3, 11),
-                "w": random.randint(10, 16),
-                "h": random.randint(4, 6),
-                "speed": random.uniform(0.12, 0.25),
-                "alpha": random.randint(100, 140),
-            })
+            self.near_blobs.append(
+                {
+                    "x": float(random.randint(21, self.width + 20)),
+                    "y": random.randint(3, 11),
+                    "w": random.randint(10, 16),
+                    "h": random.randint(4, 6),
+                    "speed": random.uniform(0.12, 0.25),
+                    "alpha": random.randint(100, 140),
+                }
+            )
 
     def _draw_blob(self, draw: ImageDraw.Draw, blob: dict, bright: bool) -> None:
         x = int(blob["x"])

@@ -25,21 +25,21 @@ class DisplayState:
     bus_direction1: tuple[int, ...] | None = None  # e.g., (5, 12) or None
     bus_direction2: tuple[int, ...] | None = None  # e.g., (3, 8) or None
     # Weather fields (all hashable types for dirty flag equality)
-    weather_temp: int | None = None          # current temp, rounded to int
-    weather_symbol: str | None = None        # MET symbol_code string
-    weather_high: int | None = None          # today's high, rounded to int
-    weather_low: int | None = None           # today's low, rounded to int
-    weather_precip_mm: float | None = None   # next 1h precipitation in mm
-    weather_is_day: bool = True              # day/night from symbol_code
+    weather_temp: int | None = None  # current temp, rounded to int
+    weather_symbol: str | None = None  # MET symbol_code string
+    weather_high: int | None = None  # today's high, rounded to int
+    weather_low: int | None = None  # today's low, rounded to int
+    weather_precip_mm: float | None = None  # next 1h precipitation in mm
+    weather_is_day: bool = True  # day/night from symbol_code
     # Message override from Discord bot
-    message_text: str | None = None          # persistent message text, or None
+    message_text: str | None = None  # persistent message text, or None
     # Birthday easter egg
-    is_birthday: bool = False                # True on March 17 or December 16
+    is_birthday: bool = False  # True on March 17 or December 16
     # Staleness flags for graceful error states
-    bus_stale: bool = False                  # bus data is aging (>180s) but still usable
-    bus_too_old: bool = False                # bus data too old (>600s) -- show dashes
-    weather_stale: bool = False              # weather data is aging (>1800s) but still usable
-    weather_too_old: bool = False            # weather data too old (>3600s) -- show dashes
+    bus_stale: bool = False  # bus data is aging (>180s) but still usable
+    bus_too_old: bool = False  # bus data too old (>600s) -- show dashes
+    weather_stale: bool = False  # weather data is aging (>1800s) but still usable
+    weather_too_old: bool = False  # weather data too old (>3600s) -- show dashes
 
     @classmethod
     def from_now(

@@ -36,8 +36,8 @@ class Config:
         self.DISPLAY_SIZE = 64
         # Font settings
         self.FONT_DIR = self.PROJECT_ROOT / "assets" / "fonts"
-        self.FONT_SMALL = "5x8"    # for date and labels
-        self.FONT_TINY = "4x6"     # for zone labels
+        self.FONT_SMALL = "5x8"  # for date and labels
+        self.FONT_TINY = "4x6"  # for zone labels
 
         # Device safety
         self.MAX_BRIGHTNESS = 90  # cap at 90% -- full brightness can crash device
@@ -65,14 +65,21 @@ class Config:
         self.DEVICE_ERROR_COOLDOWN_MAX = 60.0
 
         # --- Health tracker debounce (frozen to prevent accidental mutation) ---
-        self.HEALTH_DEBOUNCE = MappingProxyType({
-            "bus_api": MappingProxyType({"failures_before_alert": 3, "repeat_interval": 900}),
-            "weather_api": MappingProxyType({"failures_before_alert": 2, "repeat_interval": 1800}),
-            "device": MappingProxyType({"failures_before_alert": 5, "repeat_interval": 300}),
-        })
-        self.HEALTH_DEBOUNCE_DEFAULT = MappingProxyType({
-            "failures_before_alert": 3, "repeat_interval": 600,
-        })
+        self.HEALTH_DEBOUNCE = MappingProxyType(
+            {
+                "bus_api": MappingProxyType({"failures_before_alert": 3, "repeat_interval": 900}),
+                "weather_api": MappingProxyType(
+                    {"failures_before_alert": 2, "repeat_interval": 1800}
+                ),
+                "device": MappingProxyType({"failures_before_alert": 5, "repeat_interval": 300}),
+            }
+        )
+        self.HEALTH_DEBOUNCE_DEFAULT = MappingProxyType(
+            {
+                "failures_before_alert": 3,
+                "repeat_interval": 600,
+            }
+        )
 
         # Bus departure settings (Entur JourneyPlanner v3 API)
         self.BUS_QUAY_DIRECTION1 = os.environ.get("BUS_QUAY_DIR1", "")
@@ -86,11 +93,10 @@ class Config:
         self.WEATHER_LAT = float(os.environ.get("WEATHER_LAT", "0"))
         self.WEATHER_LON = float(os.environ.get("WEATHER_LON", "0"))
         self.WEATHER_REFRESH_INTERVAL = 600
-        self.WEATHER_API_URL = (
-            "https://api.met.no/weatherapi/locationforecast/2.0/compact"
-        )
+        self.WEATHER_API_URL = "https://api.met.no/weatherapi/locationforecast/2.0/compact"
         self.WEATHER_USER_AGENT = os.environ.get(
-            "WEATHER_USER_AGENT", "pixoo-dashboard/1.0",
+            "WEATHER_USER_AGENT",
+            "pixoo-dashboard/1.0",
         )
 
         # Discord message override settings
@@ -114,7 +120,8 @@ class Config:
                             self.BIRTHDAY_DATES.append((_month, _day))
                     except ValueError:
                         logger.warning(
-                            "Ignoring invalid BIRTHDAY_DATES entry: %r", _d,
+                            "Ignoring invalid BIRTHDAY_DATES entry: %r",
+                            _d,
                         )
 
     @classmethod
@@ -147,6 +154,7 @@ def get_target_brightness(dt: datetime, lat: float, lon: float) -> int:
         Target brightness percentage (0-100).
     """
     from src.providers.sun import is_dark
+
     cfg = Config.get()
     if is_dark(dt, lat, lon):
         return cfg.BRIGHTNESS_NIGHT
@@ -167,13 +175,15 @@ def validate_config() -> None:
     if not os.environ.get("WEATHER_LAT") or not os.environ.get("WEATHER_LON"):
         missing.append("WEATHER_LAT / WEATHER_LON")
     if not missing:
-        if not (-90 <= cfg.WEATHER_LAT <= 90) or not (
-            -180 <= cfg.WEATHER_LON <= 180
-        ):
+        if not (-90 <= cfg.WEATHER_LAT <= 90) or not (-180 <= cfg.WEATHER_LON <= 180):
             missing.append("WEATHER_LAT / WEATHER_LON (out of range)")
-        elif cfg.WEATHER_LAT == 0.0 and cfg.WEATHER_LON == 0.0 and (
-            os.environ.get("WEATHER_LAT", "0") == "0"
-            or os.environ.get("WEATHER_LON", "0") == "0"
+        elif (
+            cfg.WEATHER_LAT == 0.0
+            and cfg.WEATHER_LON == 0.0
+            and (
+                os.environ.get("WEATHER_LAT", "0") == "0"
+                or os.environ.get("WEATHER_LON", "0") == "0"
+            )
         ):
             missing.append("WEATHER_LAT / WEATHER_LON (defaulted to 0,0)")
 
@@ -195,8 +205,7 @@ def validate_config() -> None:
     ]:
         if quay and not quay.startswith("NSR:Quay:"):
             print(
-                f"Warning: {label} ({quay!r}) doesn't match expected format"
-                " NSR:Quay:XXXXX",
+                f"Warning: {label} ({quay!r}) doesn't match expected format NSR:Quay:XXXXX",
                 file=sys.stderr,
             )
 
@@ -209,8 +218,7 @@ def validate_config() -> None:
     if set_vars and set_vars != set(discord_vars.keys()):
         missing_discord = set(discord_vars.keys()) - set_vars
         print(
-            f"Warning: Discord partially configured. Set {missing_discord}"
-            " to enable bot.",
+            f"Warning: Discord partially configured. Set {missing_discord} to enable bot.",
             file=sys.stderr,
         )
 
@@ -219,10 +227,7 @@ def validate_config() -> None:
         try:
             int(cfg.DISCORD_CHANNEL_ID)
         except ValueError:
-            missing.append(
-                f"DISCORD_CHANNEL_ID (not a valid integer:"
-                f" {cfg.DISCORD_CHANNEL_ID!r})"
-            )
+            missing.append(f"DISCORD_CHANNEL_ID (not a valid integer: {cfg.DISCORD_CHANNEL_ID!r})")
 
     if missing:
         print(
@@ -246,6 +251,4 @@ def __getattr__(name: str):
     try:
         return getattr(cfg, name)
     except AttributeError:
-        raise AttributeError(
-            f"module 'src.config' has no attribute {name!r}"
-        ) from None
+        raise AttributeError(f"module 'src.config' has no attribute {name!r}") from None

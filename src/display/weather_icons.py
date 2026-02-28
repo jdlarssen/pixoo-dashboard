@@ -15,29 +15,51 @@ ICON_GROUP: dict[str, set[str]] = {
     "partcloud": {"partlycloudy"},
     "cloudy": {"cloudy"},
     "rain": {
-        "rain", "lightrain", "heavyrain",
-        "rainshowers", "lightrainshowers", "heavyrainshowers",
+        "rain",
+        "lightrain",
+        "heavyrain",
+        "rainshowers",
+        "lightrainshowers",
+        "heavyrainshowers",
     },
     "sleet": {
-        "sleet", "lightsleet", "heavysleet",
-        "sleetshowers", "lightsleetshowers", "heavysleetshowers",
+        "sleet",
+        "lightsleet",
+        "heavysleet",
+        "sleetshowers",
+        "lightsleetshowers",
+        "heavysleetshowers",
     },
     "snow": {
-        "snow", "lightsnow", "heavysnow",
-        "snowshowers", "lightsnowshowers", "heavysnowshowers",
+        "snow",
+        "lightsnow",
+        "heavysnow",
+        "snowshowers",
+        "lightsnowshowers",
+        "heavysnowshowers",
     },
     "thunder": {
-        "rainshowersandthunder", "heavyrainshowersandthunder",
-        "lightrainshowersandthunder", "rainandthunder",
-        "heavyrainandthunder", "lightrainandthunder",
-        "sleetshowersandthunder", "heavysleetshowersandthunder",
-        "lightsleetshowersandthunder", "sleetandthunder",
-        "heavysleetandthunder", "lightsleetandthunder",
-        "snowshowersandthunder", "heavysnowshowersandthunder",
-        "lightsnowshowersandthunder", "snowandthunder",
-        "heavysnowandthunder", "lightsnowandthunder",
+        "rainshowersandthunder",
+        "heavyrainshowersandthunder",
+        "lightrainshowersandthunder",
+        "rainandthunder",
+        "heavyrainandthunder",
+        "lightrainandthunder",
+        "sleetshowersandthunder",
+        "heavysleetshowersandthunder",
+        "lightsleetshowersandthunder",
+        "sleetandthunder",
+        "heavysleetandthunder",
+        "lightsleetandthunder",
+        "snowshowersandthunder",
+        "heavysnowshowersandthunder",
+        "lightsnowshowersandthunder",
+        "snowandthunder",
+        "heavysnowandthunder",
+        "lightsnowandthunder",
         # Handle the known typo variants
-        "lightssleetshowersandthunder", "lightssnowshowersandthunder",
+        "lightssleetshowersandthunder",
+        "lightssnowshowersandthunder",
     },
     "fog": {"fog"},
 }
@@ -51,12 +73,7 @@ for _group, _codes in ICON_GROUP.items():
 
 def symbol_to_group(symbol_code: str) -> str:
     """Map MET symbol_code to icon group. Returns 'cloudy' as fallback."""
-    base = (
-        symbol_code
-        .replace("_day", "")
-        .replace("_night", "")
-        .replace("_polartwilight", "")
-    )
+    base = symbol_code.replace("_day", "").replace("_night", "").replace("_polartwilight", "")
     return _CODE_TO_GROUP.get(base, "cloudy")
 
 
@@ -68,6 +85,7 @@ def _is_night(symbol_code: str) -> bool:
 # ---------------------------------------------------------------------------
 # Icon drawing functions (10x10 RGBA)
 # ---------------------------------------------------------------------------
+
 
 def _draw_sun(size: int) -> Image.Image:
     """Yellow sun with short ray lines."""
@@ -167,9 +185,9 @@ def _draw_cloud_with_sleet(size: int) -> Image.Image:
     """Cloud with mixed blue/white drops below."""
     img = _draw_cloud(size)
     draw = ImageDraw.Draw(img)
-    draw.point((2, 8), fill=(80, 160, 255, 220))   # rain
-    draw.point((5, 9), fill=(255, 255, 255, 200))   # snow
-    draw.point((7, 8), fill=(80, 160, 255, 220))    # rain
+    draw.point((2, 8), fill=(80, 160, 255, 220))  # rain
+    draw.point((5, 9), fill=(255, 255, 255, 200))  # snow
+    draw.point((7, 8), fill=(80, 160, 255, 220))  # rain
     return img
 
 
@@ -189,7 +207,7 @@ def _draw_fog(size: int) -> Image.Image:
     draw = ImageDraw.Draw(img)
     fog_color = (180, 180, 190, 160)
     for y in (2, 4, 6, 8):
-        x_start = (y % 3)  # slight offset for organic feel
+        x_start = y % 3  # slight offset for organic feel
         draw.line([(x_start, y), (size - 1 - x_start, y)], fill=fog_color)
     return img
 
@@ -243,6 +261,7 @@ def _draw_partcloud_night(size: int) -> Image.Image:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 @lru_cache(maxsize=16)
 def get_weather_icon(symbol_code: str, size: int = 10) -> Image.Image:

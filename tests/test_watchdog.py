@@ -15,11 +15,11 @@ class TestWatchdog:
         heartbeat = Heartbeat()
         exit_called = threading.Event()
 
-        with patch("src.main.os._exit", side_effect=lambda code: exit_called.set()), \
-             patch("src.main.os.kill"):
-            t = threading.Thread(
-                target=_watchdog_thread, args=(heartbeat, 0.3), daemon=True
-            )
+        with (
+            patch("src.main.os._exit", side_effect=lambda code: exit_called.set()),
+            patch("src.main.os.kill"),
+        ):
+            t = threading.Thread(target=_watchdog_thread, args=(heartbeat, 0.3), daemon=True)
             t.start()
 
             # Keep heartbeat fresh for longer than the timeout
@@ -43,9 +43,11 @@ class TestWatchdog:
             exit_code.append(code)
             raise _WatchdogFired
 
-        with patch("src.main.os._exit", side_effect=mock_exit), \
-             patch("src.main.os.kill"), \
-             patch("src.main.time.sleep", return_value=None):
+        with (
+            patch("src.main.os._exit", side_effect=mock_exit),
+            patch("src.main.os.kill"),
+            patch("src.main.time.sleep", return_value=None),
+        ):
             try:
                 _watchdog_thread(heartbeat, timeout=0.1)
             except _WatchdogFired:
@@ -56,7 +58,5 @@ class TestWatchdog:
     def test_watchdog_thread_is_daemon(self):
         """Watchdog thread must be a daemon so it won't prevent clean shutdown."""
         heartbeat = Heartbeat()
-        t = threading.Thread(
-            target=_watchdog_thread, args=(heartbeat,), daemon=True
-        )
+        t = threading.Thread(target=_watchdog_thread, args=(heartbeat,), daemon=True)
         assert t.daemon is True
