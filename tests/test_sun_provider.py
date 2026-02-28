@@ -1,10 +1,8 @@
 """Tests for the sun provider (sunrise/sunset/twilight calculation)."""
 
-from datetime import datetime, date, timezone
+from datetime import date, datetime, timezone
 
-import pytest
-
-from src.providers.sun import is_dark, get_sun_times
+from src.providers.sun import get_sun_times, is_dark
 
 
 class TestGetSunTimes:

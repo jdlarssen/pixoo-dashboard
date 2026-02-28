@@ -3,11 +3,8 @@
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from src.display.state import DisplayState
-from src.providers.bus import BusDeparture, fetch_departures, fetch_departures_safe
-
+from src.providers.bus import fetch_departures, fetch_departures_safe
 
 # --- Helpers ---
 

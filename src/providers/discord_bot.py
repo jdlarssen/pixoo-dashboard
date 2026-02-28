@@ -21,7 +21,8 @@ import random
 import re
 import threading
 import time
-from typing import TYPE_CHECKING, Any, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from src.providers.discord_monitor import HealthTracker
@@ -226,7 +227,10 @@ def _run_discord_bot_with_retry(
             )
             time.sleep(sleep_time)
             backoff = min(backoff * 2, 300)
-        except (discord.HTTPException, discord.GatewayNotFound, discord.ConnectionClosed, RuntimeError) as exc:
+        except (
+            discord.HTTPException, discord.GatewayNotFound,
+            discord.ConnectionClosed, RuntimeError,
+        ) as exc:
             retries += 1
             if retries >= max_retries:
                 logger.critical(
@@ -243,7 +247,10 @@ def _run_discord_bot_with_retry(
             time.sleep(sleep_time)
             backoff = min(backoff * 2, 300)
         except Exception as exc:
-            logger.critical("Discord bot hit unexpected error, not retrying: %s", exc, exc_info=True)
+            logger.critical(
+                "Discord bot hit unexpected error, not retrying: %s",
+                exc, exc_info=True,
+            )
             break
 
 
@@ -289,7 +296,10 @@ def start_discord_bot(
         try:
             monitor_id = int(monitor_channel_id)
         except ValueError:
-            logger.warning("DISCORD_MONITOR_CHANNEL_ID is not a valid integer: %r, ignoring", monitor_channel_id)
+            logger.warning(
+                "DISCORD_MONITOR_CHANNEL_ID is not a valid integer: %r, ignoring",
+                monitor_channel_id,
+            )
 
     bridge = MessageBridge()
     bot_dead_event = threading.Event()

@@ -7,11 +7,10 @@ to respect MET API terms of service.
 
 import logging
 import threading
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from zoneinfo import ZoneInfo
-
-import time
 
 import requests
 

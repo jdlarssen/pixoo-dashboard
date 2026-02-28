@@ -300,7 +300,10 @@ class CloudAnimation(WeatherAnimation):
         for cloud in self.far_clouds:
             x, y, w, h = int(cloud["x"]), cloud["y"], cloud["w"], cloud["h"]
             bg_draw.ellipse([x, y, x + w, y + h], fill=(150, 160, 180, 90))
-            bg_draw.ellipse([x + w // 3, y - 1, x + w + w // 3, y + h - 1], fill=(150, 160, 180, 70))
+            bg_draw.ellipse(
+                [x + w // 3, y - 1, x + w + w // 3, y + h - 1],
+                fill=(150, 160, 180, 70),
+            )
             cloud["x"] += cloud["speed"]
             if cloud["x"] > self.width:
                 cloud["x"] = float(-cloud["w"])
@@ -309,7 +312,10 @@ class CloudAnimation(WeatherAnimation):
         for cloud in self.near_clouds:
             x, y, w, h = int(cloud["x"]), cloud["y"], cloud["w"], cloud["h"]
             fg_draw.ellipse([x, y, x + w, y + h], fill=(190, 200, 220, 130))
-            fg_draw.ellipse([x + w // 3, y - 1, x + w + w // 3, y + h - 1], fill=(190, 200, 220, 100))
+            fg_draw.ellipse(
+                [x + w // 3, y - 1, x + w + w // 3, y + h - 1],
+                fill=(190, 200, 220, 100),
+            )
             cloud["x"] += cloud["speed"]
             if cloud["x"] > self.width:
                 cloud["x"] = float(-cloud["w"])
@@ -387,9 +393,15 @@ class SunAnimation(WeatherAnimation):
             ray[0] = random.uniform(self._FAN_MIN_DEG, self._FAN_MAX_DEG)
             ray[1] = 0.0
             is_far = base_alpha < 140
-            ray[2] = random.uniform(*SUN_FAR_RAY_SPEED) if is_far else random.uniform(*SUN_NEAR_RAY_SPEED)
-            ray[3] = random.uniform(*SUN_FAR_RAY_MAX_DIST) if is_far else random.uniform(*SUN_NEAR_RAY_MAX_DIST)
-            ray[4] = float(random.randint(*SUN_FAR_RAY_ALPHA) if is_far else random.randint(*SUN_NEAR_RAY_ALPHA))
+            far_speed = random.uniform(*SUN_FAR_RAY_SPEED)
+            near_speed = random.uniform(*SUN_NEAR_RAY_SPEED)
+            ray[2] = far_speed if is_far else near_speed
+            far_dist = random.uniform(*SUN_FAR_RAY_MAX_DIST)
+            near_dist = random.uniform(*SUN_NEAR_RAY_MAX_DIST)
+            ray[3] = far_dist if is_far else near_dist
+            far_alpha = random.randint(*SUN_FAR_RAY_ALPHA)
+            near_alpha = random.randint(*SUN_NEAR_RAY_ALPHA)
+            ray[4] = float(far_alpha if is_far else near_alpha)
             return
 
         # Distance-based alpha fade (ANIM-04)
@@ -489,7 +501,12 @@ class ThunderAnimation(WeatherAnimation):
             x, y = next_x, next_y
         return segments
 
-    def _draw_bolt(self, draw: ImageDraw.Draw, segments: list[tuple[int, int, int, int]], alpha: int) -> None:
+    def _draw_bolt(
+        self,
+        draw: ImageDraw.Draw,
+        segments: list[tuple[int, int, int, int]],
+        alpha: int,
+    ) -> None:
         """Draw a pre-generated lightning bolt."""
         color = (255, 255, 200, alpha)
         for x1, y1, x2, y2 in segments:
@@ -578,7 +595,10 @@ class FogAnimation(WeatherAnimation):
         y, w, h, alpha = blob["y"], blob["w"], blob["h"], blob["alpha"]
         base = (210, 220, 235) if bright else (180, 190, 200)
         draw.ellipse([x, y, x + w, y + h], fill=(*base, alpha))
-        draw.ellipse([x + w // 4, y - 1, x + w - w // 4, y + h - 2], fill=(*base, max(alpha - 25, 30)))
+        draw.ellipse(
+            [x + w // 4, y - 1, x + w - w // 4, y + h - 2],
+            fill=(*base, max(alpha - 25, 30)),
+        )
 
     def tick(self) -> tuple[Image.Image, Image.Image]:
         bg = self._empty()

@@ -98,7 +98,7 @@ class TestRenderFrame:
     def test_save_test_dashboard(self):
         """Save a test frame to /tmp for visual inspection."""
         frame = render_frame(TEST_STATE, FONTS)
-        output_path = Path("/tmp/test_dashboard.png")
+        output_path = Path("/tmp/test_dashboard.png")  # noqa: S108
         frame.save(output_path)
         assert output_path.exists(), "Failed to save test dashboard image"
 
@@ -209,7 +209,7 @@ class TestBusZoneRendering:
             bus_direction2=(3, 8, 18),
         )
         frame = render_frame(state, FONTS)
-        output_path = Path("/tmp/test_dashboard_bus.png")
+        output_path = Path("/tmp/test_dashboard_bus.png")  # noqa: S108
         frame.save(output_path)
         assert output_path.exists(), "Failed to save bus dashboard image"
 
@@ -376,7 +376,7 @@ class TestWeatherZoneRendering:
             weather_is_day=True,
         )
         frame = render_frame(state, FONTS)
-        output_path = Path("/tmp/test_dashboard_weather.png")
+        output_path = Path("/tmp/test_dashboard_weather.png")  # noqa: S108
         frame.save(output_path)
         assert output_path.exists(), "Failed to save weather dashboard image"
 
@@ -416,7 +416,7 @@ class TestStalenessIndicator:
         )
 
     def test_bus_staleness_dot_absent_when_too_old(self):
-        """No orange dot when bus_too_old=True (suppresses the dot -- shows dash placeholders instead)."""
+        """No orange dot when bus_too_old=True (suppresses dot)."""
         state = DisplayState(
             time_str="14:32",
             date_str="lor 21. mar",
@@ -430,7 +430,7 @@ class TestStalenessIndicator:
         )
 
     def test_weather_staleness_dot_renders_when_stale(self):
-        """Orange dot appears at (62, WEATHER_ZONE.y+1) when weather_stale=True and weather_too_old=False."""
+        """Orange dot at (62, WEATHER_ZONE.y+1) when stale."""
         state = DisplayState(
             time_str="14:32",
             date_str="lor 21. mar",
@@ -446,7 +446,8 @@ class TestStalenessIndicator:
         frame = render_frame(state, FONTS)
         pixel = frame.getpixel((62, WEATHER_ZONE.y + 1))
         assert pixel == COLOR_STALE_INDICATOR, (
-            f"Expected orange dot {COLOR_STALE_INDICATOR} at (62, {WEATHER_ZONE.y + 1}), got {pixel}"
+            f"Expected orange dot {COLOR_STALE_INDICATOR} "
+            f"at (62, {WEATHER_ZONE.y + 1}), got {pixel}"
         )
 
 

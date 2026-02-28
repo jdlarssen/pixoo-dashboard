@@ -10,10 +10,7 @@ import threading
 import time
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from src.main import (
-    DashboardState,
     Heartbeat,
     _precip_category,
     _reverse_geocode,
@@ -23,7 +20,6 @@ from src.main import (
     build_font_map,
 )
 from src.providers.weather import WeatherData
-
 
 # ---------------------------------------------------------------------------
 # _reverse_geocode() tests
@@ -759,14 +755,44 @@ class TestTestWeatherMode:
         expected_modes = ["clear", "rain", "snow", "fog", "cloudy", "sun", "thunder"]
         for mode in expected_modes:
             # Construct the WeatherData the same way main_loop does
+            _b = dict(
+                temperature=30, high_temp=32,
+                low_temp=22, is_day=True,
+            )
             data = {
-                "clear": WeatherData(temperature=30, symbol_code="clearsky_day", high_temp=32, low_temp=22, precipitation_mm=0.0, is_day=True, wind_speed=2.0, wind_from_direction=180.0),
-                "rain": WeatherData(temperature=30, symbol_code="rain_day", high_temp=32, low_temp=22, precipitation_mm=5.0, is_day=True, wind_speed=8.0, wind_from_direction=270.0),
-                "snow": WeatherData(temperature=30, symbol_code="snow_day", high_temp=32, low_temp=22, precipitation_mm=2.0, is_day=True, wind_speed=5.0, wind_from_direction=200.0),
-                "fog": WeatherData(temperature=30, symbol_code="fog", high_temp=32, low_temp=22, precipitation_mm=0.0, is_day=True),
-                "cloudy": WeatherData(temperature=30, symbol_code="cloudy", high_temp=32, low_temp=22, precipitation_mm=0.0, is_day=True),
-                "sun": WeatherData(temperature=30, symbol_code="clearsky_day", high_temp=32, low_temp=22, precipitation_mm=0.0, is_day=True),
-                "thunder": WeatherData(temperature=30, symbol_code="rainandthunder_day", high_temp=32, low_temp=22, precipitation_mm=8.0, is_day=True, wind_speed=12.0, wind_from_direction=250.0),
+                "clear": WeatherData(
+                    **_b, symbol_code="clearsky_day",
+                    precipitation_mm=0.0, wind_speed=2.0,
+                    wind_from_direction=180.0,
+                ),
+                "rain": WeatherData(
+                    **_b, symbol_code="rain_day",
+                    precipitation_mm=5.0, wind_speed=8.0,
+                    wind_from_direction=270.0,
+                ),
+                "snow": WeatherData(
+                    **_b, symbol_code="snow_day",
+                    precipitation_mm=2.0, wind_speed=5.0,
+                    wind_from_direction=200.0,
+                ),
+                "fog": WeatherData(
+                    **_b, symbol_code="fog",
+                    precipitation_mm=0.0,
+                ),
+                "cloudy": WeatherData(
+                    **_b, symbol_code="cloudy",
+                    precipitation_mm=0.0,
+                ),
+                "sun": WeatherData(
+                    **_b, symbol_code="clearsky_day",
+                    precipitation_mm=0.0,
+                ),
+                "thunder": WeatherData(
+                    **_b,
+                    symbol_code="rainandthunder_day",
+                    precipitation_mm=8.0, wind_speed=12.0,
+                    wind_from_direction=250.0,
+                ),
             }
             assert mode in data, f"Missing test weather mode: {mode}"
             assert isinstance(data[mode], WeatherData)

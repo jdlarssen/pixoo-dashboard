@@ -3,9 +3,9 @@
 from datetime import date, datetime
 from unittest.mock import MagicMock, patch
 
-import pytest
 import requests
 
+from src.display.state import DisplayState
 from src.providers.weather import (
     WeatherData,
     _parse_current,
@@ -14,8 +14,6 @@ from src.providers.weather import (
     fetch_weather,
     fetch_weather_safe,
 )
-from src.display.state import DisplayState
-
 
 # ---------------------------------------------------------------------------
 # Fixtures: mock MET API timeseries data
