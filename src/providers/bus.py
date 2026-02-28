@@ -189,7 +189,8 @@ def _safe_result(fut, timeout=12):
     """Return the future's result, or None on any failure/timeout."""
     try:
         return fut.result(timeout=timeout)
-    except Exception:
+    except Exception as exc:
+        logger.debug("Bus future failed or timed out: %s", exc)
         return None
 
 

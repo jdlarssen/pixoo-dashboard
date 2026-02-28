@@ -298,8 +298,10 @@ def _wrap_text(text: str, font, max_width: int) -> list[str]:
     max_lines = 3
     if len(lines) > max_lines:
         last_line = lines[max_lines - 1]
-        # Try to fit with ellipsis
-        while last_line:
+        # Try to fit with ellipsis (bounded to prevent runaway iteration)
+        for _ in range(200):
+            if not last_line:
+                break
             test = last_line + "..."
             bbox = font.getbbox(test)
             width = bbox[2] - bbox[0] if bbox else len(test) * 5

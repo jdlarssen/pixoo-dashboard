@@ -4,8 +4,10 @@ import ipaddress
 import logging
 import os
 import sys
+import threading
 from datetime import datetime
 from pathlib import Path
+from types import MappingProxyType
 
 from dotenv import load_dotenv
 
@@ -21,6 +23,7 @@ class Config:
     """
 
     _instance: "Config | None" = None
+    _lock = threading.Lock()
 
     def __init__(self) -> None:
         load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -61,15 +64,15 @@ class Config:
         self.DEVICE_ERROR_COOLDOWN_BASE = 3.0
         self.DEVICE_ERROR_COOLDOWN_MAX = 60.0
 
-        # --- Health tracker debounce ---
-        self.HEALTH_DEBOUNCE = {
-            "bus_api": {"failures_before_alert": 3, "repeat_interval": 900},
-            "weather_api": {"failures_before_alert": 2, "repeat_interval": 1800},
-            "device": {"failures_before_alert": 5, "repeat_interval": 300},
-        }
-        self.HEALTH_DEBOUNCE_DEFAULT = {
+        # --- Health tracker debounce (frozen to prevent accidental mutation) ---
+        self.HEALTH_DEBOUNCE = MappingProxyType({
+            "bus_api": MappingProxyType({"failures_before_alert": 3, "repeat_interval": 900}),
+            "weather_api": MappingProxyType({"failures_before_alert": 2, "repeat_interval": 1800}),
+            "device": MappingProxyType({"failures_before_alert": 5, "repeat_interval": 300}),
+        })
+        self.HEALTH_DEBOUNCE_DEFAULT = MappingProxyType({
             "failures_before_alert": 3, "repeat_interval": 600,
-        }
+        })
 
         # Bus departure settings (Entur JourneyPlanner v3 API)
         self.BUS_QUAY_DIRECTION1 = os.environ.get("BUS_QUAY_DIR1", "")
@@ -118,7 +121,9 @@ class Config:
     def get(cls) -> "Config":
         """Return the singleton Config instance, creating it on first access."""
         if cls._instance is None:
-            cls._instance = cls()
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = cls()
         return cls._instance
 
     @classmethod

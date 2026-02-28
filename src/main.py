@@ -588,15 +588,18 @@ def main() -> None:
             health_tracker.set_monitor(bridge)
             try:
                 bus_name1 = fetch_quay_name(BUS_QUAY_DIRECTION1)
-            except Exception:
+            except (OSError, ValueError, KeyError) as exc:
+                logger.warning("Failed to fetch quay name for dir1: %s", exc)
                 bus_name1 = None
             try:
                 bus_name2 = fetch_quay_name(BUS_QUAY_DIRECTION2)
-            except Exception:
+            except (OSError, ValueError, KeyError) as exc:
+                logger.warning("Failed to fetch quay name for dir2: %s", exc)
                 bus_name2 = None
             try:
                 weather_location = _reverse_geocode(WEATHER_LAT, WEATHER_LON)
-            except Exception:
+            except (OSError, ValueError, KeyError) as exc:
+                logger.warning("Failed to reverse geocode location: %s", exc)
                 weather_location = None
             bus_name1 = bus_name1 or f"Quay {BUS_QUAY_DIRECTION1}"
             bus_name2 = bus_name2 or f"Quay {BUS_QUAY_DIRECTION2}"
