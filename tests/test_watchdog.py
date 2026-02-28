@@ -4,7 +4,8 @@ import threading
 import time
 from unittest.mock import patch
 
-from src.main import Heartbeat, _watchdog_thread
+from src.watchdog import Heartbeat
+from src.watchdog import watchdog_thread as _watchdog_thread
 
 
 class TestWatchdog:
@@ -16,8 +17,8 @@ class TestWatchdog:
         exit_called = threading.Event()
 
         with (
-            patch("src.main.os._exit", side_effect=lambda code: exit_called.set()),
-            patch("src.main.os.kill"),
+            patch("src.watchdog.os._exit", side_effect=lambda code: exit_called.set()),
+            patch("src.watchdog.os.kill"),
         ):
             t = threading.Thread(target=_watchdog_thread, args=(heartbeat, 0.3), daemon=True)
             t.start()
@@ -44,9 +45,9 @@ class TestWatchdog:
             raise _WatchdogFired
 
         with (
-            patch("src.main.os._exit", side_effect=mock_exit),
-            patch("src.main.os.kill"),
-            patch("src.main.time.sleep", return_value=None),
+            patch("src.watchdog.os._exit", side_effect=mock_exit),
+            patch("src.watchdog.os.kill"),
+            patch("src.watchdog.time.sleep", return_value=None),
         ):
             try:
                 _watchdog_thread(heartbeat, timeout=0.1)

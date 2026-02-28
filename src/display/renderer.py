@@ -32,6 +32,7 @@ from src.display.layout import (
     urgency_color,
 )
 from src.display.state import DisplayState
+from src.display.text_utils import strip_non_latin1
 from src.display.weather_icons import get_weather_icon
 
 
@@ -247,22 +248,6 @@ def _render_message(
         )
 
 
-def _sanitize_for_font(text: str) -> str:
-    """Remove characters outside Latin-1 range that BDF fonts cannot render.
-
-    This is a defensive fallback -- primary sanitization happens in
-    MessageBridge.set_message(). This prevents UnicodeEncodeError if
-    non-Latin-1 text reaches the renderer through any code path.
-
-    Args:
-        text: Text that may contain non-Latin-1 characters.
-
-    Returns:
-        Text with only Latin-1 characters (code points 0-255).
-    """
-    return "".join(ch for ch in text if ord(ch) <= 255)
-
-
 def _wrap_text(text: str, font, max_width: int) -> list[str]:
     """Wrap text into lines that fit within max_width pixels.
 
@@ -274,7 +259,7 @@ def _wrap_text(text: str, font, max_width: int) -> list[str]:
     Returns:
         List of text lines, each fitting within max_width.
     """
-    text = _sanitize_for_font(text)
+    text = strip_non_latin1(text)
     words = text.split()
     if not words:
         return []

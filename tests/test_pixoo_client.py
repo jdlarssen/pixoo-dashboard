@@ -11,7 +11,7 @@ import pytest
 from PIL import Image
 from requests.exceptions import ConnectionError, ReadTimeout
 
-from src.device.pixoo_client import _ERROR_COOLDOWN_BASE, PixooClient
+from src.device.pixoo_client import _ERROR_COOLDOWN_BASE, PixooClient, PushResult
 
 
 @pytest.fixture
@@ -143,19 +143,19 @@ class TestPushFrameReturnValue:
     def test_returns_true_on_success(self, client, test_image):
         """Successful push returns True."""
         result = client.push_frame(test_image)
-        assert result is True
+        assert result is PushResult.SUCCESS
 
     def test_returns_false_on_network_error(self, client, test_image):
         """Network error during push returns False (not None)."""
         client._pixoo.push.side_effect = ReadTimeout("Read timed out")
         result = client.push_frame(test_image)
-        assert result is False
+        assert result is PushResult.ERROR
 
     def test_returns_false_on_oserror(self, client, test_image):
         """OSError (host down) returns False."""
         client._pixoo.push.side_effect = OSError("Host is down")
         result = client.push_frame(test_image)
-        assert result is False
+        assert result is PushResult.ERROR
 
     def test_returns_none_during_cooldown(self, client, test_image):
         """Cooldown skip returns None (not False)."""
@@ -163,7 +163,7 @@ class TestPushFrameReturnValue:
 
         client._error_until = time.monotonic() + 60
         result = client.push_frame(test_image)
-        assert result is None
+        assert result is PushResult.SKIPPED
 
     def test_returns_none_when_rate_limited(self, client, test_image):
         """Rate-limit skip returns None (not False)."""
@@ -171,25 +171,25 @@ class TestPushFrameReturnValue:
 
         client._last_push_time = time.monotonic()
         result = client.push_frame(test_image)
-        assert result is None
+        assert result is PushResult.SKIPPED
 
     def test_caller_can_distinguish_error_from_skip(self, client, test_image):
         """Callers can use 'is True/False/None' to route health tracking."""
 
         # Success case
         result = client.push_frame(test_image)
-        assert result is True
+        assert result is PushResult.SUCCESS
 
         # Error case
         client._last_push_time = 0.0
         client._error_until = 0.0
         client._pixoo.push.side_effect = ConnectionError("refused")
         result = client.push_frame(test_image)
-        assert result is False
+        assert result is PushResult.ERROR
 
         # Skip case (cooldown from the error above)
         result = client.push_frame(test_image)
-        assert result is None
+        assert result is PushResult.SKIPPED
 
 
 class TestSetBrightnessErrorHandling:
@@ -240,24 +240,24 @@ class TestPing:
     def test_ping_returns_true_on_success(self, client):
         """Successful ping returns True."""
         client._pixoo.validate_connection.return_value = True
-        assert client.ping() is True
+        assert client.ping() is PushResult.SUCCESS
 
     def test_ping_returns_false_on_network_error(self, client):
         """Network error during ping returns False."""
         client._pixoo.validate_connection.side_effect = ConnectionError("refused")
-        assert client.ping() is False
+        assert client.ping() is PushResult.ERROR
 
     def test_ping_returns_false_on_oserror(self, client):
         """OSError (host down) during ping returns False."""
         client._pixoo.validate_connection.side_effect = OSError("Host is down")
-        assert client.ping() is False
+        assert client.ping() is PushResult.ERROR
 
     def test_ping_returns_none_during_cooldown(self, client):
         """Ping is skipped during error cooldown."""
         import time
 
         client._error_until = time.monotonic() + 60
-        assert client.ping() is None
+        assert client.ping() is PushResult.SKIPPED
         client._pixoo.validate_connection.assert_not_called()
 
     def test_ping_sets_cooldown_on_failure(self, client):
@@ -359,7 +359,7 @@ class TestExponentialBackoff:
         client._last_push_time = 0.0
 
         result = client.push_frame(test_image)
-        assert result is True
+        assert result is PushResult.SUCCESS
         assert client._current_cooldown == _ERROR_COOLDOWN_BASE
 
     def test_ping_failure_also_increases_backoff(self, client):
@@ -377,7 +377,7 @@ class TestExponentialBackoff:
         client._pixoo.validate_connection.return_value = True
 
         result = client.ping()
-        assert result is True
+        assert result is PushResult.SUCCESS
         assert client._current_cooldown == _ERROR_COOLDOWN_BASE
 
     def test_backoff_shared_between_push_and_ping(self, client, test_image):

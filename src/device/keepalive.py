@@ -15,7 +15,7 @@ from src.config import (
     DEVICE_REBOOT_RECOVERY_WAIT,
     DEVICE_REBOOT_THRESHOLD,
 )
-from src.device.pixoo_client import PixooClient
+from src.device.pixoo_client import PixooClient, PushResult
 from src.providers.discord_monitor import HealthTracker
 
 logger = logging.getLogger(__name__)
@@ -84,11 +84,11 @@ class DeviceKeepAlive:
         time_since = now_mono - self.last_success_time
         if time_since >= DEVICE_PING_INTERVAL and self.last_success_time > 0:
             ping_result = client.ping()
-            if ping_result is True:
+            if ping_result is PushResult.SUCCESS:
                 self.record_success()
                 if health_tracker:
                     health_tracker.record_success("device")
-            elif ping_result is False:
+            elif ping_result is PushResult.ERROR:
                 self.record_failure()
                 if health_tracker:
                     health_tracker.record_failure("device", "Device ping failed")
