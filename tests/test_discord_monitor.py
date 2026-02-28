@@ -1,9 +1,9 @@
 """Tests for Discord monitoring module -- HealthTracker and embed builders."""
 
 import asyncio
-import time
 import threading
-from unittest.mock import AsyncMock, MagicMock, patch
+import time
+from unittest.mock import MagicMock, patch
 
 import discord
 import pytest
@@ -30,7 +30,10 @@ class TestEmbedBuilders:
 
     def test_error_embed_has_required_fields(self):
         """Error embed contains Component, Error Type, Failing For, Last Success fields."""
-        embed = error_embed("bus_api", "TimeoutError", "connect timed out", 120.0, "2026-02-24 10:00 UTC")
+        embed = error_embed(
+            "bus_api", "TimeoutError", "connect timed out",
+            120.0, "2026-02-24 10:00 UTC",
+        )
         field_names = [f.name for f in embed.fields]
         assert "Component" in field_names
         assert "Error Type" in field_names
@@ -39,7 +42,10 @@ class TestEmbedBuilders:
 
     def test_error_embed_field_values(self):
         """Error embed field values contain expected content."""
-        embed = error_embed("weather_api", "HTTPError", "503 Service Unavailable", 300.0, "2026-02-24 10:00 UTC")
+        embed = error_embed(
+            "weather_api", "HTTPError", "503 Service Unavailable",
+            300.0, "2026-02-24 10:00 UTC",
+        )
         fields = {f.name: f.value for f in embed.fields}
         assert fields["Component"] == "weather_api"
         assert fields["Error Type"] == "HTTPError"
@@ -122,7 +128,11 @@ class TestEmbedBuilders:
         """Status embed shows per-component status fields."""
         components = {
             "bus_api": {"status": "ok", "failure_count": 0, "last_success": "2026-02-24 10:00 UTC"},
-            "weather_api": {"status": "down", "failure_count": 5, "downtime_s": 300.0, "last_success": "2026-02-24 09:30 UTC"},
+            "weather_api": {
+                "status": "down", "failure_count": 5,
+                "downtime_s": 300.0,
+                "last_success": "2026-02-24 09:30 UTC",
+            },
         }
         embed = status_embed(components, 3600.0)
         field_names = [f.name for f in embed.fields]
@@ -138,7 +148,12 @@ class TestEmbedBuilders:
 
     def test_status_embed_down_component_shows_down(self):
         """Status embed shows DOWN with duration for failing components."""
-        components = {"device": {"status": "down", "failure_count": 10, "downtime_s": 120.0, "last_success": "ago"}}
+        components = {
+            "device": {
+                "status": "down", "failure_count": 10,
+                "downtime_s": 120.0, "last_success": "ago",
+            },
+        }
         embed = status_embed(components, 100.0)
         fields = {f.name: f.value for f in embed.fields}
         assert "DOWN" in fields["device"]

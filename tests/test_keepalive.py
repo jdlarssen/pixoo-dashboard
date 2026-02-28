@@ -9,9 +9,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from PIL import Image
-from requests.exceptions import ConnectionError, ReadTimeout
+from requests.exceptions import ConnectionError
 
-from src.device.pixoo_client import PixooClient, _ERROR_COOLDOWN_BASE
+from src.device.pixoo_client import _ERROR_COOLDOWN_BASE, PixooClient
 
 
 @pytest.fixture

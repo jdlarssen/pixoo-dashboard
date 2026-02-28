@@ -74,13 +74,15 @@ class DeviceKeepAlive:
                     DEVICE_REBOOT_RECOVERY_WAIT,
                 )
             else:
-                logger.warning("Reboot command failed, backing off for %ds", DEVICE_REBOOT_RECOVERY_WAIT * 2)
+                wait = DEVICE_REBOOT_RECOVERY_WAIT * 2
+                logger.warning("Reboot command failed, backing off for %ds", wait)
                 self._reboot_wait_until = time.monotonic() + DEVICE_REBOOT_RECOVERY_WAIT * 2
             self.consecutive_failures = 0
             return
 
         # Keep-alive ping when no recent device success
-        if (now_mono - self.last_success_time) >= DEVICE_PING_INTERVAL and self.last_success_time > 0:
+        time_since = now_mono - self.last_success_time
+        if time_since >= DEVICE_PING_INTERVAL and self.last_success_time > 0:
             ping_result = client.ping()
             if ping_result is True:
                 self.record_success()

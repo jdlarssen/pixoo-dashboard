@@ -174,7 +174,10 @@ class PixooClient:
         except (RequestException, OSError) as exc:
             logger.warning("Device communication error during push_frame: %s", exc)
             self._error_until = time.monotonic() + self._current_cooldown
-            logger.info("Device cooldown: pausing pushes for %.0fs (backoff)", self._current_cooldown)
+            logger.info(
+                "Device cooldown: pausing pushes for %.0fs (backoff)",
+                self._current_cooldown,
+            )
             self._current_cooldown = min(self._current_cooldown * 2, _ERROR_COOLDOWN_MAX)
             return False
         self._current_cooldown = _ERROR_COOLDOWN_BASE

@@ -19,7 +19,7 @@ def test_load_fonts_returns_expected_keys():
 def test_fonts_render_time_digits():
     """Each font can render the string '14:32' without error."""
     fonts = load_fonts(FONT_DIR)
-    for name, font in fonts.items():
+    for _name, font in fonts.items():
         img = Image.new("RGB", (64, 64), color=(0, 0, 0))
         draw = ImageDraw.Draw(img)
         draw.text((2, 2), "14:32", font=font, fill=(255, 255, 255))
@@ -50,7 +50,7 @@ def test_norwegian_characters_render_visible_pixels():
             draw.text((2, 2), test_str, font=font, fill=(255, 255, 255))
 
             # Check that at least some pixels are non-black
-            pixels = list(img.get_flattened_data())
+            pixels = list(img.getdata())
             non_black = [p for p in pixels if p != (0, 0, 0)]
             assert len(non_black) > 0, (
                 f"Font '{name}' rendered '{test_str}' as all black pixels -- "
@@ -88,6 +88,6 @@ def test_save_norwegian_test_image():
     # All special chars together
     draw.text((2, y), "\u00e6\u00f8\u00e5\u00c6\u00d8\u00c5", font=font_small, fill=(255, 255, 100))
 
-    output_path = Path("/tmp/font_test.png")
+    output_path = Path("/tmp/font_test.png")  # noqa: S108
     img.save(output_path)
     assert output_path.exists()

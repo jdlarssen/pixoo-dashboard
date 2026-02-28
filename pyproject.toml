@@ -5,7 +5,7 @@ description = "Always-on Pixoo 64 dashboard: clock, bus departures, and weather 
 requires-python = ">=3.10"
 dependencies = [
     "pixoo>=0.5,<1.0",
-    "Pillow>=12.1.0,<14",
+    "Pillow>=10.0,<14",
     "python-dotenv>=1.0,<2",
     "astral>=3.2,<4",
     "requests>=2.28,<3",

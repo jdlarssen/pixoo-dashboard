@@ -11,7 +11,7 @@ import pytest
 from PIL import Image
 from requests.exceptions import ConnectionError, ReadTimeout
 
-from src.device.pixoo_client import PixooClient, _ERROR_COOLDOWN_BASE, _ERROR_COOLDOWN_MAX
+from src.device.pixoo_client import _ERROR_COOLDOWN_BASE, PixooClient
 
 
 @pytest.fixture
@@ -175,7 +175,6 @@ class TestPushFrameReturnValue:
 
     def test_caller_can_distinguish_error_from_skip(self, client, test_image):
         """Callers can use 'is True/False/None' to route health tracking."""
-        import time
 
         # Success case
         result = client.push_frame(test_image)

@@ -52,7 +52,12 @@ from src.display.weather_anim import WeatherAnimation, get_animation
 from src.display.weather_icons import symbol_to_group
 from src.providers.bus import fetch_bus_data, fetch_quay_name
 from src.providers.discord_bot import MessageBridge, start_discord_bot
-from src.providers.discord_monitor import HealthTracker, MonitorBridge, startup_embed, shutdown_embed
+from src.providers.discord_monitor import (
+    HealthTracker,
+    MonitorBridge,
+    shutdown_embed,
+    startup_embed,
+)
 from src.providers.sun import is_dark
 from src.providers.weather import WeatherData, fetch_weather_safe
 from src.staleness import StalenessTracker
@@ -427,14 +432,40 @@ def main_loop(
     # --- TEST MODE: hardcode weather for visual testing ---
     # Set TEST_WEATHER env var to: clear, rain, snow, fog (cycles on restart)
     test_weather_mode = os.environ.get("TEST_WEATHER")
+    _base = dict(temperature=30, high_temp=32, low_temp=22, is_day=True)
     test_weather_map = {
-        "clear": WeatherData(temperature=30, symbol_code="clearsky_day", high_temp=32, low_temp=22, precipitation_mm=0.0, is_day=True, wind_speed=2.0, wind_from_direction=180.0),
-        "rain": WeatherData(temperature=30, symbol_code="rain_day", high_temp=32, low_temp=22, precipitation_mm=5.0, is_day=True, wind_speed=8.0, wind_from_direction=270.0),
-        "snow": WeatherData(temperature=30, symbol_code="snow_day", high_temp=32, low_temp=22, precipitation_mm=2.0, is_day=True, wind_speed=5.0, wind_from_direction=200.0),
-        "fog": WeatherData(temperature=30, symbol_code="fog", high_temp=32, low_temp=22, precipitation_mm=0.0, is_day=True),
-        "cloudy": WeatherData(temperature=30, symbol_code="cloudy", high_temp=32, low_temp=22, precipitation_mm=0.0, is_day=True),
-        "sun": WeatherData(temperature=30, symbol_code="clearsky_day", high_temp=32, low_temp=22, precipitation_mm=0.0, is_day=True),
-        "thunder": WeatherData(temperature=30, symbol_code="rainandthunder_day", high_temp=32, low_temp=22, precipitation_mm=8.0, is_day=True, wind_speed=12.0, wind_from_direction=250.0),
+        "clear": WeatherData(
+            **_base, symbol_code="clearsky_day",
+            precipitation_mm=0.0, wind_speed=2.0,
+            wind_from_direction=180.0,
+        ),
+        "rain": WeatherData(
+            **_base, symbol_code="rain_day",
+            precipitation_mm=5.0, wind_speed=8.0,
+            wind_from_direction=270.0,
+        ),
+        "snow": WeatherData(
+            **_base, symbol_code="snow_day",
+            precipitation_mm=2.0, wind_speed=5.0,
+            wind_from_direction=200.0,
+        ),
+        "fog": WeatherData(
+            **_base, symbol_code="fog",
+            precipitation_mm=0.0,
+        ),
+        "cloudy": WeatherData(
+            **_base, symbol_code="cloudy",
+            precipitation_mm=0.0,
+        ),
+        "sun": WeatherData(
+            **_base, symbol_code="clearsky_day",
+            precipitation_mm=0.0,
+        ),
+        "thunder": WeatherData(
+            **_base, symbol_code="rainandthunder_day",
+            precipitation_mm=8.0, wind_speed=12.0,
+            wind_from_direction=250.0,
+        ),
     }
     if test_weather_mode:
         logger.info("TEST MODE: weather=%s, temp=30\u00b0C, daytime", test_weather_mode)
@@ -522,7 +553,11 @@ def main_loop(
                 if health_tracker:
                     health_tracker.record_success("device")
                 if state_changed:
-                    logger.info("Pushed frame: %s %s", current_state.time_str, current_state.date_str)
+                    logger.info(
+                        "Pushed frame: %s %s",
+                        current_state.time_str,
+                        current_state.date_str,
+                    )
             elif push_result is False:
                 keepalive.record_failure()
                 if health_tracker:
@@ -616,9 +651,15 @@ def main() -> None:
                     weather_location=weather_location,
                 )
                 if bridge.send_embed(embed):
-                    logger.info("Monitoring active -- startup embed sent to channel %s", DISCORD_MONITOR_CHANNEL_ID)
+                    logger.info(
+                        "Monitoring active -- startup embed sent to channel %s",
+                        DISCORD_MONITOR_CHANNEL_ID,
+                    )
                 else:
-                    logger.warning("Monitoring active -- startup embed failed for channel %s", DISCORD_MONITOR_CHANNEL_ID)
+                    logger.warning(
+                        "Monitoring active -- startup embed failed for channel %s",
+                        DISCORD_MONITOR_CHANNEL_ID,
+                    )
             except (OSError, ValueError) as exc:
                 logger.warning("Failed to send startup embed: %s", exc)
 
