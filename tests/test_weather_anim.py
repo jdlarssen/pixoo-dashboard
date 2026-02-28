@@ -42,8 +42,8 @@ def _sample_particle_rgb(anim, num_ticks=5):
     for _ in range(num_ticks):
         bg, fg = anim.tick()
         for layer in (bg, fg):
-            # getdata() on RGBA returns tuples of (R, G, B, A)
-            for pixel in layer.getdata():
+            # get_flattened_data() on RGBA returns tuples of (R, G, B, A)
+            for pixel in layer.get_flattened_data():
                 r, g, b, a = pixel
                 if a > 0:
                     colors.append((r, g, b))
@@ -77,7 +77,7 @@ class TestAnimationVisibility:
     def _max_alpha_in_frame(self, frame: Image.Image) -> int:
         """Return the maximum alpha value found in an RGBA frame."""
         alpha_band = frame.split()[3]
-        return max(alpha_band.getdata())
+        return max(alpha_band.get_flattened_data())
 
     def _max_alpha_in_layers(self, layers: tuple[Image.Image, Image.Image]) -> int:
         """Return the maximum alpha across both bg and fg layers."""
@@ -86,7 +86,7 @@ class TestAnimationVisibility:
     def _count_non_transparent_pixels(self, frame: Image.Image) -> int:
         """Count pixels with alpha > 0."""
         alpha_band = frame.split()[3]
-        return sum(1 for a in alpha_band.getdata() if a > 0)
+        return sum(1 for a in alpha_band.get_flattened_data() if a > 0)
 
     def _count_non_transparent_in_layers(self, layers: tuple[Image.Image, Image.Image]) -> int:
         """Count non-transparent pixels across both layers."""
@@ -350,7 +350,7 @@ class TestNightAnimations:
             bg, fg = anim.tick()
             for layer in (bg, fg):
                 alpha_band = layer.split()[3]
-                for a in alpha_band.getdata():
+                for a in alpha_band.get_flattened_data():
                     if a > 0:
                         total_pixels += 1
                     max_alpha = max(max_alpha, a)
@@ -427,7 +427,7 @@ class TestStarRandomness:
             visible_count = 0
             for layer in (bg, fg):
                 alpha_band = layer.split()[3]
-                for a in alpha_band.getdata():
+                for a in alpha_band.get_flattened_data():
                     if a > 0:
                         visible_count += 1
             # Total star count: 14 far + 6 near = 20 stars
@@ -579,11 +579,11 @@ class TestRainIntensity:
             bg, fg = light.tick()
             for layer in (bg, fg):
                 alpha_band = layer.split()[3]
-                light_pixels += sum(1 for a in alpha_band.getdata() if a > 0)
+                light_pixels += sum(1 for a in alpha_band.get_flattened_data() if a > 0)
             bg, fg = heavy.tick()
             for layer in (bg, fg):
                 alpha_band = layer.split()[3]
-                heavy_pixels += sum(1 for a in alpha_band.getdata() if a > 0)
+                heavy_pixels += sum(1 for a in alpha_band.get_flattened_data() if a > 0)
         assert heavy_pixels > light_pixels, (
             f"Heavy rain ({heavy_pixels} pixels) should have "
             f"more coverage than light ({light_pixels})"
@@ -760,8 +760,8 @@ class TestCompositeAnimation:
         comp = CompositeAnimation([rain, fog])
         for _ in range(5):
             bg, fg = comp.tick()
-        bg_pixels = sum(1 for a in bg.split()[3].getdata() if a > 0)
-        fg_pixels = sum(1 for a in fg.split()[3].getdata() if a > 0)
+        bg_pixels = sum(1 for a in bg.split()[3].get_flattened_data() if a > 0)
+        fg_pixels = sum(1 for a in fg.split()[3].get_flattened_data() if a > 0)
         assert bg_pixels > 0
         assert fg_pixels > 0
 
@@ -778,7 +778,7 @@ class TestCompositeAnimation:
     def test_empty_animations_returns_empty_layers(self):
         comp = CompositeAnimation([])
         bg, fg = comp.tick()
-        assert max(bg.split()[3].getdata()) == 0
+        assert max(bg.split()[3].get_flattened_data()) == 0
 
 
 class TestWindEffect:

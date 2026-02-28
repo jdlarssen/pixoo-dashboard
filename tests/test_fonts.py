@@ -50,7 +50,7 @@ def test_norwegian_characters_render_visible_pixels():
             draw.text((2, 2), test_str, font=font, fill=(255, 255, 255))
 
             # Check that at least some pixels are non-black
-            pixels = list(img.getdata())
+            pixels = list(img.get_flattened_data())
             non_black = [p for p in pixels if p != (0, 0, 0)]
             assert len(non_black) > 0, (
                 f"Font '{name}' rendered '{test_str}' as all black pixels -- "
