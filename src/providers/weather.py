@@ -75,13 +75,13 @@ _default_cache = WeatherCache()
 class WeatherData:
     """Current weather conditions from MET Locationforecast 2.0."""
 
-    temperature: float       # current temp in Celsius
-    symbol_code: str         # MET symbol code, e.g. "partlycloudy_day"
-    high_temp: float         # today's forecast high
-    low_temp: float          # today's forecast low
+    temperature: float  # current temp in Celsius
+    symbol_code: str  # MET symbol code, e.g. "partlycloudy_day"
+    high_temp: float  # today's forecast high
+    low_temp: float  # today's forecast low
     precipitation_mm: float  # next 1h precipitation amount in mm
-    is_day: bool             # derived from symbol_code suffix
-    wind_speed: float = 0.0           # wind speed in m/s
+    is_day: bool  # derived from symbol_code suffix
+    wind_speed: float = 0.0  # wind speed in m/s
     wind_from_direction: float = 0.0  # meteorological wind direction in degrees
 
 
@@ -115,9 +115,7 @@ def _parse_current(timeseries: list[dict]) -> dict:
     instant = entry.get("data", {}).get("instant", {}).get("details", {})
     temp = instant.get("air_temperature")
     if temp is None:
-        raise ValueError(
-            "Missing 'air_temperature' in weather response instant details"
-        )
+        raise ValueError("Missing 'air_temperature' in weather response instant details")
 
     next_1h = entry.get("data", {}).get("next_1_hours", {})
     symbol_code = next_1h.get("summary", {}).get("symbol_code", "cloudy")
@@ -151,12 +149,7 @@ def _parse_high_low(timeseries: list[dict]) -> tuple[float, float]:
         time_val = entry.get("time", "")
         if not time_val.startswith(today_str):
             continue
-        temp = (
-            entry.get("data", {})
-            .get("instant", {})
-            .get("details", {})
-            .get("air_temperature")
-        )
+        temp = entry.get("data", {}).get("instant", {}).get("details", {}).get("air_temperature")
         if temp is None:
             logger.warning(
                 "Skipping timeseries entry at %s: missing air_temperature",
@@ -177,9 +170,7 @@ def _parse_high_low(timeseries: list[dict]) -> tuple[float, float]:
         return (high, low)
 
     # Last resort: use current temperature as both high and low
-    current_temp = (
-        first.get("instant", {}).get("details", {}).get("air_temperature")
-    )
+    current_temp = first.get("instant", {}).get("details", {}).get("air_temperature")
     if current_temp is not None:
         return (current_temp, current_temp)
 
@@ -187,7 +178,9 @@ def _parse_high_low(timeseries: list[dict]) -> tuple[float, float]:
 
 
 def fetch_weather(
-    lat: float, lon: float, cache: WeatherCache | None = None,
+    lat: float,
+    lon: float,
+    cache: WeatherCache | None = None,
 ) -> WeatherData | None:
     """Fetch current weather from MET Locationforecast 2.0.
 

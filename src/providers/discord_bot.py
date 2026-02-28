@@ -163,9 +163,7 @@ def run_discord_bot(
                 try:
                     from src.providers.discord_monitor import status_embed
 
-                    embed = status_embed(
-                        health_tracker.get_status(), health_tracker.uptime_s
-                    )
+                    embed = status_embed(health_tracker.get_status(), health_tracker.uptime_s)
                     await message.channel.send(embed=embed)
                 except discord.HTTPException:
                     logger.warning("Failed to send status embed")
@@ -215,41 +213,48 @@ def _run_discord_bot_with_retry(
         except (OSError, ConnectionError) as exc:
             retries += 1
             if retries >= max_retries:
-                logger.critical(
-                    "Discord bot failed %d times, giving up: %s", retries, exc
-                )
+                logger.critical("Discord bot failed %d times, giving up: %s", retries, exc)
                 break
             jitter = random.uniform(0, backoff * 0.3)
             sleep_time = backoff + jitter
             logger.warning(
                 "Discord bot crashed, retrying in %.0fs (attempt %d/%d)",
-                sleep_time, retries, max_retries,
+                sleep_time,
+                retries,
+                max_retries,
             )
             time.sleep(sleep_time)
             backoff = min(backoff * 2, 300)
         except (
-            discord.HTTPException, discord.GatewayNotFound,
-            discord.ConnectionClosed, RuntimeError,
+            discord.HTTPException,
+            discord.GatewayNotFound,
+            discord.ConnectionClosed,
+            RuntimeError,
         ) as exc:
             retries += 1
             if retries >= max_retries:
                 logger.critical(
                     "Discord bot failed %d times with retryable error, giving up: %s",
-                    retries, exc,
+                    retries,
+                    exc,
                 )
                 break
             jitter = random.uniform(0, backoff * 0.3)
             sleep_time = backoff + jitter
             logger.warning(
                 "Discord bot crashed (%s), retrying in %.0fs (attempt %d/%d)",
-                exc, sleep_time, retries, max_retries,
+                exc,
+                sleep_time,
+                retries,
+                max_retries,
             )
             time.sleep(sleep_time)
             backoff = min(backoff * 2, 300)
         except Exception as exc:
             logger.critical(
                 "Discord bot hit unexpected error, not retrying: %s",
-                exc, exc_info=True,
+                exc,
+                exc_info=True,
             )
             break
 

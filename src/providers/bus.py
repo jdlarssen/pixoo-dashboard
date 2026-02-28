@@ -59,9 +59,7 @@ class BusDeparture:
     line: str  # e.g., "4" (public line code)
 
 
-def fetch_departures(
-    quay_id: str, num_departures: int = 2
-) -> list[BusDeparture]:
+def fetch_departures(quay_id: str, num_departures: int = 2) -> list[BusDeparture]:
     """Fetch upcoming departures from a specific quay.
 
     Args:
@@ -125,9 +123,7 @@ def fetch_departures(
     return departures[:num_departures]
 
 
-def fetch_departures_safe(
-    quay_id: str, num_departures: int = 2
-) -> list[int] | None:
+def fetch_departures_safe(quay_id: str, num_departures: int = 2) -> list[int] | None:
     """Fetch departures, returning countdown minutes or None on failure.
 
     Wraps fetch_departures() with error handling so API failures never

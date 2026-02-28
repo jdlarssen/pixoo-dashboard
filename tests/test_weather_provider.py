@@ -19,10 +19,17 @@ from src.providers.weather import (
 # Fixtures: mock MET API timeseries data
 # ---------------------------------------------------------------------------
 
-def _make_entry(time_str: str, temp: float, symbol: str = "cloudy",
-                precip: float = 0.0, high6h: float | None = None,
-                low6h: float | None = None,
-                wind_speed: float = 3.0, wind_direction: float = 180.0) -> dict:
+
+def _make_entry(
+    time_str: str,
+    temp: float,
+    symbol: str = "cloudy",
+    precip: float = 0.0,
+    high6h: float | None = None,
+    low6h: float | None = None,
+    wind_speed: float = 3.0,
+    wind_direction: float = 180.0,
+) -> dict:
     """Build a single MET API timeseries entry for testing."""
     entry: dict = {
         "time": time_str,
@@ -58,6 +65,7 @@ def _today_str() -> str:
 # Tests: _parse_is_day
 # ---------------------------------------------------------------------------
 
+
 class TestParseIsDay:
     def test_day_suffix(self):
         assert _parse_is_day("clearsky_day") is True
@@ -78,6 +86,7 @@ class TestParseIsDay:
 # ---------------------------------------------------------------------------
 # Tests: _parse_current
 # ---------------------------------------------------------------------------
+
 
 class TestParseCurrent:
     def test_basic_parse(self):
@@ -110,6 +119,7 @@ class TestParseCurrent:
 # ---------------------------------------------------------------------------
 # Tests: _parse_high_low
 # ---------------------------------------------------------------------------
+
 
 class TestParseHighLow:
     def test_multiple_today_entries(self):
@@ -154,6 +164,7 @@ class TestParseHighLow:
 # Tests: fetch_weather_safe
 # ---------------------------------------------------------------------------
 
+
 class TestFetchWeatherSafe:
     @patch("src.providers.weather.requests.get")
     def test_returns_none_on_network_error(self, mock_get):
@@ -174,6 +185,7 @@ class TestFetchWeatherSafe:
 # ---------------------------------------------------------------------------
 # Tests: If-Modified-Since caching
 # ---------------------------------------------------------------------------
+
 
 class TestCaching:
     @patch("src.providers.weather.requests.get")
@@ -233,6 +245,7 @@ class TestCaching:
 # Tests: DisplayState weather integration
 # ---------------------------------------------------------------------------
 
+
 class TestDisplayStateWeather:
     def test_default_weather_fields(self):
         """Weather fields default to None/True when no data provided."""
@@ -263,16 +276,20 @@ class TestDisplayStateWeather:
         state = DisplayState.from_now(dt, weather_data=wd)
         assert state.weather_temp == 6  # rounded
         assert state.weather_symbol == "partlycloudy_day"
-        assert state.weather_high == 8   # rounded
-        assert state.weather_low == 1    # rounded
+        assert state.weather_high == 8  # rounded
+        assert state.weather_low == 1  # rounded
         assert state.weather_precip_mm == 0.5
         assert state.weather_is_day is True
 
     def test_equality_with_weather(self):
         """DisplayState equality works with weather fields (dirty flag)."""
         wd = WeatherData(
-            temperature=5.0, symbol_code="rain", high_temp=8.0,
-            low_temp=1.0, precipitation_mm=1.0, is_day=True,
+            temperature=5.0,
+            symbol_code="rain",
+            high_temp=8.0,
+            low_temp=1.0,
+            precipitation_mm=1.0,
+            is_day=True,
         )
         dt = datetime(2026, 2, 20, 14, 30)
         s1 = DisplayState.from_now(dt, weather_data=wd)
@@ -283,12 +300,20 @@ class TestDisplayStateWeather:
         """Different temperatures produce different states."""
         dt = datetime(2026, 2, 20, 14, 30)
         wd1 = WeatherData(
-            temperature=5.0, symbol_code="rain", high_temp=8.0,
-            low_temp=1.0, precipitation_mm=1.0, is_day=True,
+            temperature=5.0,
+            symbol_code="rain",
+            high_temp=8.0,
+            low_temp=1.0,
+            precipitation_mm=1.0,
+            is_day=True,
         )
         wd2 = WeatherData(
-            temperature=6.0, symbol_code="rain", high_temp=8.0,
-            low_temp=1.0, precipitation_mm=1.0, is_day=True,
+            temperature=6.0,
+            symbol_code="rain",
+            high_temp=8.0,
+            low_temp=1.0,
+            precipitation_mm=1.0,
+            is_day=True,
         )
         s1 = DisplayState.from_now(dt, weather_data=wd1)
         s2 = DisplayState.from_now(dt, weather_data=wd2)
@@ -297,13 +322,17 @@ class TestDisplayStateWeather:
     def test_negative_temp_rounds_correctly(self):
         dt = datetime(2026, 2, 20, 14, 30)
         wd = WeatherData(
-            temperature=-3.7, symbol_code="snow_night", high_temp=-1.2,
-            low_temp=-5.8, precipitation_mm=0.0, is_day=False,
+            temperature=-3.7,
+            symbol_code="snow_night",
+            high_temp=-1.2,
+            low_temp=-5.8,
+            precipitation_mm=0.0,
+            is_day=False,
         )
         state = DisplayState.from_now(dt, weather_data=wd)
         assert state.weather_temp == -4  # round(-3.7) = -4
         assert state.weather_high == -1  # round(-1.2) = -1
-        assert state.weather_low == -6   # round(-5.8) = -6
+        assert state.weather_low == -6  # round(-5.8) = -6
         assert state.weather_is_day is False
 
 
@@ -311,19 +340,33 @@ class TestDisplayStateWeather:
 # Tests: Wind data extraction
 # ---------------------------------------------------------------------------
 
+
 class TestWindData:
     def test_parse_current_includes_wind(self):
-        ts = [_make_entry(f"{_today_str()}T12:00:00Z", 5.0, "rain_day", 2.0,
-                          wind_speed=8.5, wind_direction=270.0)]
+        ts = [
+            _make_entry(
+                f"{_today_str()}T12:00:00Z",
+                5.0,
+                "rain_day",
+                2.0,
+                wind_speed=8.5,
+                wind_direction=270.0,
+            )
+        ]
         result = _parse_current(ts)
         assert result["wind_speed"] == 8.5
         assert result["wind_from_direction"] == 270.0
 
     def test_weather_data_has_wind_fields(self):
         wd = WeatherData(
-            temperature=5.0, symbol_code="rain_day", high_temp=8.0,
-            low_temp=1.0, precipitation_mm=2.0, is_day=True,
-            wind_speed=8.5, wind_from_direction=270.0,
+            temperature=5.0,
+            symbol_code="rain_day",
+            high_temp=8.0,
+            low_temp=1.0,
+            precipitation_mm=2.0,
+            is_day=True,
+            wind_speed=8.5,
+            wind_from_direction=270.0,
         )
         assert wd.wind_speed == 8.5
         assert wd.wind_from_direction == 270.0
@@ -331,8 +374,12 @@ class TestWindData:
     def test_wind_defaults_to_zero(self):
         """Wind fields should default to 0 when not provided."""
         wd = WeatherData(
-            temperature=5.0, symbol_code="rain", high_temp=8.0,
-            low_temp=1.0, precipitation_mm=0.0, is_day=True,
+            temperature=5.0,
+            symbol_code="rain",
+            high_temp=8.0,
+            low_temp=1.0,
+            precipitation_mm=0.0,
+            is_day=True,
         )
         assert wd.wind_speed == 0.0
         assert wd.wind_from_direction == 0.0

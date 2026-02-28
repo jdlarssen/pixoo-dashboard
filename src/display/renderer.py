@@ -358,9 +358,9 @@ def _draw_birthday_sparkles(draw: ImageDraw.ImageDraw, date_str: str) -> None:
     """
     h = int(hashlib.md5(date_str.encode()).hexdigest(), 16)
     sparkle_positions = [
-        (abs(h) % 20 + 35, 0),        # top area, right of center
-        (abs(h >> 4) % 15 + 2, 10),    # bottom of clock zone
-        (abs(h >> 8) % 25 + 35, 18),   # near divider 1
+        (abs(h) % 20 + 35, 0),  # top area, right of center
+        (abs(h >> 4) % 15 + 2, 10),  # bottom of clock zone
+        (abs(h >> 8) % 25 + 35, 18),  # near divider 1
     ]
     for x, y in sparkle_positions:
         if 0 <= x < 64 and 0 <= y < 64:

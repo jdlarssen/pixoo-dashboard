@@ -33,10 +33,10 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 COLORS = {
-    "error": 0xFF0000,      # Red -- problems
-    "recovery": 0x00FF00,   # Green -- recovered
-    "startup": 0x3498DB,    # Blue -- lifecycle info
-    "shutdown": 0x95A5A6,   # Gray -- lifecycle info
+    "error": 0xFF0000,  # Red -- problems
+    "recovery": 0x00FF00,  # Green -- recovered
+    "startup": 0x3498DB,  # Blue -- lifecycle info
+    "shutdown": 0x95A5A6,  # Gray -- lifecycle info
 }
 
 # ---------------------------------------------------------------------------
@@ -272,9 +272,7 @@ class MonitorBridge:
         try:
             channel = self._client.get_channel(self._channel_id)
             if channel is None:
-                logger.warning(
-                    "Monitor channel %d not found in cache", self._channel_id
-                )
+                logger.warning("Monitor channel %d not found in cache", self._channel_id)
                 return False
             coro = channel.send(embed=embed)
 
@@ -393,9 +391,7 @@ class HealthTracker:
                 self._components[component] = ComponentState(
                     name=component,
                     last_success_time=time.monotonic(),
-                    last_success_str=datetime.now(timezone.utc).strftime(
-                        "%Y-%m-%d %H:%M UTC"
-                    ),
+                    last_success_str=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
                 )
                 return
 
@@ -411,18 +407,14 @@ class HealthTracker:
             state.is_alerting = False
             state.first_failure_time = 0.0
             state.last_success_time = time.monotonic()
-            state.last_success_str = datetime.now(timezone.utc).strftime(
-                "%Y-%m-%d %H:%M UTC"
-            )
+            state.last_success_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
         # Send embed outside the lock to avoid deadlocks
         if embed_to_send is not None:
             try:
                 monitor.send_embed(embed_to_send)
             except (OSError, RuntimeError) as exc:
-                logger.warning(
-                    "Failed to send recovery embed for %s: %s", component, exc
-                )
+                logger.warning("Failed to send recovery embed for %s: %s", component, exc)
 
     def record_failure(self, component: str, error_info: str) -> None:
         """Record a failed operation for a component.
@@ -466,9 +458,7 @@ class HealthTracker:
                 if self._monitor is not None:
                     embed_to_send = error_embed(
                         component=component,
-                        error_type=error_info.split(":")[0]
-                        if ":" in error_info
-                        else error_info,
+                        error_type=error_info.split(":")[0] if ":" in error_info else error_info,
                         detail=error_info,
                         duration_s=duration,
                         last_success_str=state.last_success_str,
@@ -482,9 +472,7 @@ class HealthTracker:
             try:
                 monitor.send_embed(embed_to_send)
             except (OSError, RuntimeError) as exc:
-                logger.warning(
-                    "Failed to send error embed for %s: %s", component, exc
-                )
+                logger.warning("Failed to send error embed for %s: %s", component, exc)
 
     def get_status(self) -> dict[str, dict]:
         """Get per-component health status for the status command.

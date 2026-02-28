@@ -70,6 +70,7 @@ def _patch_requests_post(original_post):
     a timeout to any POST that targets an RFC 1918 private IP address.
     Non-device calls (e.g., to external APIs) are left untouched.
     """
+
     @functools.wraps(original_post)
     def _post_with_timeout(*args, **kwargs):
         url = args[0] if args else kwargs.get("url", "")
@@ -77,6 +78,7 @@ def _patch_requests_post(original_post):
         if "timeout" not in kwargs and _is_local_device_url(url):
             kwargs["timeout"] = _DEVICE_TIMEOUT
         return original_post(*args, **kwargs)
+
     return _post_with_timeout
 
 
@@ -104,6 +106,7 @@ class PixooClient:
         # Patch requests.post on the pixoo module only (not globally) so that
         # device HTTP calls from the pixoo library get a timeout.
         import pixoo.objects.pixoo as _pixoo_module
+
         with _patch_lock:
             if not getattr(
                 getattr(_pixoo_module, "requests", _requests_module).post,

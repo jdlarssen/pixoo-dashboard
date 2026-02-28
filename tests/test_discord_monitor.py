@@ -31,8 +31,11 @@ class TestEmbedBuilders:
     def test_error_embed_has_required_fields(self):
         """Error embed contains Component, Error Type, Failing For, Last Success fields."""
         embed = error_embed(
-            "bus_api", "TimeoutError", "connect timed out",
-            120.0, "2026-02-24 10:00 UTC",
+            "bus_api",
+            "TimeoutError",
+            "connect timed out",
+            120.0,
+            "2026-02-24 10:00 UTC",
         )
         field_names = [f.name for f in embed.fields]
         assert "Component" in field_names
@@ -43,8 +46,11 @@ class TestEmbedBuilders:
     def test_error_embed_field_values(self):
         """Error embed field values contain expected content."""
         embed = error_embed(
-            "weather_api", "HTTPError", "503 Service Unavailable",
-            300.0, "2026-02-24 10:00 UTC",
+            "weather_api",
+            "HTTPError",
+            "503 Service Unavailable",
+            300.0,
+            "2026-02-24 10:00 UTC",
         )
         fields = {f.name: f.value for f in embed.fields}
         assert fields["Component"] == "weather_api"
@@ -90,8 +96,13 @@ class TestEmbedBuilders:
     def test_startup_embed_with_names(self):
         """Startup embed uses human-readable names when provided."""
         embed = startup_embed(
-            "10.0.0.5", "Q1", "Q2", 59.91, 10.75,
-            bus_name_dir1="Sentrum", bus_name_dir2="Lade",
+            "10.0.0.5",
+            "Q1",
+            "Q2",
+            59.91,
+            10.75,
+            bus_name_dir1="Sentrum",
+            bus_name_dir2="Lade",
             weather_location="Trondheim",
         )
         fields = {f.name: f.value for f in embed.fields}
@@ -129,7 +140,8 @@ class TestEmbedBuilders:
         components = {
             "bus_api": {"status": "ok", "failure_count": 0, "last_success": "2026-02-24 10:00 UTC"},
             "weather_api": {
-                "status": "down", "failure_count": 5,
+                "status": "down",
+                "failure_count": 5,
                 "downtime_s": 300.0,
                 "last_success": "2026-02-24 09:30 UTC",
             },
@@ -150,8 +162,10 @@ class TestEmbedBuilders:
         """Status embed shows DOWN with duration for failing components."""
         components = {
             "device": {
-                "status": "down", "failure_count": 10,
-                "downtime_s": 120.0, "last_success": "ago",
+                "status": "down",
+                "failure_count": 10,
+                "downtime_s": 120.0,
+                "last_success": "ago",
             },
         }
         embed = status_embed(components, 100.0)

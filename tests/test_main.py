@@ -33,9 +33,7 @@ class TestReverseGeocode:
     def test_returns_city_on_success(self, mock_get):
         """Successful geocode returns the city name from the address."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "address": {"city": "Trondheim", "county": "Trondelag"}
-        }
+        mock_response.json.return_value = {"address": {"city": "Trondheim", "county": "Trondelag"}}
         mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
 
@@ -52,9 +50,7 @@ class TestReverseGeocode:
     def test_falls_back_to_town(self, mock_get):
         """When 'city' is missing, falls back to 'town'."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "address": {"town": "Stjordal", "county": "Trondelag"}
-        }
+        mock_response.json.return_value = {"address": {"town": "Stjordal", "county": "Trondelag"}}
         mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
 
@@ -65,9 +61,7 @@ class TestReverseGeocode:
     def test_falls_back_to_municipality(self, mock_get):
         """When city and town are missing, falls back to 'municipality'."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "address": {"municipality": "Malvik"}
-        }
+        mock_response.json.return_value = {"address": {"municipality": "Malvik"}}
         mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
 
@@ -78,9 +72,7 @@ class TestReverseGeocode:
     def test_falls_back_to_village(self, mock_get):
         """When city, town, and municipality are missing, falls back to 'village'."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "address": {"village": "Hommelvik"}
-        }
+        mock_response.json.return_value = {"address": {"village": "Hommelvik"}}
         mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
 
@@ -91,9 +83,7 @@ class TestReverseGeocode:
     def test_returns_none_when_no_address_fields(self, mock_get):
         """Returns None when address has none of the expected fields."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "address": {"country": "Norway"}
-        }
+        mock_response.json.return_value = {"address": {"country": "Norway"}}
         mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
 
@@ -240,56 +230,119 @@ class TestShouldSwapAnimation:
 
     def test_same_conditions_no_swap(self):
         """Identical conditions should not trigger a swap."""
-        assert _should_swap_animation(
-            new_group="rain", is_night=False, precip_mm=2.0, wind_speed=4.0,
-            last_group="rain", last_night=False, last_precip_mm=2.0, last_wind_speed=4.0,
-        ) is False
+        assert (
+            _should_swap_animation(
+                new_group="rain",
+                is_night=False,
+                precip_mm=2.0,
+                wind_speed=4.0,
+                last_group="rain",
+                last_night=False,
+                last_precip_mm=2.0,
+                last_wind_speed=4.0,
+            )
+            is False
+        )
 
     def test_group_change_triggers_swap(self):
         """Different weather group triggers a swap."""
-        assert _should_swap_animation(
-            new_group="snow", is_night=False, precip_mm=2.0, wind_speed=4.0,
-            last_group="rain", last_night=False, last_precip_mm=2.0, last_wind_speed=4.0,
-        ) is True
+        assert (
+            _should_swap_animation(
+                new_group="snow",
+                is_night=False,
+                precip_mm=2.0,
+                wind_speed=4.0,
+                last_group="rain",
+                last_night=False,
+                last_precip_mm=2.0,
+                last_wind_speed=4.0,
+            )
+            is True
+        )
 
     def test_night_change_triggers_swap(self):
         """Day-to-night transition triggers a swap."""
-        assert _should_swap_animation(
-            new_group="clear", is_night=True, precip_mm=0.0, wind_speed=1.0,
-            last_group="clear", last_night=False, last_precip_mm=0.0, last_wind_speed=1.0,
-        ) is True
+        assert (
+            _should_swap_animation(
+                new_group="clear",
+                is_night=True,
+                precip_mm=0.0,
+                wind_speed=1.0,
+                last_group="clear",
+                last_night=False,
+                last_precip_mm=0.0,
+                last_wind_speed=1.0,
+            )
+            is True
+        )
 
     def test_precip_category_change_triggers_swap(self):
         """Precipitation crossing a category boundary triggers a swap."""
         # light (0.5) -> moderate (2.0)
-        assert _should_swap_animation(
-            new_group="rain", is_night=False, precip_mm=2.0, wind_speed=4.0,
-            last_group="rain", last_night=False, last_precip_mm=0.5, last_wind_speed=4.0,
-        ) is True
+        assert (
+            _should_swap_animation(
+                new_group="rain",
+                is_night=False,
+                precip_mm=2.0,
+                wind_speed=4.0,
+                last_group="rain",
+                last_night=False,
+                last_precip_mm=0.5,
+                last_wind_speed=4.0,
+            )
+            is True
+        )
 
     def test_precip_same_category_no_swap(self):
         """Precipitation within the same category does not trigger swap."""
         # both moderate (1.5 and 2.5)
-        assert _should_swap_animation(
-            new_group="rain", is_night=False, precip_mm=2.5, wind_speed=4.0,
-            last_group="rain", last_night=False, last_precip_mm=1.5, last_wind_speed=4.0,
-        ) is False
+        assert (
+            _should_swap_animation(
+                new_group="rain",
+                is_night=False,
+                precip_mm=2.5,
+                wind_speed=4.0,
+                last_group="rain",
+                last_night=False,
+                last_precip_mm=1.5,
+                last_wind_speed=4.0,
+            )
+            is False
+        )
 
     def test_wind_category_change_triggers_swap(self):
         """Wind speed crossing a category boundary triggers a swap."""
         # calm (1.0) -> strong (6.0)
-        assert _should_swap_animation(
-            new_group="rain", is_night=False, precip_mm=2.0, wind_speed=6.0,
-            last_group="rain", last_night=False, last_precip_mm=2.0, last_wind_speed=1.0,
-        ) is True
+        assert (
+            _should_swap_animation(
+                new_group="rain",
+                is_night=False,
+                precip_mm=2.0,
+                wind_speed=6.0,
+                last_group="rain",
+                last_night=False,
+                last_precip_mm=2.0,
+                last_wind_speed=1.0,
+            )
+            is True
+        )
 
     def test_wind_same_category_no_swap(self):
         """Wind speed within the same category does not trigger swap."""
         # both moderate (3.5 and 4.5)
-        assert _should_swap_animation(
-            new_group="rain", is_night=False, precip_mm=2.0, wind_speed=4.5,
-            last_group="rain", last_night=False, last_precip_mm=2.0, last_wind_speed=3.5,
-        ) is False
+        assert (
+            _should_swap_animation(
+                new_group="rain",
+                is_night=False,
+                precip_mm=2.0,
+                wind_speed=4.5,
+                last_group="rain",
+                last_night=False,
+                last_precip_mm=2.0,
+                last_wind_speed=3.5,
+            )
+            is False
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -366,9 +419,11 @@ class TestWatchdogThread:
             exit_codes.append(code)
             raise _WatchdogFired
 
-        with patch("src.main.os._exit", side_effect=capture_exit), \
-             patch("src.main.os.kill"), \
-             patch("src.main.time.sleep", return_value=None):
+        with (
+            patch("src.main.os._exit", side_effect=capture_exit),
+            patch("src.main.os.kill"),
+            patch("src.main.time.sleep", return_value=None),
+        ):
             try:
                 _watchdog_thread(heartbeat, timeout=1.0)
             except _WatchdogFired:
@@ -393,9 +448,11 @@ class TestWatchdogThread:
             # Actually sleep a tiny bit to let the thread run
             original_sleep(0.01)
 
-        with patch("src.main.os._exit", side_effect=lambda c: exit_called.set()), \
-             patch("src.main.os.kill"), \
-             patch("src.main.time.sleep", side_effect=counting_sleep):
+        with (
+            patch("src.main.os._exit", side_effect=lambda c: exit_called.set()),
+            patch("src.main.os.kill"),
+            patch("src.main.time.sleep", side_effect=counting_sleep),
+        ):
             try:
                 _watchdog_thread(heartbeat, timeout=10.0)
             except StopIteration:
@@ -420,10 +477,12 @@ class TestWatchdogThread:
             raise _WatchdogFired
 
         # time.monotonic returns base_time + 200 (so elapsed = 200)
-        with patch("src.main.os._exit", side_effect=capture_exit), \
-             patch("src.main.os.kill"), \
-             patch("src.main.time.sleep", return_value=None), \
-             patch("src.main.time.monotonic", return_value=base_time + 200):
+        with (
+            patch("src.main.os._exit", side_effect=capture_exit),
+            patch("src.main.os.kill"),
+            patch("src.main.time.sleep", return_value=None),
+            patch("src.main.time.monotonic", return_value=base_time + 200),
+        ):
             try:
                 _watchdog_thread(heartbeat, timeout=120)
             except _WatchdogFired:
@@ -590,8 +649,12 @@ class TestStalenessLogic:
     def test_weather_too_old_results_in_none_effective_data(self):
         """When weather data is too old, effective_weather should be None."""
         weather_data = WeatherData(
-            temperature=15.0, symbol_code="cloudy", high_temp=18.0,
-            low_temp=10.0, precipitation_mm=0.0, is_day=True,
+            temperature=15.0,
+            symbol_code="cloudy",
+            high_temp=18.0,
+            low_temp=10.0,
+            precipitation_mm=0.0,
+            is_day=True,
         )
         weather_too_old = True
         effective_weather = None if weather_too_old else weather_data
@@ -600,8 +663,12 @@ class TestStalenessLogic:
     def test_weather_not_too_old_preserves_data(self):
         """When weather data is not too old, effective_weather preserves actual data."""
         weather_data = WeatherData(
-            temperature=15.0, symbol_code="cloudy", high_temp=18.0,
-            low_temp=10.0, precipitation_mm=0.0, is_day=True,
+            temperature=15.0,
+            symbol_code="cloudy",
+            high_temp=18.0,
+            low_temp=10.0,
+            precipitation_mm=0.0,
+            is_day=True,
         )
         weather_too_old = False
         effective_weather = None if weather_too_old else weather_data
@@ -672,8 +739,10 @@ class TestTestWeatherMode:
             if call_count[0] >= 1:
                 raise KeyboardInterrupt
 
-        with patch("src.main.time.sleep", side_effect=break_after_one), \
-             patch("src.main.threading.Thread") as mock_thread:
+        with (
+            patch("src.main.time.sleep", side_effect=break_after_one),
+            patch("src.main.threading.Thread") as mock_thread,
+        ):
             # Prevent watchdog thread from actually starting
             mock_thread.return_value = MagicMock()
 
@@ -725,9 +794,11 @@ class TestTestWeatherMode:
             if call_count[0] >= 1:
                 raise KeyboardInterrupt
 
-        with patch("src.main.time.sleep", side_effect=break_after_one), \
-             patch("src.main.threading.Thread") as mock_thread, \
-             patch("src.main.fetch_weather_safe") as mock_weather_api:
+        with (
+            patch("src.main.time.sleep", side_effect=break_after_one),
+            patch("src.main.threading.Thread") as mock_thread,
+            patch("src.main.fetch_weather_safe") as mock_weather_api,
+        ):
             mock_thread.return_value = MagicMock()
 
             try:
@@ -756,41 +827,53 @@ class TestTestWeatherMode:
         for mode in expected_modes:
             # Construct the WeatherData the same way main_loop does
             _b = dict(
-                temperature=30, high_temp=32,
-                low_temp=22, is_day=True,
+                temperature=30,
+                high_temp=32,
+                low_temp=22,
+                is_day=True,
             )
             data = {
                 "clear": WeatherData(
-                    **_b, symbol_code="clearsky_day",
-                    precipitation_mm=0.0, wind_speed=2.0,
+                    **_b,
+                    symbol_code="clearsky_day",
+                    precipitation_mm=0.0,
+                    wind_speed=2.0,
                     wind_from_direction=180.0,
                 ),
                 "rain": WeatherData(
-                    **_b, symbol_code="rain_day",
-                    precipitation_mm=5.0, wind_speed=8.0,
+                    **_b,
+                    symbol_code="rain_day",
+                    precipitation_mm=5.0,
+                    wind_speed=8.0,
                     wind_from_direction=270.0,
                 ),
                 "snow": WeatherData(
-                    **_b, symbol_code="snow_day",
-                    precipitation_mm=2.0, wind_speed=5.0,
+                    **_b,
+                    symbol_code="snow_day",
+                    precipitation_mm=2.0,
+                    wind_speed=5.0,
                     wind_from_direction=200.0,
                 ),
                 "fog": WeatherData(
-                    **_b, symbol_code="fog",
+                    **_b,
+                    symbol_code="fog",
                     precipitation_mm=0.0,
                 ),
                 "cloudy": WeatherData(
-                    **_b, symbol_code="cloudy",
+                    **_b,
+                    symbol_code="cloudy",
                     precipitation_mm=0.0,
                 ),
                 "sun": WeatherData(
-                    **_b, symbol_code="clearsky_day",
+                    **_b,
+                    symbol_code="clearsky_day",
                     precipitation_mm=0.0,
                 ),
                 "thunder": WeatherData(
                     **_b,
                     symbol_code="rainandthunder_day",
-                    precipitation_mm=8.0, wind_speed=12.0,
+                    precipitation_mm=8.0,
+                    wind_speed=12.0,
                     wind_from_direction=250.0,
                 ),
             }

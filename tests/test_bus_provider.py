@@ -59,9 +59,7 @@ class TestCountdownCalculation:
         dep2 = now + timedelta(minutes=12, seconds=10)  # 12.17 min -> ceil -> 13
 
         mock_response = MagicMock()
-        mock_response.json.return_value = _make_entur_response(
-            [_make_call(dep1), _make_call(dep2)]
-        )
+        mock_response.json.return_value = _make_entur_response([_make_call(dep1), _make_call(dep2)])
         mock_response.raise_for_status = MagicMock()
         mock_post.return_value = mock_response
 
@@ -82,9 +80,7 @@ class TestCountdownCalculation:
         past_dep = now - timedelta(minutes=2)  # 2 minutes ago
 
         mock_response = MagicMock()
-        mock_response.json.return_value = _make_entur_response(
-            [_make_call(past_dep)]
-        )
+        mock_response.json.return_value = _make_entur_response([_make_call(past_dep)])
         mock_response.raise_for_status = MagicMock()
         mock_post.return_value = mock_response
 
@@ -104,9 +100,7 @@ class TestCountdownCalculation:
         imminent = now + timedelta(seconds=30)  # 0.5 min -> ceil -> 1
 
         mock_response = MagicMock()
-        mock_response.json.return_value = _make_entur_response(
-            [_make_call(imminent)]
-        )
+        mock_response.json.return_value = _make_entur_response([_make_call(imminent)])
         mock_response.raise_for_status = MagicMock()
         mock_post.return_value = mock_response
 
@@ -134,11 +128,13 @@ class TestCancellationFiltering:
         dep3 = now + timedelta(minutes=15)
 
         mock_response = MagicMock()
-        mock_response.json.return_value = _make_entur_response([
-            _make_call(dep1),
-            _make_call(dep2, cancellation=True),
-            _make_call(dep3),
-        ])
+        mock_response.json.return_value = _make_entur_response(
+            [
+                _make_call(dep1),
+                _make_call(dep2, cancellation=True),
+                _make_call(dep3),
+            ]
+        )
         mock_response.raise_for_status = MagicMock()
         mock_post.return_value = mock_response
 
@@ -160,10 +156,12 @@ class TestCancellationFiltering:
         dep2 = now + timedelta(minutes=10)
 
         mock_response = MagicMock()
-        mock_response.json.return_value = _make_entur_response([
-            _make_call(dep1, cancellation=True),
-            _make_call(dep2, cancellation=True),
-        ])
+        mock_response.json.return_value = _make_entur_response(
+            [
+                _make_call(dep1, cancellation=True),
+                _make_call(dep2, cancellation=True),
+            ]
+        )
         mock_response.raise_for_status = MagicMock()
         mock_post.return_value = mock_response
 
@@ -282,9 +280,7 @@ class TestErrorHandling:
         dep2 = now + timedelta(minutes=9)
 
         mock_response = MagicMock()
-        mock_response.json.return_value = _make_entur_response(
-            [_make_call(dep1), _make_call(dep2)]
-        )
+        mock_response.json.return_value = _make_entur_response([_make_call(dep1), _make_call(dep2)])
         mock_response.raise_for_status = MagicMock()
         mock_post.return_value = mock_response
 

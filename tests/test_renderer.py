@@ -411,9 +411,7 @@ class TestStalenessIndicator:
         )
         frame = render_frame(state, FONTS)
         pixel = frame.getpixel((62, BUS_ZONE.y + 1))
-        assert pixel != COLOR_STALE_INDICATOR, (
-            "Orange dot should not appear when bus_stale=False"
-        )
+        assert pixel != COLOR_STALE_INDICATOR, "Orange dot should not appear when bus_stale=False"
 
     def test_bus_staleness_dot_absent_when_too_old(self):
         """No orange dot when bus_too_old=True (suppresses dot)."""
@@ -425,9 +423,7 @@ class TestStalenessIndicator:
         )
         frame = render_frame(state, FONTS)
         pixel = frame.getpixel((62, BUS_ZONE.y + 1))
-        assert pixel != COLOR_STALE_INDICATOR, (
-            "Orange dot should not appear when bus_too_old=True"
-        )
+        assert pixel != COLOR_STALE_INDICATOR, "Orange dot should not appear when bus_too_old=True"
 
     def test_weather_staleness_dot_renders_when_stale(self):
         """Orange dot at (62, WEATHER_ZONE.y+1) when stale."""

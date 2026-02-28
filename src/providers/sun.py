@@ -43,6 +43,7 @@ def get_sun_times(lat: float, lon: float, d: date) -> dict[str, datetime]:
         # Polar night or midnight sun — astral can't compute dawn/dusk.
         # Detect which case: try noon sun elevation.
         from astral.sun import elevation
+
         noon = datetime(d.year, d.month, d.day, 12, 0, tzinfo=timezone.utc)
         elev = elevation(observer, noon)
         if elev > 0:
