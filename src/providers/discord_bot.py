@@ -123,6 +123,10 @@ def run_discord_bot(
     @client.event
     async def on_ready():
         logger.info("Discord bot connected as %s", client.user)
+        # Signal "alive" only after the bot is actually connected, not before
+        # attempting connection (avoids race in _run_discord_bot_with_retry).
+        if bot_dead_event is not None:
+            bot_dead_event.clear()
         if on_ready_callback is not None:
             try:
                 await asyncio.get_event_loop().run_in_executor(None, on_ready_callback, client)
@@ -201,10 +205,9 @@ def _run_discord_bot_with_retry(
     max_retries = 20
     retries = 0
     while True:
-        # Clear the dead event before each attempt so the main loop sees it fresh
-        dead_event = kwargs.get("bot_dead_event")
-        if dead_event is not None:
-            dead_event.clear()
+        # NOTE: dead_event is cleared by the on_ready callback inside
+        # run_discord_bot, not here, to avoid a race where the main loop
+        # sees "alive" before the bot actually reconnects.
         try:
             run_discord_bot(bridge, token, channel_id, **kwargs)
             break  # clean disconnect, don't retry
@@ -239,8 +242,8 @@ def _run_discord_bot_with_retry(
             )
             time.sleep(sleep_time)
             backoff = min(backoff * 2, 300)
-        except Exception:
-            logger.critical("Discord bot hit unexpected error, not retrying", exc_info=True)
+        except Exception as exc:
+            logger.critical("Discord bot hit unexpected error, not retrying: %s", exc, exc_info=True)
             break
 
 

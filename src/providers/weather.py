@@ -31,13 +31,28 @@ class WeatherCache:
         self._cache_time: float = 0.0
         self._lock = threading.Lock()
         self._max_age = max_age
+        self._fetching = False
 
     def get(self) -> tuple[dict | None, str | None]:
-        """Return (cached_data, last_modified) if cache is fresh, else (None, None)."""
+        """Return (cached_data, last_modified) if cache is fresh, else (None, None).
+
+        If another thread is already fetching, returns stale data to avoid
+        thundering herd against the MET API.
+        """
         with self._lock:
             if self._data and (time.monotonic() - self._cache_time) < self._max_age:
                 return self._data, self._last_modified
+            if self._fetching and self._data:
+                return self._data, self._last_modified
             return None, None
+
+    def mark_fetching(self) -> bool:
+        """Mark cache as being refreshed. Returns True if caller should fetch."""
+        with self._lock:
+            if self._fetching:
+                return False
+            self._fetching = True
+            return True
 
     def set(self, data: dict, last_modified: str | None) -> None:
         """Store response data and last-modified header."""
@@ -45,6 +60,12 @@ class WeatherCache:
             self._data = data
             self._last_modified = last_modified
             self._cache_time = time.monotonic()
+            self._fetching = False
+
+    def clear_fetching(self) -> None:
+        """Clear fetching flag on error (so next caller retries)."""
+        with self._lock:
+            self._fetching = False
 
 
 # Module-level default instance for backward compat
@@ -189,30 +210,45 @@ def fetch_weather(
     cache = cache or _default_cache
     cached_data, last_modified = cache.get()
 
-    headers: dict[str, str] = {"User-Agent": WEATHER_USER_AGENT}
-    if last_modified and cached_data:
-        headers["If-Modified-Since"] = last_modified
-
-    response = requests.get(
-        WEATHER_API_URL,
-        params={"lat": f"{lat:.4f}", "lon": f"{lon:.4f}"},
-        headers=headers,
-        timeout=10,
-    )
-
-    if response.status_code == 429:
-        retry_after = int(response.headers.get("Retry-After", 5))
-        logger.warning("Rate-limited by API, backing off %ds", retry_after)
-        time.sleep(min(retry_after, 30))  # Cap at 30s to avoid excessive waits
-        return None
-
-    if response.status_code == 304 and cached_data:
-        # Data unchanged, parse from cache
+    if cached_data:
+        # Cache is fresh (or another thread is already fetching); use cached data
         data = cached_data
     else:
-        response.raise_for_status()
-        data = response.json()
-        cache.set(data, response.headers.get("Last-Modified"))
+        # Cache miss — try to become the fetching thread
+        if not cache.mark_fetching():
+            # Another thread won the race; no stale data available, bail out
+            return None
+
+        try:
+            headers: dict[str, str] = {"User-Agent": WEATHER_USER_AGENT}
+            if last_modified:
+                headers["If-Modified-Since"] = last_modified
+
+            response = requests.get(
+                WEATHER_API_URL,
+                params={"lat": f"{lat:.4f}", "lon": f"{lon:.4f}"},
+                headers=headers,
+                timeout=10,
+            )
+
+            if response.status_code == 429:
+                retry_after = int(response.headers.get("Retry-After", 5))
+                logger.warning("Rate-limited by API, backing off %ds", retry_after)
+                time.sleep(min(retry_after, 30))  # Cap at 30s to avoid excessive waits
+                cache.clear_fetching()
+                return None
+
+            if response.status_code == 304 and cached_data:
+                # Data unchanged, parse from cache
+                data = cached_data
+                cache.clear_fetching()
+            else:
+                response.raise_for_status()
+                data = response.json()
+                cache.set(data, response.headers.get("Last-Modified"))
+        except Exception:
+            cache.clear_fetching()
+            raise
 
     timeseries = data["properties"]["timeseries"]
     current = _parse_current(timeseries)
