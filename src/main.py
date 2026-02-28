@@ -108,6 +108,7 @@ def main_loop(
     message_bridge: MessageBridge | None = None,
     health_tracker: HealthTracker | None = None,
     bot_dead_event: threading.Event | None = None,
+    stop_event: threading.Event | None = None,
 ) -> None:
     """Run the dashboard main loop.
 
@@ -126,6 +127,7 @@ def main_loop(
         message_bridge: Optional MessageBridge from Discord bot for message override.
         health_tracker: Optional HealthTracker for monitoring integration.
         bot_dead_event: Optional threading.Event set when Discord bot thread dies.
+        stop_event: Optional threading.Event for graceful shutdown signalling.
     """
     # --- TEST MODE: hardcode weather for visual testing ---
     # Set TEST_WEATHER env var to: clear, rain, snow, fog (cycles on restart)
@@ -185,7 +187,11 @@ def main_loop(
 
     # Watchdog: detect hung main loop and force-exit for launchd restart
     heartbeat = Heartbeat()
-    watchdog = threading.Thread(target=_watchdog_thread, args=(heartbeat,), daemon=True)
+    if stop_event is None:
+        stop_event = threading.Event()
+    watchdog = threading.Thread(
+        target=_watchdog_thread, args=(heartbeat,), kwargs={"stop_event": stop_event}, daemon=True
+    )
     watchdog.start()
     logger.info("Watchdog started (timeout=%ds)", WATCHDOG_TIMEOUT)
 
@@ -197,7 +203,7 @@ def main_loop(
     bus_breaker = CircuitBreaker("Bus API", failure_threshold=3, reset_timeout=300)
     weather_breaker = CircuitBreaker("Weather API", failure_threshold=3, reset_timeout=300)
 
-    while True:
+    while not stop_event.is_set():
         now_mono = time.monotonic()
         now_utc = datetime.now(timezone.utc)
 
@@ -294,7 +300,10 @@ def main() -> None:
     """Parse arguments and start the dashboard."""
     validate_config()
 
+    stop_event = threading.Event()
+
     def _sigterm_handler(signum, frame):
+        stop_event.set()
         raise KeyboardInterrupt
 
     signal.signal(signal.SIGTERM, _sigterm_handler)
@@ -407,8 +416,10 @@ def main() -> None:
             message_bridge=message_bridge,
             health_tracker=health_tracker,
             bot_dead_event=bot_dead_event,
+            stop_event=stop_event,
         )
     except KeyboardInterrupt:
+        stop_event.set()
         logger.info("Shutting down")
         # Best-effort shutdown embed -- wait briefly for delivery
         if monitor_bridge_ref[0]:
