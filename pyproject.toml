@@ -14,8 +14,8 @@ dependencies = [
 [project.optional-dependencies]
 discord = ["discord.py>=2.0,<3"]
 dev = [
-    "pytest",
-    "ruff",
+    "pytest>=7.0,<9",
+    "ruff>=0.4,<1",
 ]
 
 [tool.ruff]

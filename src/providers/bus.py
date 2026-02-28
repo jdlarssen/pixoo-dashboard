@@ -7,6 +7,7 @@ countdown minutes until each departure.
 import atexit
 import logging
 import math
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -177,8 +178,19 @@ def fetch_quay_name(quay_id: str) -> str | None:
         return None
 
 
-_bus_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="bus-fetch")
-atexit.register(_bus_executor.shutdown, wait=False)
+_bus_executor: ThreadPoolExecutor | None = None
+_executor_lock = threading.Lock()
+
+
+def _get_executor() -> ThreadPoolExecutor:
+    """Return (and lazily create) the shared bus-fetch thread pool."""
+    global _bus_executor
+    if _bus_executor is None:
+        with _executor_lock:
+            if _bus_executor is None:
+                _bus_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="bus-fetch")
+                atexit.register(_bus_executor.shutdown, wait=False)
+    return _bus_executor
 
 
 def _safe_result(fut, timeout=12):
@@ -197,8 +209,9 @@ def fetch_bus_data() -> tuple[list[int] | None, list[int] | None]:
         Tuple of (direction1_minutes, direction2_minutes).
         Each element is a list of countdown minutes or None on failure.
     """
-    fut1 = _bus_executor.submit(fetch_departures_safe, BUS_QUAY_DIRECTION1, BUS_NUM_DEPARTURES)
-    fut2 = _bus_executor.submit(fetch_departures_safe, BUS_QUAY_DIRECTION2, BUS_NUM_DEPARTURES)
+    executor = _get_executor()
+    fut1 = executor.submit(fetch_departures_safe, BUS_QUAY_DIRECTION1, BUS_NUM_DEPARTURES)
+    fut2 = executor.submit(fetch_departures_safe, BUS_QUAY_DIRECTION2, BUS_NUM_DEPARTURES)
     dir1 = _safe_result(fut1, timeout=12)
     dir2 = _safe_result(fut2, timeout=12)
     return (dir1, dir2)

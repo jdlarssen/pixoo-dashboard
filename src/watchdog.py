@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import os
 import signal
+import threading
 import time
 
 logger = logging.getLogger(__name__)
@@ -30,16 +31,27 @@ class Heartbeat:
         return time.monotonic() - self._timestamp
 
 
-def watchdog_thread(heartbeat: Heartbeat, timeout: float = 120) -> None:
+def watchdog_thread(
+    heartbeat: Heartbeat,
+    timeout: float = 120,
+    stop_event: threading.Event | None = None,
+) -> None:
     """Monitor main loop heartbeat; force-kill if stale.
 
     Runs as a daemon thread. Checks every 30s whether the main loop
     has updated its heartbeat timestamp. If the heartbeat is older than
     *timeout* seconds, logs a critical message and calls os._exit(1)
     so launchd can restart the process.
+
+    If *stop_event* is provided and set, the watchdog exits cleanly.
     """
-    while True:
-        time.sleep(30)
+    while not (stop_event and stop_event.is_set()):
+        if stop_event:
+            stop_event.wait(timeout=30)
+            if stop_event.is_set():
+                break
+        else:
+            time.sleep(30)
         elapsed = heartbeat.elapsed
         if elapsed > timeout:
             logger.critical(
@@ -52,3 +64,4 @@ def watchdog_thread(heartbeat: Heartbeat, timeout: float = 120) -> None:
             logger.critical("Watchdog: still alive after SIGTERM grace period, forcing exit")
             logging.shutdown()  # flush all handlers before hard exit
             os._exit(1)
+    logger.info("Watchdog stopped cleanly")
