@@ -30,6 +30,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+MAX_MESSAGE_LENGTH = 200
+
 
 class MessageBridge:
     """Thread-safe bridge for passing messages from Discord bot to main loop.
@@ -96,7 +98,9 @@ def run_discord_bot(
     """
     import discord
 
-    intents = discord.Intents.default()
+    intents = discord.Intents.none()
+    intents.guilds = True
+    intents.guild_messages = True
     intents.message_content = True
     client = discord.Client(intents=intents)
 
@@ -126,6 +130,13 @@ def run_discord_bot(
                 bridge.set_message(None)
                 logger.info("Display message cleared via Discord")
             else:
+                if len(content) > MAX_MESSAGE_LENGTH:
+                    logger.warning(
+                        "Discord message truncated from %d to %d chars",
+                        len(content),
+                        MAX_MESSAGE_LENGTH,
+                    )
+                    content = content[:MAX_MESSAGE_LENGTH]
                 bridge.set_message(content)
                 logger.info("Display message set: %s", content[:50])
 

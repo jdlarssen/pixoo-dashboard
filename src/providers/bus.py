@@ -88,7 +88,10 @@ def fetch_departures(quay_id: str, num_departures: int = 2) -> list[BusDeparture
         timeout=10,
     )
     if response.status_code == 429:
-        retry_after = int(response.headers.get("Retry-After", 5))
+        try:
+            retry_after = int(response.headers.get("Retry-After", 5))
+        except (ValueError, TypeError):
+            retry_after = 5
         logger.warning("Rate-limited by API, backing off %ds", retry_after)
         time.sleep(min(retry_after, 30))  # Cap at 30s to avoid excessive waits
         return []
@@ -166,7 +169,10 @@ def fetch_quay_name(quay_id: str) -> str | None:
             timeout=10,
         )
         if response.status_code == 429:
-            retry_after = int(response.headers.get("Retry-After", 5))
+            try:
+                retry_after = int(response.headers.get("Retry-After", 5))
+            except (ValueError, TypeError):
+                retry_after = 5
             logger.warning("Rate-limited by API, backing off %ds", retry_after)
             time.sleep(min(retry_after, 30))  # Cap at 30s to avoid excessive waits
             return None

@@ -3,6 +3,7 @@
 import ipaddress
 import logging
 import os
+import subprocess
 import sys
 import threading
 from datetime import datetime
@@ -13,6 +14,23 @@ from typing import TYPE_CHECKING
 from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
+
+
+def _get_keychain_secret(service: str, account: str) -> str | None:
+    """Retrieve a secret from macOS Keychain. Returns None on any failure."""
+    try:
+        cmd = ["security", "find-generic-password", "-a", account, "-s", service, "-w"]
+        result = subprocess.run(  # noqa: S603
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        pass
+    return None
 
 
 class Config:
@@ -101,7 +119,9 @@ class Config:
         )
 
         # Discord message override settings
-        self.DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN")
+        self.DISCORD_BOT_TOKEN = _get_keychain_secret(
+            "discord-bot-token", "discord-bot-token"
+        ) or os.environ.get("DISCORD_BOT_TOKEN")
         self.DISCORD_CHANNEL_ID = os.environ.get("DISCORD_CHANNEL_ID")
         self.DISCORD_MONITOR_CHANNEL_ID = os.environ.get(
             "DISCORD_MONITOR_CHANNEL_ID",
